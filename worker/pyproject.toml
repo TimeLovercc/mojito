@@ -1,0 +1,21 @@
+[project]
+name = "mojito-worker"
+version = "0.1.0"
+description = "mojito local worker: notes, refresh, reviews, feeds and chat with read-only local data"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "google-auth>=2.58.1",
+    "httpx>=0.28.1",
+    "pillow>=12.3.0",
+    "python-dotenv>=1.2.3",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+mojito-worker = "mojito_worker:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

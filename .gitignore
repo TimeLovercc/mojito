@@ -1,0 +1,31 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+# node / expo
+node_modules/
+.expo/
+dist/
+dist-pwa/
+android/
+ios/
+# data & secrets
+*.db
+*.sqlite
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+credentials.json
+google-services.json
+# build products
+*.apk
+*.aab
+*.dmg
+*.app/
+# local notes, handoffs and editor/OS files that never belong in the repo
+.handoff/
+.kickoff.md
+.claude/settings.local.json
+.DS_Store

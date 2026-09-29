@@ -1,0 +1,113 @@
+{
+  "expo": {
+    "name": "Mojito",
+    "slug": "mojito",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "mojito",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#111111",
+    "android": {
+      "package": "com.example.mojito",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "allowBackup": false,
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "./plugins/with-release-signing.js",
+      "expo-font",
+      "./plugins/with-local-cleartext.js",
+      "./plugins/with-google-services.js",
+      "./plugins/with-gradle-memory.js",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#e9c27a",
+          "defaultChannel": "digest"
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/geist-mono/400Regular/GeistMono_400Regular.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "Today",
+              "label": "Mojito 今天",
+              "description": "今天到期、等你拍板件数、下一个日程",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "Big",
+              "label": "Mojito 今天（大）",
+              "description": "今天到期、等你拍板、被忘了，底部笔记和对话",
+              "minWidth": "250dp",
+              "minHeight": "390dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 6,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "Note",
+              "label": "Mojito 笔记",
+              "description": "点一下直接写笔记",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "resizeMode": "none"
+            }
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "让 Mojito 从相册选图发给 Claude 看",
+          "cameraPermission": "让 Mojito 拍照发给 Claude 看",
+          "microphonePermission": false
+        }
+      ],
+      "./plugins/with-config-changes.js"
+    ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "extra": {
+      "router": {}
+    }
+  }
+}

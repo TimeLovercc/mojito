@@ -1,0 +1,25 @@
+[Unit]
+Description=mojito server-side lightweight agent (chat, morning/evening)
+After=network-online.target mojito-hub.service
+Wants=network-online.target
+
+[Service]
+User=mojito
+Group=mojito
+WorkingDirectory=/opt/mojito/agent
+EnvironmentFile=/var/lib/mojito/agent.env
+ExecStart=/usr/local/bin/uv run --frozen --no-sync mojito-agent
+Restart=always
+RestartSec=5
+# Sized for a 1GB VM: cap the agent (including claude -p children) and let the OOM killer take it before the hub.
+MemoryMax=450M
+OOMScoreAdjust=900
+NoNewPrivileges=true
+ProtectSystem=strict
+# mojito's HOME is /var/lib/mojito; claude -p writes ~/.claude there.
+ReadWritePaths=/var/lib/mojito
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

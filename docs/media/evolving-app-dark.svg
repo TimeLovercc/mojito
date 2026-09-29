@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
+<title>Traditional app vs. Mojito, an evolving app</title>
+<desc>Left: a traditional app, a UI on top of a large hard-coded backend of services, rules and pipelines; every change waits for the next release. Right: Mojito, the same UI on a thin hub on your server. On your Mac (or a Mac mini) an agent, Claude Code, can read your context (mail, calendar, files, logins) and the app's own code and design. You ask in plain words, for example "Put the next step on top, in bold.", and the agent rewrites the app; changes it judges risky wait for your OK.</desc>
+<defs>
+  <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#3FBF73" stop-opacity="0.42"/>
+    <stop offset="0.45" stop-color="#3FBF73" stop-opacity="0.189"/>
+    <stop offset="1" stop-color="#3FBF73" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#5BD48F"/>
+    <stop offset="1" stop-color="#1F7A45"/>
+  </linearGradient>
+</defs>
+<rect x="1" y="1" width="1598" height="898" rx="24" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/>
+<path d="M800 64V860" stroke="#30363D" stroke-width="1.5" stroke-dasharray="4 6"/>
+<circle cx="800" cy="470" r="22" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/>
+<text x="800" y="476" font-size="16" font-weight="600" fill="#9198A1" text-anchor="middle">vs</text>
+<text x="56" y="84" font-size="34" font-weight="700" fill="#E6EDF3" text-anchor="start">Traditional app</text>
+<text x="56" y="118" font-size="20" font-weight="400" fill="#9198A1" text-anchor="start">Frozen code: someone else decides what it does.</text>
+<rect x="56" y="146" width="708" height="108" rx="14" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/><text x="82" y="193" font-size="22" font-weight="600" fill="#E6EDF3" text-anchor="start">App UI</text><text x="82" y="221" font-size="17" font-weight="400" fill="#9198A1" text-anchor="start">phone · Mac · web</text><rect x="304" y="168.0" width="136" height="64" rx="9" fill="#151B23" stroke="#30363D" stroke-width="1.5"/><circle cx="321" cy="186.0" r="4.5" fill="#6E7681"/><rect x="333" y="182.0" width="78" height="8" rx="4" fill="#9198A1" fill-opacity="0.55"/><rect x="316" y="200.0" width="104" height="6" rx="3" fill="#262C36"/><rect x="316" y="212.0" width="70" height="6" rx="3" fill="#262C36"/><rect x="454" y="168.0" width="136" height="64" rx="9" fill="#151B23" stroke="#30363D" stroke-width="1.5"/><circle cx="471" cy="186.0" r="4.5" fill="#6E7681"/><rect x="483" y="182.0" width="68" height="8" rx="4" fill="#9198A1" fill-opacity="0.55"/><rect x="466" y="200.0" width="96" height="6" rx="3" fill="#262C36"/><rect x="466" y="212.0" width="76" height="6" rx="3" fill="#262C36"/><rect x="604" y="168.0" width="136" height="64" rx="9" fill="#151B23" stroke="#30363D" stroke-width="1.5"/><circle cx="621" cy="186.0" r="4.5" fill="#6E7681"/><rect x="633" y="182.0" width="58" height="8" rx="4" fill="#9198A1" fill-opacity="0.55"/><rect x="616" y="200.0" width="88" height="6" rx="3" fill="#262C36"/><rect x="616" y="212.0" width="82" height="6" rx="3" fill="#262C36"/>
+<path d="M116 254V290" stroke="#6E7681" stroke-width="2"/>
+<path d="M214 254V290" stroke="#6E7681" stroke-width="2"/>
+<path d="M312 254V290" stroke="#6E7681" stroke-width="2"/>
+<path d="M410 254V290" stroke="#6E7681" stroke-width="2"/>
+<path d="M508 254V290" stroke="#6E7681" stroke-width="2"/>
+<path d="M606 254V290" stroke="#6E7681" stroke-width="2"/>
+<path d="M704 254V290" stroke="#6E7681" stroke-width="2"/>
+<rect x="56" y="290" width="708" height="492" rx="14" fill="#151B23" stroke="#30363D" stroke-width="1.5"/>
+<text x="80" y="330" font-size="22" font-weight="600" fill="#E6EDF3">Backend<tspan dx="12" font-size="17" font-weight="400" fill="#9198A1">hard-coded services, rules and pipelines</tspan></text>
+<polygon points="708.0,322.0 711.7,325.1 710.8,328.1 706.0,328.7 704.5,330.5 704.9,335.3 702.1,336.8 698.3,333.8 696.0,334.0 692.9,337.7 689.9,336.8 689.3,332.0 687.5,330.5 682.7,330.9 681.2,328.1 684.2,324.3 684.0,322.0 680.3,318.9 681.2,315.9 686.0,315.3 687.5,313.5 687.1,308.7 689.9,307.2 693.7,310.2 696.0,310.0 699.1,306.3 702.1,307.2 702.7,312.0 704.5,313.5 709.3,313.1 710.8,315.9 707.8,319.7" fill="none" stroke="#6E7681" stroke-width="1.5" stroke-linejoin="round"/><circle cx="696" cy="322" r="4.5" fill="none" stroke="#6E7681" stroke-width="1.5"/>
+<polygon points="732.5,338.0 734.7,340.4 733.9,342.8 730.6,343.3 729.3,344.6 728.8,347.9 726.4,348.7 724.0,346.5 722.1,346.3 719.2,347.9 717.1,346.6 717.4,343.3 716.3,341.7 713.3,340.4 713.0,338.0 715.7,336.1 716.3,334.3 715.4,331.1 717.1,329.4 720.3,330.3 722.1,329.7 724.0,327.0 726.4,327.3 727.7,330.3 729.3,331.4 732.6,331.1 733.9,333.2 732.3,336.1" fill="none" stroke="#6E7681" stroke-width="1.5" stroke-linejoin="round"/><circle cx="724" cy="338" r="3" fill="none" stroke="#6E7681" stroke-width="1.5"/>
+<rect x="80" y="360" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="94" cy="374" r="3" fill="#6E7681"/>
+<rect x="102" y="372" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="155.0" y="404" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">API gateway</text>
+<rect x="250" y="360" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="264" cy="374" r="3" fill="#6E7681"/>
+<rect x="272" y="372" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="325.0" y="404" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Auth service</text>
+<rect x="420" y="360" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="434" cy="374" r="3" fill="#6E7681"/>
+<rect x="442" y="372" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="495.0" y="404" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Session store</text>
+<rect x="590" y="360" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="604" cy="374" r="3" fill="#6E7681"/>
+<rect x="612" y="372" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="665.0" y="404" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Rate limiter</text>
+<rect x="80" y="440" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="94" cy="454" r="3" fill="#6E7681"/>
+<rect x="102" y="452" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="155.0" y="484" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Rules engine</text>
+<rect x="250" y="440" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="264" cy="454" r="3" fill="#6E7681"/>
+<rect x="272" y="452" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="325.0" y="484" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Feature flags</text>
+<rect x="420" y="440" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="434" cy="454" r="3" fill="#6E7681"/>
+<rect x="442" y="452" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="495.0" y="484" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Permissions</text>
+<rect x="590" y="440" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="604" cy="454" r="3" fill="#6E7681"/>
+<rect x="612" y="452" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="665.0" y="484" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Config</text>
+<rect x="80" y="520" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="94" cy="534" r="3" fill="#6E7681"/>
+<rect x="102" y="532" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="155.0" y="564" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Recommender</text>
+<rect x="250" y="520" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="264" cy="534" r="3" fill="#6E7681"/>
+<rect x="272" y="532" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="325.0" y="564" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Ranking model</text>
+<rect x="420" y="520" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="434" cy="534" r="3" fill="#6E7681"/>
+<rect x="442" y="532" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="495.0" y="564" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Search index</text>
+<rect x="590" y="520" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="604" cy="534" r="3" fill="#6E7681"/>
+<rect x="612" y="532" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="665.0" y="564" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Moderation</text>
+<rect x="80" y="600" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="94" cy="614" r="3" fill="#6E7681"/>
+<rect x="102" y="612" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="155.0" y="644" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Event queue</text>
+<path d="M232 632.0H246" stroke="#6E7681" stroke-width="1.5"/>
+<polygon points="249,632.0 243,627.8 243,636.2" fill="#6E7681"/>
+<rect x="250" y="600" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="264" cy="614" r="3" fill="#6E7681"/>
+<rect x="272" y="612" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="325.0" y="644" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">ETL job</text>
+<path d="M402 632.0H416" stroke="#6E7681" stroke-width="1.5"/>
+<polygon points="419,632.0 413,627.8 413,636.2" fill="#6E7681"/>
+<rect x="420" y="600" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="434" cy="614" r="3" fill="#6E7681"/>
+<rect x="442" y="612" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="495.0" y="644" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Warehouse</text>
+<path d="M572 632.0H586" stroke="#6E7681" stroke-width="1.5"/>
+<polygon points="589,632.0 583,627.8 583,636.2" fill="#6E7681"/>
+<rect x="590" y="600" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="604" cy="614" r="3" fill="#6E7681"/>
+<rect x="612" y="612" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="665.0" y="644" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Reports</text>
+<rect x="80" y="680" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="94" cy="694" r="3" fill="#6E7681"/>
+<rect x="102" y="692" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="155.0" y="724" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Notifications</text>
+<rect x="250" y="680" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="264" cy="694" r="3" fill="#6E7681"/>
+<rect x="272" y="692" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="325.0" y="724" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Cron jobs</text>
+<rect x="420" y="680" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="434" cy="694" r="3" fill="#6E7681"/>
+<rect x="442" y="692" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="495.0" y="724" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Sync service</text>
+<rect x="590" y="680" width="150" height="64" rx="8" fill="#0D1117" stroke="#30363D" stroke-width="1.25"/>
+<circle cx="604" cy="694" r="3" fill="#6E7681"/>
+<rect x="612" y="692" width="22" height="4" rx="2" fill="#262C36"/>
+<text x="665.0" y="724" font-size="16" font-weight="500" fill="#9198A1" text-anchor="middle">Billing</text>
+<g transform="translate(56 825) scale(1.0833)" fill="none" stroke="#6E7681" stroke-width="1.62" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></g>
+<text x="94" y="845" font-size="21" font-weight="400" fill="#9198A1" text-anchor="start">Every change waits for the next release.</text>
+<svg x="828" y="38" width="62" height="62" viewBox="0 0 1024 1024"><defs>
+    <path id="lg-glass" d="M292 340 L732 340 L698 816 Q694 872 638 872 L386 872 Q330 872 326 816 Z"/>
+    <clipPath id="lg-inside">
+      <use href="#lg-glass"/>
+    </clipPath>
+    <linearGradient id="lg-drink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D2F4DF"/>
+      <stop offset="1" stop-color="#86D9A9"/>
+    </linearGradient>
+    <path id="lg-leaf" d="M0 0 C60 -54 170 -54 232 0 C170 54 60 54 0 0 Z"/>
+    <path id="lg-bit" d="M0 0 C18 -20 52 -20 70 0 C52 20 18 20 0 0 Z"/>
+  </defs>
+
+  
+  <use href="#lg-glass" fill="#F4FCF7"/>
+  <g clip-path="url(#lg-inside)">
+    <rect x="260" y="452" width="500" height="440" fill="url(#lg-drink)"/>
+    <rect x="260" y="452" width="500" height="18" fill="#E8FAEF"/>
+    
+    <rect x="382" y="500" width="118" height="118" rx="22" fill="#F4FFF8" fill-opacity="0.8" stroke="#B7E8CB" stroke-width="8" transform="rotate(-12 441 559)"/>
+    <rect x="530" y="556" width="112" height="112" rx="22" fill="#F4FFF8" fill-opacity="0.8" stroke="#B7E8CB" stroke-width="8" transform="rotate(14 586 612)"/>
+    
+    <use href="#lg-bit" fill="#2E9E5B" transform="translate(392 818) rotate(-28)"/>
+    <use href="#lg-bit" fill="#28894F" transform="translate(520 836) rotate(-8)"/>
+    <use href="#lg-bit" fill="#2E9E5B" transform="translate(588 800) rotate(24)"/>
+    
+    <circle cx="470" cy="700" r="12" fill="#FFFFFF" fill-opacity="0.85"/>
+    <circle cx="640" cy="720" r="9" fill="#FFFFFF" fill-opacity="0.85"/>
+    <circle cx="610" cy="500" r="10" fill="#FFFFFF" fill-opacity="0.85"/>
+    
+    <path d="M592 820 Q610 560 646 330" fill="none" stroke="#1F7A45" stroke-width="18" stroke-linecap="round"/>
+    
+    <path d="M350 408 L376 776" fill="none" stroke="#FFFFFF" stroke-opacity="0.75" stroke-width="24" stroke-linecap="round"/>
+  </g>
+  <use href="#lg-glass" fill="none" stroke="#134E3A" stroke-width="28" stroke-linejoin="round"/>
+
+  
+  <g transform="translate(646 330)">
+    <g transform="rotate(-104)">
+      <use href="#lg-leaf" fill="#2E9E5B"/>
+      <path d="M18 0 L204 0" stroke="#A3E3BD" stroke-width="9" stroke-linecap="round"/>
+    </g>
+    <g transform="rotate(-18)">
+      <use href="#lg-leaf" fill="#2E9E5B"/>
+      <path d="M18 0 L204 0" stroke="#A3E3BD" stroke-width="9" stroke-linecap="round"/>
+    </g>
+    <g transform="rotate(-60)">
+      <use href="#lg-leaf" fill="#38B26A"/>
+      <path d="M18 0 L204 0" stroke="#B9EDCD" stroke-width="9" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  
+  <g transform="translate(316 326)">
+    <circle r="124" fill="#4E9A25"/>
+    <circle r="106" fill="#F2F9D4"/>
+    <circle r="94" fill="#B8E257"/>
+    <g stroke="#F2F9D4" stroke-width="11" stroke-linecap="round">
+      <path d="M0 -84 L0 84"/>
+      <path d="M-84 0 L84 0"/>
+      <path d="M-59 -59 L59 59"/>
+      <path d="M-59 59 L59 -59"/>
+    </g>
+    <circle r="15" fill="#F2F9D4"/>
+  </g>
+</svg>
+<text x="896" y="84" font-size="34" font-weight="700" fill="#E6EDF3">Mojito<tspan dx="10" font-weight="500" fill="#5BD48F">(evolving app)</tspan></text>
+<text x="836" y="118" font-size="20" font-weight="400" fill="#9198A1" text-anchor="start">Thin code: an agent with your context changes the app itself.</text>
+<rect x="836" y="146" width="708" height="108" rx="14" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/><text x="862" y="193" font-size="22" font-weight="600" fill="#E6EDF3" text-anchor="start">App UI</text><text x="862" y="221" font-size="17" font-weight="400" fill="#9198A1" text-anchor="start">phone · Mac · web</text><rect x="1084" y="168.0" width="136" height="64" rx="9" fill="#151B23" stroke="#30363D" stroke-width="1.5"/><circle cx="1101" cy="186.0" r="4.5" fill="#6E7681"/><rect x="1113" y="182.0" width="78" height="8" rx="4" fill="#9198A1" fill-opacity="0.55"/><rect x="1096" y="200.0" width="104" height="6" rx="3" fill="#262C36"/><rect x="1096" y="212.0" width="70" height="6" rx="3" fill="#262C36"/><rect x="1234" y="168.0" width="136" height="64" rx="9" fill="#151B23" stroke="#30363D" stroke-width="1.5"/><circle cx="1251" cy="186.0" r="4.5" fill="#6E7681"/><rect x="1263" y="182.0" width="68" height="8" rx="4" fill="#9198A1" fill-opacity="0.55"/><rect x="1246" y="200.0" width="96" height="6" rx="3" fill="#262C36"/><rect x="1246" y="212.0" width="76" height="6" rx="3" fill="#262C36"/><rect x="1384" y="168.0" width="136" height="64" rx="9" fill="#0F2419" stroke="#5BD48F" stroke-width="1.5"/><circle cx="1401" cy="186.0" r="4.5" fill="#5BD48F"/><rect x="1413" y="182.0" width="58" height="8" rx="4" fill="#E6EDF3" fill-opacity="0.55"/><rect x="1396" y="200.0" width="88" height="6" rx="3" fill="#262C36"/><rect x="1396" y="212.0" width="82" height="6" rx="3" fill="#262C36"/>
+<path d="M1190.0 254V278" stroke="#6E7681" stroke-width="2"/>
+<rect x="955.0" y="278" width="470" height="42" rx="10" fill="#151B23" stroke="#30363D" stroke-width="1.5"/>
+<text x="1190.0" y="305" font-size="17" text-anchor="middle" fill="#9198A1"><tspan font-weight="600" fill="#E6EDF3">Hub</tspan> on your server: storage, API, push</text>
+<rect x="836" y="346" width="708" height="446" rx="16" fill="none" stroke="#3FBF73" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="7 6"/>
+<g transform="translate(854 360) scale(1.0000)" fill="none" stroke="#5BD48F" stroke-width="1.90" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></g>
+<text x="886" y="378" font-size="17" font-weight="600" fill="#5BD48F" text-anchor="start">Your Mac (or a Mac mini)</text>
+<circle cx="1190.0" cy="470" r="150" fill="url(#glow)"/>
+<path d="M1190.0 320V392" stroke="#6E7681" stroke-width="2"/>
+<circle cx="1190.0" cy="470" r="76" fill="none" stroke="#23613F" stroke-width="1.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+<circle cx="1190.0" cy="470" r="58" fill="url(#core)"/>
+<circle cx="1190.0" cy="470" r="58" fill="none" stroke="#B8E257" stroke-opacity="0.55" stroke-width="2"/>
+<path d="M1169.0 457l14 13-14 13M1192.0 485h19" fill="none" stroke="#06140C" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1092.0" y="466" font-size="28" font-weight="700" fill="#E6EDF3" text-anchor="end">Agent</text>
+<text x="1092.0" y="494" font-size="19" font-weight="400" fill="#9198A1" text-anchor="end">Claude Code</text>
+<path d="M1148.2 510.6C1108.2 560.6 986.0 542 986.0 612" fill="none" stroke="#3FBF73" stroke-width="2" stroke-opacity="0.8"/>
+<rect x="836" y="612" width="300" height="156" rx="14" fill="#0F2419" stroke="#23613F" stroke-width="1.5"/>
+<circle cx="986.0" cy="612" r="4" fill="#3FBF73"/>
+<text x="856" y="648" font-size="19" font-weight="600" fill="#E6EDF3" text-anchor="start">Your context</text>
+<text x="856" y="673" font-size="16" font-weight="400" fill="#9198A1" text-anchor="start">already on your Mac</text>
+<g transform="translate(873.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/></g>
+<text x="888.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">mail</text>
+<g transform="translate(938.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/></g>
+<text x="953.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">calendar</text>
+<g transform="translate(1003.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+<text x="1018.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">files</text>
+<g transform="translate(1068.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3M16.5 6.5l3 3M14 9l2 2"/></g>
+<text x="1083.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">logins</text>
+<path d="M1231.8 510.6C1271.8 560.6 1394.0 542 1394.0 612" fill="none" stroke="#3FBF73" stroke-width="2" stroke-opacity="0.8"/>
+<rect x="1244" y="612" width="300" height="156" rx="14" fill="#0F2419" stroke="#23613F" stroke-width="1.5"/>
+<circle cx="1394.0" cy="612" r="4" fill="#3FBF73"/>
+<text x="1264" y="648" font-size="19" font-weight="600" fill="#E6EDF3" text-anchor="start">Its own code &amp; design</text>
+<text x="1264" y="673" font-size="16" font-weight="400" fill="#9198A1" text-anchor="start">it knows how it is built</text>
+<g transform="translate(1281.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 5l-3 14"/></g>
+<text x="1296.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">source</text>
+<g transform="translate(1346.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></g>
+<text x="1361.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">design</text>
+<g transform="translate(1411.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></g>
+<text x="1426.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">docs</text>
+<g transform="translate(1476.5 690) scale(1.2500)" fill="none" stroke="#5BD48F" stroke-width="1.76" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-10.6 8.6"/></g>
+<text x="1491.5" y="748" font-size="15" font-weight="500" fill="#9198A1" text-anchor="middle">history</text>
+<path d="M1252.0 462C1400.0 462 1484 420 1484 268" fill="none" stroke="#5BD48F" stroke-width="3" stroke-linecap="round"/>
+<polygon points="1484,257 1474.2,271 1493.8,271" fill="#5BD48F"/>
+<circle cx="1461.9" cy="376.9" r="15" fill="#0D1117" stroke="#5BD48F" stroke-width="2.5"/>
+<path d="M1455.4 377.4l4.3 4.3 8.2-8.6" fill="none" stroke="#5BD48F" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1435.86" y="372.936" font-size="16" font-weight="400" fill="#9198A1" text-anchor="end">changes it judges risky</text>
+<text x="1435.86" y="393.936" font-size="16" font-weight="400" fill="#9198A1" text-anchor="end">wait for your OK</text>
+<text x="1280.0" y="502" font-size="21" font-weight="600" fill="#5BD48F" text-anchor="start">rewrites the app</text>
+<path d="M1190.0 810V544" stroke="#5BD48F" stroke-width="3" stroke-linecap="round"/>
+<polygon points="1190.0,533 1180.2,547 1199.8,547" fill="#5BD48F"/>
+<rect x="900.0" y="812" width="580" height="50" rx="25" fill="#0F2419" stroke="#3FBF73" stroke-width="1.5"/>
+<g transform="translate(918.0 823) scale(1.1667)" fill="none" stroke="#5BD48F" stroke-width="1.63" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></g>
+<text x="956.0" y="844" font-size="20" fill="#E6EDF3"><tspan font-weight="700">You:</tspan> “Put the next step on top, in bold.”</text>
+</svg>

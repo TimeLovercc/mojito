@@ -1,0 +1,19 @@
+[project]
+name = "mojito-agent"
+version = "0.1.0"
+description = "mojito server-side lightweight agent (chat, morning brief, evening question)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "google-auth>=2.58.1",
+    "httpx>=0.28.1",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+mojito-agent = "mojito_agent:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

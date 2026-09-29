@@ -1,0 +1,116 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""Publish a card to the mojito feed (POST /cards, docs/api.md "来源 2：会话主动发布")."""
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+# MOJITO_SECRETS_DIR: the folder outside any repo that holds cards.env (see hub/deploy/deploy.env.example).
+ENV_PATH = Path(os.environ["MOJITO_SECRETS_DIR"]).expanduser() / "cards.env"
+ENV_KEYS = ("MOJITO_HUB_URL", "MOJITO_CARDS_TOKEN")
+SUMMARY_MAX = 800
+
+
+def fail(message: str) -> None:
+    print(f"mojito-card: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def read_env() -> dict[str, str]:
+    if not ENV_PATH.is_file():
+        fail(f"missing {ENV_PATH} (needs {', '.join(ENV_KEYS)})")
+    env = {}
+    for line in ENV_PATH.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        if not sep:
+            fail(f"bad line in {ENV_PATH}: {line!r}")
+        env[key.strip()] = value.strip().strip("\"'")
+    missing = [k for k in ENV_KEYS if k not in env or not env[k]]
+    if missing:
+        fail(f"{ENV_PATH} is missing {', '.join(missing)}")
+    return env
+
+
+def orca_origin() -> str:
+    """session:<Orca worktree name>, or fail asking for --origin."""
+    if shutil.which("orca") is None:
+        fail("orca not found on PATH; pass --origin")
+    proc = subprocess.run(["orca", "worktree", "current", "--json"], capture_output=True, text=True)
+    out = json.loads(proc.stdout)
+    if proc.returncode != 0 or not out["ok"]:
+        fail(f"not in an Orca worktree ({out['error']['message']}); pass --origin")
+    return f"session:{out['result']['worktree']['displayName']}"
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        prog="mojito-card",
+        description="Publish a card to the mojito feed. Only when you judge a result is worth reading.",
+    )
+    p.add_argument("--project", required=True, help="project id, or 'none'")
+    p.add_argument("--kind", required=True, choices=["paper", "idea", "report", "other"])
+    p.add_argument("--title", required=True)
+    p.add_argument("--summary", required=True, help=f"<= {SUMMARY_MAX} chars; say why it is worth reading")
+    p.add_argument("--link", help="http(s) URL of the original")
+    p.add_argument("--key", help="dedupe key (default: first 16 hex of sha1(title))")
+    p.add_argument("--origin", help="card origin, e.g. session:<name> (default: current Orca worktree)")
+    args = p.parse_args()
+    for name in ("project", "title", "summary"):
+        if not getattr(args, name).strip():
+            p.error(f"--{name} is empty")
+    if len(args.summary) > SUMMARY_MAX:
+        p.error(f"--summary is {len(args.summary)} chars, max {SUMMARY_MAX}; shorten it")
+    return args
+
+
+def main() -> None:
+    args = parse_args()
+    env = read_env()
+    body = {
+        "origin": args.origin if args.origin else orca_origin(),
+        "kind": args.kind,
+        "project_id": None if args.project == "none" else args.project,
+        "title": args.title,
+        "summary": args.summary,
+        "link": args.link,
+        "dedupe_key": args.key if args.key else hashlib.sha1(args.title.encode()).hexdigest()[:16],
+    }
+    req = urllib.request.Request(
+        env["MOJITO_HUB_URL"].rstrip("/") + "/cards",
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {env['MOJITO_CARDS_TOKEN']}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            card = json.load(resp)
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            print(f"已经发过（dedupe_key={body['dedupe_key']}）")
+            return
+        raw = e.read().decode()
+        # FastAPI errors are {"detail": ...}; a proxy in front of the hub may answer with plain text.
+        detail = json.loads(raw)["detail"] if e.headers.get_content_type() == "application/json" else raw
+        fail(f"hub {e.code}: {detail if isinstance(detail, str) else json.dumps(detail, ensure_ascii=False)}")
+    print(f"已发布 {card['id']}  {card['origin']}  {card['title']}")
+
+
+if __name__ == "__main__":
+    main()

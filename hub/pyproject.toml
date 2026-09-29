@@ -1,0 +1,22 @@
+[project]
+name = "mojito-hub"
+version = "0.1.0"
+description = "mojito hub: FastAPI + SQLite"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "google-auth>=2.58.1",
+    "http-ece>=1.2.1",
+    "icalendar>=7.3.0",
+    "py-vapid>=1.9.4",
+    "python-multipart>=0.0.32",
+    "recurring-ical-events>=3.8.2",
+    "tzdata>=2026.4",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

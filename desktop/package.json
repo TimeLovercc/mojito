@@ -1,0 +1,16 @@
+{
+  "name": "mojito-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "web": "cd ../mobile && npx expo export -p web --clear",
+    "dev": "node --env-file=.env node_modules/.bin/tauri dev",
+    "build": "node --env-file=.env node_modules/.bin/tauri build --bundles app",
+    "tauri": "tauri",
+    "build:dev": "node --env-file=.env node_modules/.bin/tauri build --debug --bundles app",
+    "release": "node --env-file=.env scripts/release.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

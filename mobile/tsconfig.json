@@ -1,0 +1,8 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  // 在 expo 默认的排除项上加两个构建产物目录（dist-pwa 里的压缩 JS 会让 tsc 栈溢出）
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js", "jest.config.js", "android", "ios", "dist", "dist-pwa"]
+}

@@ -1,0 +1,630 @@
+{
+  "demo_day": "2026-09-28",
+  "sources": [
+    {
+      "name": "worker",
+      "expected_interval_s": 300,
+      "last_seen_at": null
+    },
+    {
+      "name": "nas-backup",
+      "expected_interval_s": 900,
+      "last_seen_at": "2026-09-28T03:00:00+00:00"
+    },
+    {
+      "name": "server-agent",
+      "expected_interval_s": 300,
+      "last_seen_at": null
+    },
+    {
+      "name": "google-calendar",
+      "expected_interval_s": 3600,
+      "last_seen_at": null
+    },
+    {
+      "name": "maintainer",
+      "expected_interval_s": 900,
+      "last_seen_at": null
+    },
+    {
+      "name": "feed-papers",
+      "expected_interval_s": 86400,
+      "last_seen_at": "2026-09-28T07:00:00+00:00",
+      "health": "ok",
+      "health_detail": null,
+      "health_at": "2026-09-28T07:05:00+00:00"
+    }
+  ],
+  "records": [
+    {
+      "id": "r-demo-maint",
+      "at": "2026-09-27T19:35:00+00:00",
+      "author": "system",
+      "source": "maintainer",
+      "kind": "chat",
+      "tier": "digest",
+      "item_id": null,
+      "title": "Is three lines right, or two lines plus tap for more?",
+      "body": "Is three lines right, or two lines plus tap for more?",
+      "evidence": null,
+      "needs_processing": false,
+      "feedback_id": "f-demo-1"
+    },
+    {
+      "id": "r-demo-amp",
+      "at": "2026-09-27T23:40:00+00:00",
+      "author": "me",
+      "source": "app",
+      "kind": "note",
+      "tier": "log",
+      "item_id": null,
+      "title": "Find a used practice amp",
+      "body": "Under 150, with a headphone jack",
+      "evidence": null,
+      "needs_processing": true
+    },
+    {
+      "id": "r-demo-cal",
+      "at": "2026-09-27T23:45:00+00:00",
+      "author": "system",
+      "source": "server-agent",
+      "kind": "log",
+      "tier": "digest",
+      "item_id": "i-lf-beta-date",
+      "title": "Event added: Coffee with Jordan tomorrow 10:00",
+      "body": "",
+      "evidence": null,
+      "needs_processing": false,
+      "undo": {
+        "type": "calendar",
+        "op": "create",
+        "event_id": "demo-coffee",
+        "before": null
+      },
+      "undone_at": null
+    },
+    {
+      "id": "r-demo-amp-item",
+      "at": "2026-09-27T23:50:00+00:00",
+      "author": "system",
+      "source": "worker",
+      "kind": "log",
+      "tier": "digest",
+      "item_id": "note-r-demo-amp",
+      "title": "New item from a note: find a used amp",
+      "body": "The worker turned a “please handle” note into an item; it waits for your OK.",
+      "evidence": "inferred",
+      "needs_processing": false
+    },
+    {
+      "id": "r-demo-raw",
+      "at": "2026-09-27T23:55:00+00:00",
+      "author": "system",
+      "source": "worker",
+      "kind": "log",
+      "tier": "log",
+      "item_id": "note-r-demo-amp",
+      "title": "Find a used amp: status waiting_you → active",
+      "body": "Source note r-demo-amp, owner auto_then_me (demo: raw values should render as readable text)",
+      "evidence": "record:r-demo-amp",
+      "needs_processing": false
+    },
+    {
+      "id": "r-demo-price",
+      "at": "2026-09-28T03:50:00+00:00",
+      "author": "system",
+      "source": "worker",
+      "kind": "alert",
+      "tier": "interrupt",
+      "item_id": null,
+      "title": "A saved amp listing dropped to $140",
+      "body": "The used practice amp on your saved list is now $140, under your $150 limit.",
+      "evidence": null,
+      "needs_processing": false
+    },
+    {
+      "id": "r-demo-brief",
+      "at": "2026-09-28T07:30:00+00:00",
+      "author": "system",
+      "source": "server-agent",
+      "kind": "chat",
+      "tier": "quiet",
+      "item_id": null,
+      "title": "Morning brief",
+      "body": "Good morning. Focus: onboarding and 20 minutes of guitar. One thing needs your call; lunch with Jordan at 12:30.",
+      "evidence": null,
+      "needs_processing": false
+    },
+    {
+      "id": "r-demo-md",
+      "at": "2026-09-28T07:40:00+00:00",
+      "author": "system",
+      "source": "server-agent",
+      "kind": "chat",
+      "tier": "digest",
+      "item_id": null,
+      "title": "A plan for today",
+      "body": "A plan for today:\n\n1. **Morning**: record the onboarding walkthrough\n2. **Afternoon**: finish onboarding at 14:00, icon review with Riley at 16:00\n\nTwo small things:\n- Reply to Casey's crash-log email\n- Skim the [beta checklist](https://example.com/beta-checklist)",
+      "evidence": null,
+      "needs_processing": false,
+      "feedback_id": null
+    },
+    {
+      "id": "r-demo-route",
+      "at": "2026-09-28T07:41:00+00:00",
+      "author": "system",
+      "source": "server-agent",
+      "kind": "chat",
+      "tier": "log",
+      "item_id": null,
+      "title": "Handed to the Mac; it will reply when it wakes",
+      "body": "Handed to the Mac; it will reply when it wakes",
+      "evidence": null,
+      "needs_processing": false,
+      "feedback_id": null
+    }
+  ],
+  "plans": [
+    {
+      "id": "p-2026-10-08",
+      "start": "2026-10-08",
+      "end": "2026-10-21",
+      "goal_ids": [
+        "g-launch",
+        "g-openmic",
+        "g-closet"
+      ],
+      "item_ids": [
+        "i-lf-pricing",
+        "i-gt-song3",
+        "i-cl-donate"
+      ],
+      "status": "draft",
+      "created_at": "2026-09-27T23:50:00+00:00",
+      "closed_at": null
+    },
+    {
+      "id": "p-2026-09-24-r202609280700",
+      "start": "2026-09-24",
+      "end": "2026-10-07",
+      "goal_ids": [
+        "g-launch",
+        "g-openmic",
+        "g-closet"
+      ],
+      "item_ids": [
+        "i-lf-onboarding",
+        "i-lf-landing",
+        "i-lf-pricing",
+        "i-lf-crash",
+        "i-lf-beta-date",
+        "i-app-today",
+        "i-gt-practice",
+        "i-gt-song3",
+        "i-gt-strings",
+        "i-cl-sort",
+        "i-cl-donate",
+        "note-r-demo-amp"
+      ],
+      "status": "draft",
+      "created_at": "2026-09-28T07:00:00+00:00",
+      "closed_at": null,
+      "revises": "p-2026-09-24"
+    }
+  ],
+  "items": [
+    {
+      "id": "note-r-demo-amp",
+      "title": "Find a used practice amp",
+      "category": "life",
+      "status": "waiting_you",
+      "next_step": "Message the seller about the $140 practice amp",
+      "next_at": "2026-09-28T09:00:00+00:00",
+      "owner": "auto_then_me",
+      "done_definition": "You buy an amp and try it once",
+      "goal_id": "g-openmic",
+      "progress": {
+        "value": 3,
+        "target": 10,
+        "unit": "candidates"
+      },
+      "updated_at": "2026-09-27T23:50:00+00:00",
+      "updated_by": "worker",
+      "project_id": "p-guitar"
+    }
+  ],
+  "reviews": [
+    {
+      "plan_id": "p-2026-09-10",
+      "created_at": "2026-09-23T21:10:00+00:00",
+      "summary": "3 of 4 done: the sign-up flow, song one and the shoe rack on time; pricing didn't move.",
+      "completed_item_ids": [
+        "i-prev-signup",
+        "i-prev-song1",
+        "i-prev-shoes"
+      ],
+      "missed_item_ids": [
+        "i-lf-pricing"
+      ],
+      "patterns": [
+        "Loaflog work piled up on weekends; weekday evenings only moved guitar and the closet",
+        "Things with a fixed time (lessons, drop-offs) got done; things without one slipped"
+      ],
+      "user_note": "Next period: pricing in week one, Loaflog on weekday mornings.",
+      "status": "done"
+    }
+  ],
+  "drafts": [
+    {
+      "id": "d-demo-lesson",
+      "at": "2026-09-27T23:40:00+00:00",
+      "source": "worker",
+      "channel": "email",
+      "to": "Music school front desk",
+      "subject": "Confirming the new lesson time",
+      "body": "Hi,\n\nThanks for letting me know lessons move to 18:30; that works for me. Could we keep the same room?\n\nThanks,\nSam",
+      "item_id": "i-gt-practice",
+      "status": "pending"
+    }
+  ],
+  "projects": [
+    {
+      "id": "p-loaflog-export",
+      "title": "loaflog-export",
+      "area": "research",
+      "status": "proposed",
+      "repo_path": "~/code/loaflog-export",
+      "goal_id": null,
+      "summary": null,
+      "summary_evidence": null,
+      "summary_at": null
+    }
+  ],
+  "snapshots": {
+    "p-app": {
+      "taken_at": "2026-09-27T23:00:00+00:00",
+      "worktrees": [
+        {
+          "name": "main",
+          "branch": "main",
+          "path": "~/code/mojito",
+          "status": "in-review",
+          "last_output": "Maintainer: 3 feedback items shipped, waiting for new ones",
+          "last_activity_at": "2026-09-27T21:30:00+00:00"
+        },
+        {
+          "name": "mobile",
+          "branch": "sam/mobile",
+          "path": "~/code/mojito-worktrees/mobile",
+          "status": "in-review",
+          "last_output": "Merged: big widget hides empty blocks",
+          "last_activity_at": "2026-09-27T21:20:00+00:00"
+        },
+        {
+          "name": "desktop",
+          "branch": "sam/desktop",
+          "path": "~/code/mojito-worktrees/desktop",
+          "status": "in-review",
+          "last_output": "Merged: frosted sidebar",
+          "last_activity_at": "2026-09-27T00:05:00+00:00"
+        }
+      ],
+      "commits": [
+        {
+          "repo": "mojito",
+          "sha": "32f4b9c",
+          "subject": "mobile: big widget hides empty blocks",
+          "at": "2026-09-27T21:18:00+00:00"
+        },
+        {
+          "repo": "mojito",
+          "sha": "ae78ac9",
+          "subject": "desktop: frosted sidebar, two-column today",
+          "at": "2026-09-27T00:02:00+00:00"
+        },
+        {
+          "repo": "mojito",
+          "sha": "5edd890",
+          "subject": "mobile: register the push device once per launch",
+          "at": "2026-09-25T21:38:00+00:00"
+        }
+      ]
+    },
+    "p-loaflog": {
+      "taken_at": "2026-09-27T23:00:00+00:00",
+      "worktrees": [
+        {
+          "name": "crash-fix",
+          "branch": "fix/photo-crash",
+          "path": "~/code/loaflog",
+          "status": "in-progress",
+          "last_output": "overnight soak 31/40 · crash rate 0.4%",
+          "last_activity_at": "2026-09-27T22:40:00+00:00"
+        }
+      ],
+      "commits": [
+        {
+          "repo": "loaflog",
+          "sha": "57d2b53",
+          "subject": "onboarding: merge the five screens into three",
+          "at": "2026-09-27T20:30:00+00:00"
+        },
+        {
+          "repo": "loaflog",
+          "sha": "063c5ff",
+          "subject": "photos: compress thumbnails while picking",
+          "at": "2026-09-27T16:10:00+00:00"
+        },
+        {
+          "repo": "loaflog",
+          "sha": "18c88a0",
+          "subject": "add overnight crash soak test",
+          "at": "2026-09-26T17:40:00+00:00"
+        }
+      ]
+    }
+  },
+  "auth": [
+    {
+      "name": "google-calendar-write",
+      "ok": true,
+      "detail": null,
+      "checked_at": "2026-09-28T05:00:00+00:00"
+    },
+    {
+      "name": "gmail-read",
+      "ok": true,
+      "detail": null,
+      "checked_at": "2026-09-28T05:00:00+00:00"
+    },
+    {
+      "name": "claude-server",
+      "ok": true,
+      "detail": null,
+      "checked_at": "2026-09-28T05:30:00+00:00"
+    },
+    {
+      "name": "claude-mac",
+      "ok": true,
+      "detail": null,
+      "checked_at": "2026-09-28T04:00:00+00:00"
+    }
+  ],
+  "project_summaries": {
+    "p-loaflog": {
+      "summary": "The new onboarding only needs its video; photo-upload crash 3/5 fixed, overnight test running.",
+      "summary_evidence": "57d2b53",
+      "summary_at": "2026-09-27T23:00:00+00:00"
+    },
+    "p-app": {
+      "summary": "The last 3 feedback items all shipped; the Today page could be leaner.",
+      "summary_evidence": "inferred",
+      "summary_at": "2026-09-27T23:00:00+00:00"
+    },
+    "p-guitar": {
+      "summary": "4 sessions this week; song two's chorus works, and the strings need replacing.",
+      "summary_evidence": "inferred",
+      "summary_at": "2026-09-27T23:00:00+00:00"
+    },
+    "p-closet": {
+      "summary": "One bag of summer clothes is out, one to go; drop-off before the weekend.",
+      "summary_evidence": "inferred",
+      "summary_at": "2026-09-27T23:00:00+00:00"
+    }
+  },
+  "cards": [
+    {
+      "id": "c-demo-1",
+      "at": "2026-09-27T07:02:00+00:00",
+      "source": "worker",
+      "origin": "arxiv",
+      "kind": "paper",
+      "project_id": "p-loaflog",
+      "title": "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications",
+      "summary": "Lightweight convolutional networks for phones: depthwise separable convolutions cut the compute a lot for a small loss in accuracy.\nWhy it may interest you: Loaflog wants to score crumb photos on the phone itself; this is the usual starting point.\nRelated project: Loaflog",
+      "link": "https://arxiv.org/abs/1704.04861",
+      "dedupe_key": "1704.04861",
+      "status": "saved",
+      "item_id": null,
+      "image_attachment_id": null
+    },
+    {
+      "id": "c-demo-2",
+      "at": "2026-09-28T07:02:00+00:00",
+      "source": "worker",
+      "origin": "arxiv",
+      "kind": "paper",
+      "project_id": "p-loaflog",
+      "title": "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks",
+      "summary": "Scales network depth, width and input resolution together, getting better accuracy with fewer parameters.\nWhy it may interest you: If MobileNet is not accurate enough, this is the next family to try.\nRelated project: Loaflog",
+      "link": "https://arxiv.org/abs/1905.11946",
+      "dedupe_key": "1905.11946",
+      "status": "new",
+      "item_id": null,
+      "image_attachment_id": null
+    },
+    {
+      "id": "c-demo-3",
+      "at": "2026-09-28T07:04:00+00:00",
+      "source": "worker",
+      "origin": "hf-daily",
+      "kind": "paper",
+      "project_id": null,
+      "title": "Segment Anything",
+      "summary": "A general model that segments any object in an image from a prompt, released with a large segmentation dataset.\nWhy it may interest you: It could cut the loaf's cross-section out of the background before scoring.",
+      "link": "https://arxiv.org/abs/2304.02643",
+      "dedupe_key": "2304.02643",
+      "status": "new",
+      "item_id": null,
+      "image_attachment_id": null
+    },
+    {
+      "id": "c-demo-4",
+      "at": "2026-09-28T07:31:00+00:00",
+      "source": "worker",
+      "origin": "gmail",
+      "kind": "mail",
+      "project_id": null,
+      "title": "Today's mail: 3 worth reading",
+      "summary": "Casey (beta tester) · Photo upload crashes on an older phone — crash log attached; related to “Fix the photo-upload crash”\nRiley · Icon options, round two — pick one of three directions at today's 16:00 icon review\nMusic school · Lesson time change — from now on 18:30 (your next guitar lesson is the day after tomorrow)",
+      "link": null,
+      "dedupe_key": "2026-09-28",
+      "status": "new",
+      "item_id": null,
+      "image_attachment_id": null
+    },
+    {
+      "id": "c-demo-5",
+      "at": "2026-09-28T08:10:00+00:00",
+      "source": "cards",
+      "origin": "session:crash-fix",
+      "kind": "report",
+      "project_id": "p-loaflog",
+      "title": "Crash repro: 3 of 5 cases fixed",
+      "summary": "Of the 5 repro cases (10+ photos on older phones), 3 are fixed by compressing thumbnails while picking. The other 2 involve the photo-permission prompt; continuing tomorrow.",
+      "link": null,
+      "dedupe_key": "crash-fix-1",
+      "status": "new",
+      "item_id": null,
+      "image_attachment_id": "a-mock-cover"
+    }
+  ],
+  "feedback": [
+    {
+      "id": "f-demo-1",
+      "at": "2026-09-27T19:30:00+00:00",
+      "body": "Feed cards are too long. Can they show three lines by default?",
+      "attachments": [],
+      "context": {
+        "screen": "feed",
+        "item_id": null,
+        "project_id": null,
+        "app_update_id": "00000000-0000-4000-8000-000000000001"
+      },
+      "status": "awaiting_approval",
+      "ship_mode": "ask",
+      "summary": "Card summaries stop at three lines; open a card for the full text. Ready: approve and it ships as an over-the-air update (two cold starts to take effect).",
+      "updated_at": "2026-09-27T19:40:00+00:00"
+    }
+  ],
+  "feedback_messages": [
+    {
+      "id": "fm-demo-1",
+      "feedback_id": "f-demo-1",
+      "at": "2026-09-27T19:35:00+00:00",
+      "author": "maintainer",
+      "body": "Is three lines right, or two lines plus tap for more?",
+      "attachments": []
+    }
+  ],
+  "taste": [
+    {
+      "id": "t-demo-1",
+      "at": "2026-09-19T22:00:00+00:00",
+      "text": "Prefer papers that come with code or a demo",
+      "source": "server-agent"
+    },
+    {
+      "id": "t-demo-2",
+      "at": "2026-09-22T21:50:00+00:00",
+      "text": "On-device models first; not interested in pure LLM benchmarks",
+      "source": "server-agent"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "papers",
+      "name": "Daily papers",
+      "kind": "papers",
+      "at": "07:00",
+      "enabled": true,
+      "config": {},
+      "last_run_at": "2026-09-28T07:04:00+00:00",
+      "last_result": "Posted 3 cards",
+      "health": "ok"
+    },
+    {
+      "id": "mail",
+      "name": "Daily mail",
+      "kind": "mail",
+      "at": "07:30",
+      "enabled": true,
+      "config": {},
+      "last_run_at": "2026-09-28T07:31:00+00:00",
+      "last_result": "Today's mail: 3 worth reading",
+      "health": "ok"
+    }
+  ],
+  "events": [
+    {
+      "uid": "demo-cowork",
+      "start": "2026-09-28T09:30:00+00:00",
+      "end": "2026-09-28T11:30:00+00:00",
+      "all_day": false,
+      "title": "Coworking",
+      "location": "Library, 2nd floor"
+    },
+    {
+      "uid": "demo-lunch",
+      "start": "2026-09-28T12:30:00+00:00",
+      "end": "2026-09-28T13:15:00+00:00",
+      "all_day": false,
+      "title": "Lunch with Jordan",
+      "location": null
+    },
+    {
+      "uid": "demo-icons",
+      "start": "2026-09-28T16:00:00+00:00",
+      "end": "2026-09-28T16:30:00+00:00",
+      "all_day": false,
+      "title": "Icon review with Riley (video)",
+      "location": null
+    },
+    {
+      "uid": "demo-freeze",
+      "start": "2026-09-29T00:00:00+00:00",
+      "end": "2026-09-30T00:00:00+00:00",
+      "all_day": true,
+      "title": "Beta build freeze",
+      "location": null
+    },
+    {
+      "uid": "demo-coffee",
+      "start": "2026-09-29T10:00:00+00:00",
+      "end": "2026-09-29T10:30:00+00:00",
+      "all_day": false,
+      "title": "Coffee with Jordan",
+      "location": null
+    },
+    {
+      "uid": "demo-lesson",
+      "start": "2026-09-30T18:30:00+00:00",
+      "end": "2026-09-30T19:30:00+00:00",
+      "all_day": false,
+      "title": "Guitar lesson",
+      "location": "Music school, room 3"
+    },
+    {
+      "uid": "demo-casey",
+      "start": "2026-10-01T11:00:00+00:00",
+      "end": "2026-10-01T11:45:00+00:00",
+      "all_day": false,
+      "title": "Call with Casey: beta feedback",
+      "location": null
+    },
+    {
+      "uid": "demo-signup",
+      "start": "2026-10-03T18:00:00+00:00",
+      "end": "2026-10-03T18:30:00+00:00",
+      "all_day": false,
+      "title": "Open mic sign-up closes",
+      "location": "Corner café"
+    }
+  ],
+  "simulated_review": {
+    "summary": "(mock draft) Loaflog moved steadily this period; the restring never happened.",
+    "patterns": [
+      "“Restring” has no time set and slipped twice"
+    ]
+  }
+}
