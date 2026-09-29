@@ -1,0 +1,50 @@
+# Online demo on GitHub Pages: the web app with the mock hub running in the browser (mobile/demo/build-demo.mjs).
+# Enable once under Settings -> Pages -> Source: GitHub Actions. The demo lives at /<repository name>/.
+name: Demo on GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm i --no-save esbuild@0.25.10 buffer@6.0.3
+      - run: node demo/build-demo.mjs
+        env:
+          MOJITO_DEMO_BASE: /${{ github.event.repository.name }}
+          EXPO_PUBLIC_MOJITO_TIMEZONE: America/Los_Angeles
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: mobile/dist-demo
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -17,6 +17,7 @@
   <a href="https://youtu.be/gMkHYQJ1r8Q"><img src="docs/media/mojito.gif" width="100%" alt="An 11-second animated demo. Most apps are a machine built for millions; Mojito keeps a thin app with Claude Code on your Mac at its core, reading your mail, calendar and files. You ask in chat, the agent rebuilds the app, and a card's next step changes. It ends on the Mojito logo: the local, evolving alternative to cloud personal AI."></a>
 </p>
 <p align="center"><sub>An 11-second loop with recreated screens and demo data. <a href="https://youtu.be/gMkHYQJ1r8Q">Watch the 25-second video with sound</a> (it includes some AI-generated footage). If you like where this is going, a star helps other people find it.</sub></p>
+<p align="center"><a href="https://timelovercc.github.io/mojito/"><b>Try the live demo</b></a>: the app with sample data, running entirely in your browser. No account and no server; it resets when you reload.</p>
 
 <p align="center">
   <picture>

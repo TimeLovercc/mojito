@@ -17,6 +17,7 @@
   <a href="https://youtu.be/gMkHYQJ1r8Q"><img src="docs/media/mojito.gif" width="100%" alt="11 秒动图演示：大多数 app 是为千万人造的机器；Mojito 只留一层薄薄的 app，核心是你 Mac 上的 Claude Code，它能读你的邮件、日历和文件。你在对话里提，agent 重做 app，卡片上的下一步就变了。最后是 Mojito 的图标：本地的、会进化的云端个人 AI 替代品。"></a>
 </p>
 <p align="center"><sub>11 秒循环动图，界面为演示数据重现。<a href="https://youtu.be/gMkHYQJ1r8Q">看 25 秒带声音的完整视频</a>（部分画面由 AI 生成）。如果你喜欢这个方向，点个 star 能让更多人看到它。</sub></p>
+<p align="center"><a href="https://timelovercc.github.io/mojito/"><b>在线试玩</b></a>：带示例数据的完整 app，整个跑在你的浏览器里。不用注册，也没有服务器；刷新就重置。</p>
 
 <p align="center">
   <picture>
