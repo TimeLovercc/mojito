@@ -14,6 +14,11 @@
 **Mojito 是一个会进化的 app：它会照你的意思改写自己。** 在对话里说你想要什么，你自己 Mac 上的 Claude Code agent 就会改代码，把更新发到你的手机、Mac 和网页版。装好时，它是一个你自己托管的每日计划 app：今天页、计划、笔记、信息流和对话。
 
 <p align="center">
+  <a href="https://youtu.be/gMkHYQJ1r8Q"><img src="docs/media/mojito.gif" width="100%" alt="11 秒动图演示：大多数 app 是为千万人造的机器；Mojito 只留一层薄薄的 app，核心是你 Mac 上的 Claude Code，它能读你的邮件、日历和文件。你在对话里提，agent 重做 app，卡片上的下一步就变了。最后是 Mojito 的图标：本地的、会进化的云端个人 AI 替代品。"></a>
+</p>
+<p align="center"><sub>11 秒循环动图，界面为演示数据重现。<a href="https://youtu.be/gMkHYQJ1r8Q">看 25 秒带声音的完整视频</a>（部分画面由 AI 生成）。如果你喜欢这个方向，点个 star 能让更多人看到它。</sub></p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/hero-light.png">
