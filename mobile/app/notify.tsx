@@ -82,9 +82,12 @@ function NotifyRow({ kind, settings, onSaved }: { kind: NotifyKind; settings: Se
 
 const styles = StyleSheet.create({
   h2: { ...font.bold, fontSize: size.page, color: colors.tx, letterSpacing: desktop ? 0 : -0.4, marginTop: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 13 },
+  // 电脑（docs/desktop-v2.md 逐页方案 7）：每行最小 44，标题 15 + 说明 13 tx2，右侧自绘 Toggle
+  row: desktop
+    ? { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingVertical: 10, paddingHorizontal: 16 }
+    : { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 13 },
   text: { flex: 1, gap: 2 },
-  name: { ...font.medium, fontSize: size.body, color: colors.tx },
-  note: { ...font.regular, fontSize: size.small, color: colors.tx2 },
+  name: { ...(desktop ? font.regular : font.medium), fontSize: size.body, color: colors.tx },
+  note: { ...font.regular, fontSize: desktop ? size.secondary : size.small, color: colors.tx2 },
   hint: { ...font.regular, fontSize: size.small, color: colors.tx2 },
 })

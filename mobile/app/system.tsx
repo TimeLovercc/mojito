@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import {
   Bell,
@@ -12,8 +12,7 @@ import {
   NotebookText,
   RefreshCw,
 } from 'lucide-react-native'
-import { actions } from '../src/api/client'
-import type { AuthList, JobsList, Language, Metrics, Runner, Settings as NotifySettings, Source, SourcesList } from '../src/api/types'
+import type { AuthList, JobsList, Metrics, Runner, Settings as NotifySettings, Source, SourcesList } from '../src/api/types'
 import { readLastSync } from '../src/cache'
 import { Screen } from '../src/components/Screen'
 import { Btn, Card, Empty, Filter, Rows, Section } from '../src/components/ui'
@@ -21,7 +20,6 @@ import { useConfig } from '../src/config/context'
 import { jobStatus } from '../src/labels'
 import { useRefresh } from '../src/refresh'
 import { addDays, ago, todayYmd, when } from '../src/time'
-import { useErrorToast, useToast } from '../src/toast'
 import {
   colorSchemeSetting,
   colors,
@@ -30,46 +28,45 @@ import {
   fontScaleName,
   radii,
   size,
-  type ColorSchemeSetting,
-  type FontScaleName,
 } from '../src/theme'
-import { writeColorSchemeSync, writeFontScaleSync } from '../src/config/font-scale'
-import { reloadApp } from '../src/reload'
 import { language, t } from '../src/i18n'
-import { switchLanguage } from '../src/i18n/sync'
-import * as Updates from 'expo-updates'
 import { humanize } from '../src/errors'
 import { useHub, type HubView } from '../src/use-hub'
-import { trackAction, useViewTracking } from '../src/usage'
+import { useViewTracking } from '../src/usage'
 import { tauri } from '../src/tauri'
+import { AGENTS, AGENT_SOURCES, AUTH_LABEL, MAINTAINER, problemsOf, type Problem } from '../src/problems'
 import { Toggle } from '../src/components/Toggle'
 import { useWide } from '../src/wide'
-import { syncWindowTheme } from '../src/window-theme'
 import type { TauriApi } from '../src/tauri-api'
 import { pwa } from '../src/pwa'
 import { PwaSettings } from '../src/components/PwaSettings'
-
-// 两个 agent 的心跳来自数据源 server-agent / worker，不在"数据源"列表里重复显示
-const AGENTS: { runner: Runner; source: string; name: string; note: string }[] = [
-  { runner: 'server', source: 'server-agent', name: t('轻量 agent'), note: t('服务器 · 一次一个任务') },
-  { runner: 'mac', source: 'worker', name: 'Mac agent', note: t('Mac · 睡着时任务排队') },
-]
-// 维护会话每 15 分钟报心跳（数据源 maintainer），也在"运行"里显示，不在数据源列表重复
-const MAINTAINER = 'maintainer'
-const AGENT_SOURCES = new Set([...AGENTS.map((a) => a.source), MAINTAINER])
-
-function interval(s: number): string {
-  if (s % 86400 === 0) return t('{n} 天', { n: s / 86400 })
-  if (s % 3600 === 0) return t('{n} 小时', { n: s / 3600 })
-  if (s % 60 === 0) return t('{n} 分钟', { n: s / 60 })
-  return t('{n} 秒', { n: s })
-}
-
-export type Problem = { text: string; bad: boolean }
+import {
+  FIX_CLAUDE,
+  FIX_GOOGLE,
+  LANGUAGES,
+  SCALES,
+  SCHEMES,
+  interval,
+  pickScale,
+  pickScheme,
+  useAutostart,
+  useConnectionForm,
+  useNotifyForm,
+  useOpenOrca,
+  usePickLanguage,
+  useStartReview,
+  versionLines,
+} from '../src/system-shared'
+import { SystemWide } from '../src/desktop/SystemWide'
 
 // 回答"这些信息靠得住吗"（design.md 8.3）：顶部一行"一切正常 / 有 N 个问题"，点开看细节；
 // 下面是 7 天指标和常用动作，设置、反馈、全部动态、版本收进"更多"
 export default function SystemScreen() {
+  const wide = useWide()
+  return wide && desktop ? <SystemWide /> : <SystemPhone />
+}
+
+function SystemPhone() {
   const view = useHub<SourcesList>('/sources')
   const auth = useHub<AuthList>('/auth-status')
   useViewTracking('system')
@@ -113,32 +110,6 @@ export default function SystemScreen() {
       {() => null}
     </Screen>
   )
-}
-
-// 汇总所有要人留意的：hub 连不上、agent / 维护会话失联、数据源没心跳或结果不对、授权失效
-export function problemsOf(configured: boolean, hubError: boolean, sources: SourcesList | null, auth: AuthList | null): Problem[] | null {
-  if (!configured) return [{ text: t('还没填 hub 地址和令牌（在"更多"里）'), bad: true }]
-  if (hubError) return [{ text: t('Hub 连不上'), bad: true }]
-  if (sources === null || auth === null) return null
-  const out: Problem[] = []
-  const find = (name: string) => sources.sources.find((x) => x.name === name)
-  for (const a of AGENTS) {
-    const src = find(a.source)
-    if (src === undefined) out.push({ text: t('{name}未登记', { name: a.name }), bad: true })
-    else if (!src.alive) out.push({ text: t('{name}失联', { name: a.name }), bad: true })
-  }
-  const m = find(MAINTAINER)
-  if (m === undefined) out.push({ text: t('维护会话没报过心跳'), bad: true })
-  else if (!m.alive) out.push({ text: t('维护会话失联'), bad: true })
-  for (const src of sources.sources.filter((x) => !AGENT_SOURCES.has(x.name))) {
-    if (!src.alive) out.push({ text: t('{name} 没心跳', { name: src.name }), bad: true })
-    else if (src.health === 'error') out.push({ text: t('{name} 出错', { name: src.name }), bad: true })
-    else if (src.health === 'warn') out.push({ text: t('{name} 需要留意', { name: src.name }), bad: false })
-  }
-  for (const x of auth.auth.filter((y) => !y.ok)) {
-    out.push({ text: t('{name} 授权失效', { name: x.name in AUTH_LABEL ? AUTH_LABEL[x.name] : x.name }), bad: true })
-  }
-  return out
 }
 
 function StatusLine({ problems, open, onToggle }: { problems: Problem[] | null; open: boolean; onToggle: () => void }) {
@@ -289,7 +260,7 @@ function MetricsBlock() {
           </View>
         ))}
       </Card>
-      <Text style={styles.queue}>{t('上面是每天打开次数，下面是晚间提问有没有回')}</Text>
+      {desktop ? null : <Text style={styles.queue}>{t('上面是每天打开次数，下面是晚间提问有没有回')}</Text>}
     </Section>
   )
 }
@@ -341,22 +312,9 @@ function SourceRow({ source: s }: { source: Source }) {
   )
 }
 
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
-
 // Mac app 开机自启（desktop 的 autostart 插件；首次启动 desktop 默认打开）
 function AutostartBlock({ api }: { api: TauriApi }) {
-  const showError = useErrorToast()
-  const [on, setOn] = useState<boolean | null>(null)
-  useFocusEffect(
-    useCallback(() => {
-      api.autostart.isEnabled().then(setOn, (err: string) => showError(t('读不到开机自启'), new Error(err)))
-    }, [api]),
-  )
-  const toggle = (next: boolean) =>
-    (next ? api.autostart.enable() : api.autostart.disable()).then(
-      () => setOn(next),
-      (err: string) => showError(t('没改成'), new Error(err)),
-    )
+  const { on, toggle } = useAutostart(api)
   return (
     <Section title="Mac app">
       <Card style={styles.autostart}>
@@ -382,33 +340,7 @@ function NotifyBlock() {
 }
 
 function NotifyForm({ current, onSaved }: { current: NotifySettings; onSaved: () => Promise<void> }) {
-  const { config } = useConfig()
-  const toast = useToast()
-  const showError = useErrorToast()
-  const [morning, setMorning] = useState(current.morning_at)
-  const [evening, setEvening] = useState(current.evening_at)
-  const [eveningOn, setEveningOn] = useState(current.evening_enabled)
-  const [busy, setBusy] = useState(false)
-  const valid = HHMM.test(morning) && HHMM.test(evening)
-  const changed = morning !== current.morning_at || evening !== current.evening_at || eveningOn !== current.evening_enabled
-  const save = async () => {
-    if (config.hub === null) {
-      toast(t('先在下面填 hub 地址和令牌'), true)
-      return
-    }
-    setBusy(true)
-    try {
-      await actions.putSettings(config.hub, { ...current, morning_at: morning, evening_at: evening, evening_enabled: eveningOn })
-      trackAction('settings_save', { what: 'notify', evening_enabled: eveningOn })
-      toast(t('通知时间已保存'), false)
-      await onSaved()
-    } catch (err) {
-      if (!(err instanceof Error)) throw err
-      showError(t('没保存上'), err)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { morning, setMorning, evening, setEvening, eveningOn, setEveningOn, busy, valid, changed, save } = useNotifyForm(current, onSaved)
   return (
     <Card style={styles.form}>
       <View style={styles.timeRow}>
@@ -458,15 +390,6 @@ function NotifyForm({ current, onSaved }: { current: NotifySettings; onSaved: ()
 }
 
 // 外部授权：Google 和 Claude 的令牌失效时在这里标红，并写明怎么修
-const AUTH_LABEL: Record<string, string> = {
-  'google-calendar-write': t('Google 日历（写）'),
-  'gmail-read': t('Gmail（只读）'),
-  'claude-server': t('Claude（服务器）'),
-  'claude-mac': t('Claude（Mac）'),
-}
-const FIX_GOOGLE = t('在 Mac 上跑 uv run hub/deploy/google-auth.py 重新授权，再跑 hub/deploy/install-secrets.sh')
-const FIX_CLAUDE = t('跑 claude setup-token 生成新令牌，再跑 hub/deploy/install-secrets.sh')
-
 function AuthBlock({ view }: { view: HubView<AuthList> }) {
   return (
     <Section title={t('授权')} right={t('上次检查')}>
@@ -527,75 +450,28 @@ function RefreshBlock() {
   )
 }
 
-// 提前复盘：POST /jobs {kind: draft_review}，Mac 起草复盘和下一期计划
 // 显示：字号（在安卓系统字体大小之上再放大）和深浅色。都在样式创建时定下，选了之后重载一次生效
 function DisplayBlock() {
-  const scales: [FontScaleName, string][] = [
-    ['standard', t('标准')],
-    ['large', t('大')],
-    ['xlarge', t('特大')],
-  ]
-  const schemes: [ColorSchemeSetting, string][] = [
-    ['system', t('跟随系统')],
-    ['dark', t('深色')],
-    ['light', t('浅色')],
-  ]
-  // 语言名不翻译：切换的人要认得出自己的语言
-  const languages: [Language, string][] = [
-    ['zh', '中文'],
-    ['en', 'English'],
-  ]
-  const { config } = useConfig()
-  const showError = useErrorToast()
+  const pickLanguage = usePickLanguage()
   return (
     <Section title={t('显示')}>
       <Card style={styles.form}>
         <Text style={styles.label}>{t('字号')}</Text>
         <View style={styles.chipRow}>
-          {scales.map(([k, label]) => (
-            <Filter
-              key={k}
-              label={label}
-              on={fontScaleName === k}
-              onPress={() => {
-                if (k === fontScaleName) return
-                trackAction('settings_save', { what: 'font_scale', value: k })
-                writeFontScaleSync(k)
-                reloadApp()
-              }}
-            />
+          {SCALES.map(([k, label]) => (
+            <Filter key={k} label={label} on={fontScaleName === k} onPress={() => pickScale(k)} />
           ))}
         </View>
         <Text style={styles.label}>{t('深浅色')}</Text>
         <View style={styles.chipRow}>
-          {schemes.map(([k, label]) => (
-            <Filter
-              key={k}
-              label={label}
-              on={colorSchemeSetting === k}
-              onPress={() => {
-                if (k === colorSchemeSetting) return
-                trackAction('settings_save', { what: 'color_scheme', value: k })
-                writeColorSchemeSync(k)
-                syncWindowTheme(k)
-                reloadApp()
-              }}
-            />
+          {SCHEMES.map(([k, label]) => (
+            <Filter key={k} label={label} on={colorSchemeSetting === k} onPress={() => pickScheme(k)} />
           ))}
         </View>
         <Text style={styles.label}>{t('语言')}</Text>
         <View style={styles.chipRow}>
-          {languages.map(([k, label]) => (
-            <Filter
-              key={k}
-              label={label}
-              on={language === k}
-              onPress={() => {
-                if (k === language) return
-                trackAction('settings_save', { what: 'language', value: k })
-                switchLanguage(k, config.hub).catch((err: Error) => showError(t('没切换成'), err))
-              }}
-            />
+          {LANGUAGES.map(([k, label]) => (
+            <Filter key={k} label={label} on={language === k} onPress={() => pickLanguage(k)} />
           ))}
         </View>
         <Text style={styles.hint}>
@@ -607,29 +483,7 @@ function DisplayBlock() {
 }
 
 function ReviewNowBlock() {
-  const { config } = useConfig()
-  const { bump } = useRefresh()
-  const toast = useToast()
-  const showError = useErrorToast()
-  const [busy, setBusy] = useState(false)
-  const start = async () => {
-    if (config.hub === null) {
-      toast(t('先在下面填 hub 地址和令牌'), true)
-      return
-    }
-    setBusy(true)
-    try {
-      const job = await actions.requestReview(config.hub)
-      trackAction('review_start', null)
-      toast(job.status === 'queued' ? t('复盘已排队，Mac 醒来后起草复盘和下一期计划') : t('复盘开始了'), false)
-      bump()
-    } catch (err) {
-      if (!(err instanceof Error)) throw err
-      showError(t('没能开始复盘'), err)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { busy, start } = useStartReview()
   return (
     <View style={styles.block}>
       <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
@@ -641,17 +495,7 @@ function ReviewNowBlock() {
 }
 
 function OrcaBlock() {
-  const { config } = useConfig()
-  const toast = useToast()
-  const showError = useErrorToast()
-  const open = () => {
-    if (config.orcaUrl === null) {
-      toast(t('先在下面填 Orca 链接'), true)
-      return
-    }
-    trackAction('open_orca', null)
-    Linking.openURL(config.orcaUrl).catch((err: Error) => showError(t('打不开 Orca'), err))
-  }
+  const open = useOpenOrca()
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
       <Btn label={t('去 Orca')} icon={ExternalLink} onPress={open} />
@@ -661,18 +505,7 @@ function OrcaBlock() {
 
 // 当前运行的 JS 包：空中更新的 updateId / 创建时间，或 APK 内置包；用来确认手机上是哪个版本
 function VersionBlock() {
-  // 开发模式和网页模式没有 updateId；APK 内置包和空中更新包都有
-  // 网页版（PWA）没有 updateId，显示构建号（和 /app/version.json 的 build 对得上）
-  const lines =
-    pwa !== null
-      ? [t('网页版 build {build}', { build: pwa.build })]
-      : Updates.updateId === null
-      ? [t('JS 包：开发 / 网页模式，没有 updateId')]
-      : [
-          t('JS 包：{kind} {id}', { kind: Updates.isEmbeddedLaunch ? t('APK 内置') : t('空中更新'), id: Updates.updateId }),
-          ...(Updates.createdAt === null ? [] : [t('创建于 {when}', { when: when(Updates.createdAt.toISOString()) })]),
-          `runtime ${Updates.runtimeVersion === null ? t('无') : Updates.runtimeVersion.slice(0, 12)} · channel ${Updates.channel === null ? t('无') : Updates.channel}`,
-        ]
+  const lines = versionLines()
   return (
     <View style={styles.version}>
       {lines.map((l) => (
@@ -685,24 +518,7 @@ function VersionBlock() {
 }
 
 function Settings() {
-  const { config, update } = useConfig()
-  const toast = useToast()
-  const showError = useErrorToast()
-  const [hubUrl, setHubUrl] = useState(config.hub === null ? '' : config.hub.hubUrl)
-  const [token, setToken] = useState(config.hub === null ? '' : config.hub.token)
-  const [orcaUrl, setOrcaUrl] = useState(config.orcaUrl === null ? '' : config.orcaUrl)
-
-  const save = async () => {
-    const url = hubUrl.trim()
-    const tok = token.trim()
-    if ((url === '') !== (tok === '')) {
-      toast(t('hub 地址和令牌要一起填（或一起清空）'), true)
-      return
-    }
-    const orca = orcaUrl.trim()
-    await update({ hub: url === '' ? null : { hubUrl: url, token: tok }, orcaUrl: orca === '' ? null : orca })
-    toast(t('已保存'), false)
-  }
+  const { hubUrl, setHubUrl, token, setToken, orcaUrl, setOrcaUrl, save } = useConnectionForm()
 
   return (
     <Section title={t('连接设置')}>

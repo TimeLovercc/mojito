@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { PixelRatio, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import { ChevronDown, ChevronUp } from 'lucide-react-native'
-import type { ChatPage, GoalsList, HubRecord, ItemDetail } from '../../src/api/types'
+import type { ChatPage, GoalsList, HubRecord, ItemDetail, ProjectsList } from '../../src/api/types'
 import { ChatThread, Composer, mergeChat, useChatJobs, useReplyPolling } from '../../src/components/Chat'
 import { ItemDecision, ItemLifecycle } from '../../src/components/Decision'
 import { ProgressBar } from '../../src/components/ProgressBar'
@@ -14,7 +14,8 @@ import { when } from '../../src/time'
 import { colors, desktop, font, size } from '../../src/theme'
 import { useHub } from '../../src/use-hub'
 import { useScreenIds, useViewTracking } from '../../src/usage'
-import { useChatSubject } from '../../src/wide'
+import { useChatSubject, useWide } from '../../src/wide'
+import { ItemToolsD } from '../../src/desktop/ItemTools'
 import { t } from '../../src/i18n'
 
 const toneColor = { g: colors.ok, a: colors.warn, r: colors.bad, n: colors.tx2 } as const
@@ -23,6 +24,8 @@ export default function ItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const view = useHub<ItemDetail>(`/items/${encodeURIComponent(id)}`)
   const goals = useHub<GoalsList>('/goals')
+  const projects = useHub<ProjectsList>('/projects')
+  const wide = useWide()
   useViewTracking('item_detail')
   useScreenIds(id, view.data === null ? null : view.data.item.project_id)
   useChatSubject(view.data === null ? null : { kind: 'item', id, title: view.data.item.title })
@@ -37,10 +40,18 @@ export default function ItemScreen() {
     view.refresh()
   }, [chat.refresh, refreshJobs, view.refresh])
   useReplyPolling(thread, byRecord, refreshAll)
+  // 电脑宽屏（docs/desktop-v2.md 逐页方案 3）：顶栏"‹ 项目名"，右侧"完成""⋯"；等你拍板的事项仍在正文里同意 / 不要
+  const deskBar = wide && desktop
+  const item = view.data === null ? null : view.data.item
+  const project =
+    item === null || item.project_id === null || projects.data === null
+      ? undefined
+      : projects.data.projects.find((p) => p.id === item.project_id)
   return (
     <Screen
       view={view}
-      head={{ kind: 'back', label: t('事项') }}
+      head={{ kind: 'back', label: deskBar && project !== undefined ? project.title : t('事项') }}
+      tools={deskBar && item !== null && item.status !== 'waiting_you' ? <ItemToolsD item={item} /> : null}
       bottom={
         <Composer
           target={{
@@ -54,6 +65,7 @@ export default function ItemScreen() {
             },
           }}
           placeholder={t('写笔记或问问这件事…')}
+          chips={null}
         />
       }
     >
@@ -79,7 +91,7 @@ export default function ItemScreen() {
                   </View>
                 ) : null}
               </View>
-              {item.status === 'waiting_you' ? <ItemDecision item={item} /> : <ItemLifecycle item={item} />}
+              {item.status === 'waiting_you' ? <ItemDecision item={item} /> : deskBar ? null : <ItemLifecycle item={item} />}
             </View>
 
             <Card style={styles.kv}>

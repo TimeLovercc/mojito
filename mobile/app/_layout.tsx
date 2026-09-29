@@ -63,7 +63,10 @@ export default function RootLayout() {
                   <Stack.Screen name="cards/[id]" />
                   <Stack.Screen name="taste" />
                   <Stack.Screen name="subscriptions" />
-                  <Stack.Screen name="menubar" />
+                  <Stack.Screen
+                    name="menubar"
+                    options={{ contentStyle: { backgroundColor: tauri === null ? colors.card : 'transparent' } }}
+                  />
                   <Stack.Screen name="notify" />
                   <Stack.Screen name="records/[id]" />
                   <Stack.Screen name="plans/[id]" />
@@ -90,7 +93,8 @@ function Shell({ children }: { children: ReactNode }) {
   // 使用记录：启动和每次回到前台时上报；菜单栏面板不算打开
   useUsageFlush(!menubar)
   useLanguageSync()
-  if (menubar) return <View style={styles.page}>{children}</View>
+  // 菜单栏面板在 Mac app 里是 Popover 毛玻璃窗口：根和页面底色都透明（面板自己叠 popoverTint）
+  if (menubar) return <View style={[styles.page, tauri !== null && styles.clear]}>{children}</View>
   return (
     <View style={[styles.page, wide && styles.row, wide && tauri !== null && styles.clear]}>
       {wide ? <Sidebar /> : null}

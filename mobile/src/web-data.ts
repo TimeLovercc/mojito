@@ -12,3 +12,6 @@ export const hoverRow = data({ hover: 'row' })
 export const dragRegion = data({ tauriDragRegion: 'deep' })
 // 对话输入卡上方 24px 渐变遮罩
 export const fadeTop = data({ fade: 'top' })
+// 悬停才显示的元信息：组（外层）和元信息本身（src/desktop/HoverMeta.tsx）
+export const hoverGroup = data({ hovergroup: 'on' })
+export const hoverMeta = data({ hovermeta: 'on' })

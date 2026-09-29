@@ -23,7 +23,7 @@ export default function FeedbackThreadScreen() {
     <Screen
       view={view}
       head={{ kind: 'back', label: t('反馈与建议') }}
-      bottom={<Composer target={{ kind: 'feedback_reply', feedbackId: id }} placeholder={t('回复维护会话…')} />}
+      bottom={<Composer target={{ kind: 'feedback_reply', feedbackId: id }} placeholder={t('回复维护会话…')} chips={null} />}
     >
       {(fb) => (
         <>

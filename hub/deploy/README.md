@@ -113,7 +113,7 @@ hub/deploy/deploy-web.sh main "<用户能感知的变化>"
 ```
 
 1. 在 Mac 的临时目录里 `git archive` 出 `mobile/`，然后 `npm ci`，再用 `MOJITO_WEB_BUILD=<sha12>` 执行 `npm run build:pwa`。
-2. 检查产物：扩展名在白名单里；没有 `*.map`、`sourceMappingURL`、`EXPO_PUBLIC_`、`u.expo.dev`、`.env*`、密钥文件、apk；`version.json` 的 build 等于 sha12。
+2. 检查产物：扩展名在白名单里；没有 `*.map`、`sourceMappingURL`、`EXPO_PUBLIC_`、`https://u.expo.dev`（expo-router 库代码里有字面量 `u.expo.dev`，不拦）、`.env*`、密钥文件、apk；`version.json` 的 build 等于 sha12。
 3. 上传到 `releases/<sha12>/`，把上一版自己的 `_expo/static` 并入新版（用 `cp -an`，这样还开着旧页面的设备不会 404），然后原子切换 `current`，删到只剩 3 版。
 4. 检查 `/app/`、`sw.js`、`pwa-boot.js`、`manifest.webmanifest` 都返回 200，content-type 正确，并带 CSP；`version.json` 的 build 等于 sha12。
 5. 推送"网页版已更新：<第一行>"（`category=release`）。

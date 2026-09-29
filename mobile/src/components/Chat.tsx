@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ArrowUp } from 'lucide-react-native'
@@ -169,7 +169,8 @@ function draftKey(target: ComposerTarget): string {
   return `chat:${target.itemId}:${target.projectId}:${target.cardId}`
 }
 
-export function Composer({ target, placeholder }: { target: ComposerTarget; placeholder: string }) {
+// chips：电脑上输入卡顶行的芯片（对话整页的"正在看：X ×"），没有传 null
+export function Composer({ target, placeholder, chips }: { target: ComposerTarget; placeholder: string; chips: ReactNode | null }) {
   const feedback = target.kind !== 'chat'
   const { config } = useConfig()
   const toast = useToast()
@@ -215,42 +216,60 @@ export function Composer({ target, placeholder }: { target: ComposerTarget; plac
   const canSend = !busy && (text.trim() !== '' || attach.count > 0)
   const inputRef = useRef<TextInput>(null)
   const desk = useDesktopInput(text, () => (canSend ? send() : undefined), inputRef)
+  const input = (
+    <TextInput
+      ref={inputRef}
+      style={[styles.input, desk.style]}
+      onKeyPress={desk.onKeyPress}
+      numberOfLines={desk.numberOfLines}
+      placeholder={placeholder}
+      placeholderTextColor={desktop ? colors.tx3 : colors.tx2}
+      value={text}
+      onChangeText={setText}
+      multiline
+      editable={!busy}
+    />
+  )
+  const sendKey = (
+    <Pressable
+      accessibilityLabel={t('发送')}
+      onPress={send}
+      disabled={!canSend}
+      style={desktop ? [composerD.send, !canSend && composerD.sendOff] : [styles.send, !canSend && { opacity: 0.4 }]}
+    >
+      {busy ? (
+        <ActivityIndicator size="small" color={colors.onBrand} />
+      ) : (
+        <ArrowUp size={desktop ? 16 : 18} color={desktop ? sendArrow(canSend) : colors.onBrand} strokeWidth={2.2} />
+      )}
+    </Pressable>
+  )
+  // 电脑（docs/desktop-v2.md 对话·输入卡）：芯片行（上下文芯片 + 待发缩略图）在卡片里，主行在下；外边距由调用方给
+  if (desktop) {
+    return (
+      <View style={[composerD.card, feedback && { boxShadow: `0 0 0 1px ${colors.warn}` }]}>
+        {chips === null && attach.count === 0 ? null : (
+          <View style={composerD.chips}>
+            {chips}
+            {attach.pending}
+          </View>
+        )}
+        <View style={composerD.row}>
+          {attach.button}
+          {input}
+          {sendKey}
+        </View>
+      </View>
+    )
+  }
   return (
     <View>
       {attach.pending}
       {attach.chooser}
-      <View
-        style={
-          desktop
-            ? [composerD.card, styles.cardGap, feedback && { boxShadow: `0 0 0 1px ${colors.warn}` }]
-            : [styles.composer, feedback && { borderColor: colors.warn }]
-        }
-      >
+      <View style={[styles.composer, feedback && { borderColor: colors.warn }]}>
         {attach.button}
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, desk.style]}
-          onKeyPress={desk.onKeyPress}
-          numberOfLines={desk.numberOfLines}
-          placeholder={placeholder}
-          placeholderTextColor={colors.tx2}
-          value={text}
-          onChangeText={setText}
-          multiline
-          editable={!busy}
-        />
-        <Pressable
-          accessibilityLabel={t('发送')}
-          onPress={send}
-          disabled={!canSend}
-          style={desktop ? [composerD.send, !canSend && composerD.sendOff] : [styles.send, !canSend && { opacity: 0.4 }]}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color={colors.onBrand} />
-          ) : (
-            <ArrowUp size={desktop ? 16 : 18} color={desktop ? sendArrow(canSend) : colors.onBrand} strokeWidth={2.2} />
-          )}
-        </Pressable>
+        {input}
+        {sendKey}
       </View>
     </View>
   )
@@ -302,7 +321,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  cardGap: { marginHorizontal: 16, marginBottom: 16 },
   input: { ...font.regular, flex: 1, color: colors.tx, fontSize: size.body, maxHeight: 120, paddingVertical: 8 },
   send: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
 })

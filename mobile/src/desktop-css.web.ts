@@ -19,6 +19,10 @@ export function installDesktopCss() {
     [data-hover="row"] { transition: background-color 120ms cubic-bezier(.32,.72,0,1); }
     [data-hover="row"]:hover { background-color: ${overlay.hover}; }
     [data-hover="row"]:active { background-color: ${overlay.pressed}; }
+    /* 悬停才出现的元信息：进入延迟 100ms、显隐 120ms；键盘聚焦到组里时也显示 */
+    [data-hovermeta="on"] { opacity: 0; transition: opacity 120ms cubic-bezier(.32,.72,0,1) 0ms; }
+    [data-hovergroup="on"]:hover [data-hovermeta="on"],
+    [data-hovergroup="on"]:focus-within [data-hovermeta="on"] { opacity: 1; transition-delay: 100ms; }
     /* 对话输入卡上方的渐变遮罩 */
     [data-fade="top"] { background: linear-gradient(to bottom, ${colors.bg}00, ${colors.bg}); pointer-events: none; }
     /* 滚动不回弹；图片不能拖出窗口 */

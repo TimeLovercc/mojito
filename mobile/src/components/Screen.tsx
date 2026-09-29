@@ -9,7 +9,7 @@ import { t } from '../i18n'
 import { when } from '../time'
 import { Avatar } from './Avatar'
 import { BottomInset } from './BottomInset'
-import { colors, font, overlay, size, space } from '../theme'
+import { colors, desktop, font, overlay, size, space } from '../theme'
 import { useHub, type HubView } from '../use-hub'
 import { useWide } from '../wide'
 import { dragRegion } from '../web-data'
@@ -30,6 +30,7 @@ export function Screen<T>({
   full,
   flush,
   sub,
+  tools,
 }: {
   view: HubView<T>
   head: Head
@@ -45,6 +46,8 @@ export function Screen<T>({
   flush?: boolean
   // 宽屏顶栏标题旁的小字（如信息流"6 条新的"）
   sub?: string
+  // 宽屏顶栏右侧的页面级按钮（电脑事项详情的"完成""⋯"）
+  tools?: ReactNode
 }) {
   const insets = useSafeAreaInsets()
   const wide = useWide()
@@ -52,7 +55,7 @@ export function Screen<T>({
   // 整页避让键盘（edge-to-edge 下系统不再自动缩小窗口）：底部输入框、系统页设置都不被挡
   return (
     <KeyboardAvoidingView style={styles.page} behavior="padding">
-      {wide && head.kind !== 'none' ? <TopBar head={head} sub={sub === undefined ? null : sub} syncing={syncing} /> : null}
+      {wide && head.kind !== 'none' ? <TopBar head={head} sub={sub === undefined ? null : sub} tools={tools === undefined ? null : tools} syncing={syncing} /> : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={
@@ -73,7 +76,11 @@ export function Screen<T>({
         {footer}
       </ScrollView>
       {fab && !wide ? <ChatFab /> : null}
-      {bottom === undefined ? null : <BottomInset>{bottom}</BottomInset>}
+      {bottom === undefined ? null : (
+        <BottomInset>
+          <View style={desktop && styles.bottomD}>{bottom}</View>
+        </BottomInset>
+      )}
     </KeyboardAvoidingView>
   )
 }
@@ -82,7 +89,7 @@ type BarHead = { kind: 'brand' } | { kind: 'title'; title: string } | { kind: 'b
 
 // 宽屏顶栏（内部界面稿（未公开） 的 .bar）：高 52、下边线；左边标题 + 小字（或"‹ 返回"），右边同步小圆点。对话入口只在侧边栏（用户定）。
 // 并排的页面（信息流、项目）自己在两栏上方放一条，列表栏的 Screen 用 head none
-export function TopBar({ head, sub, syncing }: { head: BarHead; sub: string | null; syncing: boolean }) {
+export function TopBar({ head, sub, tools, syncing }: { head: BarHead; sub: string | null; tools: ReactNode; syncing: boolean }) {
   const router = useRouter()
   return (
     <View style={styles.bar} {...dragRegion}>
@@ -98,6 +105,7 @@ export function TopBar({ head, sub, syncing }: { head: BarHead; sub: string | nu
         </View>
       )}
       <View style={styles.acts}>
+        {tools}
         <SyncDot on={syncing} />
       </View>
     </View>
@@ -214,9 +222,12 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: space.gutter, paddingBottom: 150, gap: space.section },
   wideContent: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 48, gap: 20 },
-  read: { width: '100%', maxWidth: 760, alignSelf: 'center' },
+  // 单栏阅读页（计划、笔记、系统、通知、事项详情）：内容列 720 居中（加左右内边距 24）
+  read: { width: '100%', maxWidth: 768, alignSelf: 'center' },
   wideFull: { width: '100%', maxWidth: 1120, alignSelf: 'center' },
   flushContent: { paddingBottom: 32 },
+  // 电脑：底部输入卡的外边距（Composer 自己不带）
+  bottomD: { paddingHorizontal: 16, paddingBottom: 16 },
   bar: {
     height: 52,
     flexDirection: 'row',

@@ -80,7 +80,8 @@ def _gist(tail: list[str]) -> str | None:
 
 def _last_output(worktree_id: str, terminals: list[dict]) -> str | None:
     """Gist of the most recently active terminal in this worktree, secrets masked."""
-    mine = [t for t in terminals if t["worktreeId"] == worktree_id]
+    mine = [t for t in terminals
+            if t["worktreeId"] == worktree_id and t["lastOutputAt"] is not None]
     if not mine:
         return None
     latest = max(mine, key=lambda t: t["lastOutputAt"])

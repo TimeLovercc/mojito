@@ -4,7 +4,6 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{Emitter, Manager};
-use tauri_plugin_http::reqwest;
 
 const INTERVAL: Duration = Duration::from_secs(30);
 const LIMIT: u32 = 50;
@@ -75,7 +74,14 @@ enum Failure {
 
 pub fn start(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let client = reqwest::Client::builder().timeout(Duration::from_secs(20)).build().unwrap();
+        // 每 30 秒一轮，空闲连接多半已被 Funnel 或睡眠、换网弄断，复用它只会等到超时：不留空闲连接，每轮重新连。
+        // 连不上 8 秒就算失败（被丢的 SYN 重传 1–3 秒内一般就通了），下一轮照常重试
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(20))
+            .connect_timeout(Duration::from_secs(8))
+            .pool_max_idle_per_host(0)
+            .build()
+            .unwrap();
         loop {
             match tick(&app, &client).await {
                 Ok(()) => {}

@@ -26,7 +26,7 @@ export default function FeedbackScreen() {
           </Text>
         </View>
       }
-      bottom={<Composer target={{ kind: 'feedback' }} placeholder={t('说说哪里不对、想怎么改…')} />}
+      bottom={<Composer target={{ kind: 'feedback' }} placeholder={t('说说哪里不对、想怎么改…')} chips={null} />}
     >
       {({ feedback }) => (
         <Section title={t('我提过的')} right={String(feedback.length)}>

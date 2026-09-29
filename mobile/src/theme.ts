@@ -68,10 +68,37 @@ export const WIDE_MIN = 900
 // 触屏的 iPad / 横屏 iPhone（网页版）没有鼠标，按手机密度（src/pointer.web.ts）。
 export const desktop = Platform.OS === 'web' && (tauri !== null || (Dimensions.get('window').width >= WIDE_MIN && finePointer))
 
-// 分层按做法 A（docs/desktop-v2.md 分层：B/C token 不变，只是电脑取用方式不同）：侧栏 < 内容 < 卡片。
-// 电脑深色的内容底用 tabbar；浏览器里侧栏没有毛玻璃时的回退色：浅色 raised、深色原来的 bg
-export const colors = isDark ? (desktop ? { ...DARK, bg: DARK.tabbar } : DARK) : LIGHT
-export const sideFallback = isDark ? DARK.bg : LIGHT.raised
+// 电脑配色 B 中性′（docs/desktop-v2.md 顶部拍板，只用于电脑密度；手机仍是 B 冷静蓝 / C 浅色纸面）：
+// 只换表面和中性文字，品牌色和 ok / warn / bad 不变。层次：侧栏 < 内容 bg < 卡片 card；输入卡深色用 raised。
+// line 由文字色乘透明度得到（同 overlay.hair）
+const DESK_LIGHT: typeof DARK = {
+  ...LIGHT,
+  bg: '#f3f3f0',
+  card: '#ffffff',
+  raised: '#ecece8',
+  line: 'rgba(23,23,22,0.12)',
+  tx: '#171716',
+  tx2: '#52524e',
+  tx3: '#6f6f6a',
+  tabbar: '#ffffff',
+}
+const DESK_DARK: typeof DARK = {
+  ...DARK,
+  bg: '#151515',
+  card: '#1f1f1e',
+  raised: '#262625',
+  line: 'rgba(236,236,234,0.10)',
+  tx: '#ececea',
+  tx2: '#a9a9a5',
+  tx3: '#8c8c87',
+  tabbar: '#151515',
+}
+export const colors = desktop ? (isDark ? DESK_DARK : DESK_LIGHT) : isDark ? DARK : LIGHT
+// 侧栏底：Mac app 浅色是毛玻璃叠 #ecece8 α .65；深色不透明 #0c0c0c（深色时 desktop 关掉毛玻璃，保证层次）。
+// 浏览器里没有毛玻璃，浅色用 #ecece8 实色
+export const sideBg = isDark ? '#0c0c0c' : tauri === null ? '#ecece8' : 'rgba(236,236,232,0.65)'
+// 菜单栏面板叠在 Popover 毛玻璃上的底色
+export const popoverTint = isDark ? 'rgba(38,38,37,0.76)' : 'rgba(255,255,255,0.74)'
 
 // 电脑上字体要写在每个 Text 上（react-native-web 给每个 Text 单独写 font，html 上设无效）：界面字苹方；
 // mono 数字用 Geist Mono，混排串里的汉字回退到苹方；字重最重 600（docs/desktop-v2.md 字体）

@@ -6,7 +6,8 @@ import { ChevronLeft, Eye, Newspaper } from 'lucide-react-native'
 import type { Card } from '../src/api/types'
 import { ChatBody, ContextBar, useServerStatus, type ChatAbout } from '../src/components/ChatPane'
 import { TopBar } from '../src/components/Screen'
-import { colors, font, size } from '../src/theme'
+import { colors, desktop, font, size } from '../src/theme'
+import { ChatWide } from '../src/desktop/ChatWide'
 import { humanize } from '../src/errors'
 import { t } from '../src/i18n'
 import { useHub } from '../src/use-hub'
@@ -39,11 +40,21 @@ export default function ChatScreen() {
       <ContextBar icon={Eye} text={t('正在看：{title}', { title: subject.title })} onClear={() => setSubject(null)} />
     )
 
+  // 电脑宽屏：对话整页（src/desktop/ChatWide.tsx），上下文是输入卡里的芯片
+  if (wide && desktop) {
+    return (
+      <ChatWide
+        about={about}
+        context={subject === null ? null : params.card_id !== undefined ? <CardTitle cardId={subject.id} /> : t('正在看：{title}', { title: subject.title })}
+        onClearContext={() => setSubject(null)}
+      />
+    )
+  }
   return (
     // 输入框避让键盘和底部导航条
     <KeyboardAvoidingView style={[styles.page, !wide && { paddingTop: insets.top + 6 }]} behavior="padding">
       {wide ? (
-        <TopBar head={{ kind: 'title', title: t('对话') }} sub={status.text} syncing={false} />
+        <TopBar head={{ kind: 'title', title: t('对话') }} sub={status.text} tools={null} syncing={false} />
       ) : (
         <View style={styles.head}>
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} hitSlop={10} style={styles.headSide}>
@@ -65,6 +76,13 @@ function subjectOf(p: Params): Subject | null {
   if (p.kind === undefined) return null
   if (p.id === undefined || p.title === undefined) throw new Error(`对话页参数不全：${JSON.stringify(p)}`)
   return { kind: p.kind, id: p.id, title: p.title }
+}
+
+// 电脑对话整页的芯片文字：从信息流卡片"问问"进来时写卡片标题
+function CardTitle({ cardId }: { cardId: string }) {
+  const card = useHub<Card>(`/cards/${encodeURIComponent(cardId)}`)
+  const title = card.data === null ? (card.error === null ? t('读取卡片…') : humanize(card.error).message) : card.data.title
+  return <>{t('关于：{title}', { title })}</>
 }
 
 // 从卡片"问问这个"进来：显示在问哪张卡片，可以去掉

@@ -17,13 +17,20 @@ import { useMarkReadOnLeave } from '../../src/read-mark'
 import { when } from '../../src/time'
 import { useChatSubject, useWide } from '../../src/wide'
 import { hoverRow } from '../../src/web-data'
+import { FeedWide } from '../../src/desktop/FeedWide'
 import { t } from '../../src/i18n'
 
 const PAGE = 20
 
 // 信息流：值得读的东西（论文、会话发布的结果）。有尽头，"上次读到这里"以下是看过的。
-// 宽屏（design.md 8.4）：左边列表，右边阅读区
+// 电脑宽屏用 src/desktop/FeedWide.tsx；手机和非电脑密度的宽屏（iPad）用下面的页面
 export default function CardsScreen() {
+  const wide = useWide()
+  return wide && desktop ? <FeedWide /> : <CardsList />
+}
+
+// 宽屏（design.md 8.4，iPad 等非电脑密度）：左边列表，右边阅读区
+function CardsList() {
   const wide = useWide()
   const [picked, setPicked] = useState<string | null>(null)
   const view = useHub<CardsPage>(`/cards?limit=${PAGE}`)
@@ -144,6 +151,7 @@ export default function CardsScreen() {
       <TopBar
         head={{ kind: 'title', title: t('信息流') }}
         sub={freshCount === null || freshCount < 0 ? null : t('{n} 条新的', { n: freshCount })}
+        tools={null}
         syncing={view.syncing && !view.pulling}
       />
       <View style={styles.split}>

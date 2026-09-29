@@ -10,13 +10,14 @@ import { UndoButton } from '../../src/components/Undo'
 import { Thumbs } from '../../src/components/Chat'
 import { useImageAttach } from '../../src/components/ImageAttach'
 import { useDesktopInput } from '../../src/input'
+import { useWide } from '../../src/wide'
+import { addDays, clock, longDate, todayYmd, weekdayOf, when, ymdOf } from '../../src/time'
 import { composerD, sendArrow } from '../../src/components/ComposerStyle'
 import { useDraft } from '../../src/draft'
 import { Btn, Card, Empty, Rows } from '../../src/components/ui'
 import { useConfig } from '../../src/config/context'
 import { humanize } from '../../src/errors'
 import { useRefresh } from '../../src/refresh'
-import { when } from '../../src/time'
 import { useErrorToast, useToast } from '../../src/toast'
 import { colors, desktop, font, radii, size } from '../../src/theme'
 import { trackAction, useViewTracking } from '../../src/usage'
@@ -41,6 +42,7 @@ export default function NotesScreen() {
   const [older, setOlder] = useState<HubRecord[]>([])
   const [exhausted, setExhausted] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
+  const wide = useWide()
   useViewTracking('notes')
 
   const page = view.data
@@ -81,6 +83,14 @@ export default function NotesScreen() {
           <View style={{ gap: 10 }}>
             {notes.length === 0 ? (
               <Empty text={t('还没有笔记，上面写一句试试')} />
+            ) : wide && desktop ? (
+              <NotesByDay
+                notes={notes}
+                projectTitle={projectTitle}
+                open={open}
+                onToggle={(id) => setOpen(open === id ? null : id)}
+                onHidden={view.refresh}
+              />
             ) : (
               <Card>
                 <Rows>
@@ -111,6 +121,57 @@ export default function NotesScreen() {
   )
 }
 
+// 电脑（docs/desktop-v2.md 逐页方案 5）：按天分组，组头 13/500 tx2；每条不套卡片——44 宽时间列、正文 15/24 可选中
+// （收起最多 4 行）、项目名 12 tx3、缩略图；悬停叠 hover，点开原地展开和手机一样的"打开事项 / 撤销整理 / 删除"
+function NotesByDay({
+  notes,
+  projectTitle,
+  open,
+  onToggle,
+  onHidden,
+}: {
+  notes: HubRecord[]
+  projectTitle: (id: string | null) => string | null
+  open: string | null
+  onToggle: (id: string) => void
+  onHidden: () => Promise<void>
+}) {
+  const today = todayYmd()
+  const label = (ymd: string) => (ymd === today ? t('今天') : ymd === addDays(today, -1) ? t('昨天') : `${longDate(ymd)} ${weekdayOf(ymd)}`)
+  return (
+    <View>
+      {notes.map((r, i) => {
+        const day = ymdOf(new Date(r.at))
+        const newDay = i === 0 || ymdOf(new Date(notes[i - 1].at)) !== day
+        const project = projectTitle(r.project_id)
+        const text = noteText(r)
+        return (
+          <View key={r.id}>
+            {newDay ? <Text style={[styles.dayHead, i === 0 && { marginTop: 0 }]}>{label(day)}</Text> : null}
+            <Pressable style={styles.rowD} onPress={() => onToggle(r.id)} {...hoverRow}>
+              <Text style={styles.timeD}>{clock(r.at)}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                {r.title === '[图片]' && r.body === '' ? null : (
+                  <RichText text={text} style={styles.textD} enums={false} numberOfLines={open === r.id ? undefined : 4} />
+                )}
+                <Thumbs record={r} />
+                {project === null ? null : <Text style={styles.projectD}>{project}</Text>}
+                {open === r.id ? <NoteDetail note={r} onHidden={onHidden} /> : null}
+              </View>
+            </Pressable>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+// 笔记正文：现在 body 是整段原文（第一行同时当 title）；09-29 之前的笔记 body 只存第一行以后的部分，拼回 title
+function noteText(note: HubRecord): string {
+  if (note.body === '') return note.title
+  return note.body.startsWith(note.title) ? note.body : `${note.title}\n${note.body}`
+}
+
 function NoteRow({
   note,
   project,
@@ -124,7 +185,7 @@ function NoteRow({
   onToggle: () => void
   onHidden: () => Promise<void>
 }) {
-  const text = note.body === '' || note.body === note.title ? note.title : `${note.title}\n${note.body}`
+  const text = noteText(note)
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.raised }]} onPress={onToggle} {...hoverRow}>
       {note.title === '[图片]' && note.body === '' ? null : (
@@ -231,14 +292,15 @@ function QuickNote({ onSent, focus }: { onSent: () => Promise<void>; focus: stri
       const title = lines[0].trim()
       await actions.addRecord(hub, {
         title: title === '' ? '[图片]' : title,
-        body: lines.slice(1).join('\n').trim(),
+        body: text.trim(),
         item_id: null,
         project_id: null,
         needs_processing: true,
         attachment_ids: ids,
       })
       trackAction('note', { needs_processing: true, images: String(ids.length) })
-      toast(t('记好了，Claude 会整理'), false)
+      // 电脑上不弹提示，笔记直接出现在下面的时间线里
+      if (!desktop) toast(t('记好了，Claude 会整理'), false)
       setText('')
       attach.clear()
       await onSent()
@@ -254,44 +316,46 @@ function QuickNote({ onSent, focus }: { onSent: () => Promise<void>; focus: stri
   const desk = useDesktopInput(text, () => (canSend ? send() : undefined), input)
   return (
     <View>
-      {attach.pending}
+      {desktop ? null : attach.pending}
       {attach.chooser}
+      {/* 电脑：两层输入卡，待发缩略图在卡片顶行（docs/desktop-v2.md 笔记） */}
       <View style={desktop ? composerD.card : styles.quick}>
-        {attach.button}
-        <TextInput
-          ref={input}
-          style={[styles.input, desk.style]}
-          onKeyPress={desk.onKeyPress}
-          numberOfLines={desk.numberOfLines}
-          placeholder={t('写笔记…要办的事会自动变成事项')}
-          placeholderTextColor={colors.tx2}
-          value={text}
-          onChangeText={setText}
-          multiline
-          editable={!busy}
-        />
-        <Pressable
-          accessibilityLabel={t('记下')}
-          onPress={send}
-          disabled={!canSend}
-          style={desktop ? [composerD.send, !canSend && composerD.sendOff] : [styles.send, !canSend && { opacity: 0.4 }]}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color={colors.onBrand} />
-          ) : (
-            <ArrowUp size={desktop ? 16 : 18} color={desktop ? sendArrow(canSend) : colors.onBrand} strokeWidth={2.2} />
-          )}
-        </Pressable>
+        {desktop && attach.count > 0 ? <View style={composerD.chips}>{attach.pending}</View> : null}
+        <View style={desktop ? composerD.row : styles.quickRow}>
+          {attach.button}
+          <TextInput
+            ref={input}
+            style={[styles.input, desk.style]}
+            onKeyPress={desk.onKeyPress}
+            numberOfLines={desk.numberOfLines}
+            placeholder={t('写笔记…要办的事会自动变成事项')}
+            placeholderTextColor={desktop ? colors.tx3 : colors.tx2}
+            value={text}
+            onChangeText={setText}
+            multiline
+            editable={!busy}
+          />
+          <Pressable
+            accessibilityLabel={t('记下')}
+            onPress={send}
+            disabled={!canSend}
+            style={desktop ? [composerD.send, !canSend && composerD.sendOff] : [styles.send, !canSend && { opacity: 0.4 }]}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.onBrand} />
+            ) : (
+              <ArrowUp size={desktop ? 16 : 18} color={desktop ? sendArrow(canSend) : colors.onBrand} strokeWidth={2.2} />
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  // 手机：外框 + 一行（quickRow）
   quick: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
     paddingLeft: 6,
     paddingRight: 6,
     paddingVertical: 6,
@@ -300,6 +364,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
+  quickRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   input: { ...font.regular, flex: 1, minHeight: 40, maxHeight: 160, color: colors.tx, fontSize: size.body, paddingVertical: 8 },
   send: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   row: { paddingVertical: 10, paddingHorizontal: 13, gap: 4 },
@@ -310,5 +375,10 @@ const styles = StyleSheet.create({
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
   linkText: { ...font.regular, fontSize: size.secondary, color: colors.brand, flexShrink: 1 },
   hide: { ...font.regular, fontSize: size.secondary, color: colors.bad },
+  dayHead: { ...font.medium, fontSize: size.secondary, color: colors.tx2, marginTop: 20, marginBottom: 6, paddingHorizontal: 8 },
+  rowD: { flexDirection: 'row', gap: 0, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 8 },
+  timeD: { ...font.mono, width: 44, fontSize: size.small, lineHeight: 24, color: colors.tx3 },
+  textD: { ...font.regular, fontSize: size.body, lineHeight: 24, color: colors.tx, userSelect: 'text' },
+  projectD: { ...font.regular, fontSize: size.small, color: colors.tx3, marginTop: 2 },
   end: { ...font.regular, fontSize: size.small, color: colors.tx2, textAlign: 'center', marginTop: 8 },
 })

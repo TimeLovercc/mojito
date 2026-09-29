@@ -11,7 +11,8 @@ import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { useWide } from '../../src/wide'
 import { TopBar } from '../../src/components/Screen'
-import { colors, font, size } from '../../src/theme'
+import { colors, desktop, font, size } from '../../src/theme'
+import { ProjectsWide } from '../../src/desktop/ProjectsWide'
 import type { Project } from '../../src/api/types'
 import { ProjectPane } from '../projects/[id]'
 import { hoverRow } from '../../src/web-data'
@@ -19,10 +20,10 @@ import { t } from '../../src/i18n'
 
 const OPEN = new Set(['active', 'waiting_you', 'scheduled'])
 
-// 项目面板：研究 / 生活两组，不属于任何项目的进行中事项归入"其他"。宽屏见 WideProjects
+// 项目面板：研究 / 生活两组，不属于任何项目的进行中事项归入"其他"。电脑宽屏见 src/desktop/ProjectsWide.tsx，其他宽屏（iPad）见 WideProjects
 export default function ProjectsScreen() {
   const wide = useWide()
-  return wide ? <WideProjects /> : <PhoneProjects />
+  return wide ? (desktop ? <ProjectsWide /> : <WideProjects />) : <PhoneProjects />
 }
 
 function PhoneProjects() {
@@ -112,7 +113,7 @@ function WideProjects() {
   )
   return (
     <View style={styles.page}>
-      <TopBar head={{ kind: 'title', title: t('项目') }} sub={null} syncing={research.syncing || life.syncing} />
+      <TopBar head={{ kind: 'title', title: t('项目') }} sub={null} tools={null} syncing={research.syncing || life.syncing} />
       <View style={styles.split}>
         <ScrollView style={styles.plist} contentContainerStyle={styles.plistBody}>
           <StaleBanner view={research} />

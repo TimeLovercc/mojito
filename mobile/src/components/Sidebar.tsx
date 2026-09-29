@@ -2,12 +2,12 @@ import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { usePathname, useRouter, type Href } from 'expo-router'
 import { Activity, Bell, FolderKanban, MessageCircle, Newspaper, NotebookPen, Sun, Target, type LucideIcon } from 'lucide-react-native'
-import { problemsOf } from '../../app/system'
+import { problemsOf } from '../problems'
 import type { AuthList, CardsPage, ProjectsList, SourcesList, Today } from '../api/types'
 import { useConfig } from '../config/context'
 import { daysBetween, todayYmd } from '../time'
 import { t } from '../i18n'
-import { colors, font, isDark, overlay, sideFallback, size } from '../theme'
+import { colors, font, overlay, sideBg, size } from '../theme'
 import { tauri } from '../tauri'
 import { useHub } from '../use-hub'
 import { dragRegion, hoverRow } from '../web-data'
@@ -25,7 +25,7 @@ const TABS: Tab[] = [
 ]
 
 // 宽屏左侧边栏（docs/desktop-v2.md 侧栏 220）：顶部 52 留给红黄绿（兼拖动区）；五个页签；空 16；对话 / 系统 / 通知。
-// Mac app 里透明透出毛玻璃，浏览器里用回退色；选中是中性叠加 + 品牌色图标
+// 贴边 + 右侧细线；浅色 Mac app 里透出毛玻璃，深色不透明（theme.sideBg）；选中是中性叠加 + 品牌色图标
 export function Sidebar() {
   const router = useRouter()
   const path = usePathname()
@@ -49,8 +49,8 @@ export function Sidebar() {
 
   return (
     <View style={styles.side}>
-      {/* 0–52：红黄绿所在，兼窗口拖动区，不放字 */}
-      <View style={styles.lights} {...dragRegion} />
+      {/* Mac app：0–52 是红黄绿所在，兼窗口拖动区，不放字；浏览器里（iPad、宽窗口）没有红黄绿，不留这一行 */}
+      {tauri === null ? <View style={styles.top} /> : <View style={styles.lights} {...dragRegion} />}
       {TABS.map((t) => (
         <Nav
           key={t.label}
@@ -131,13 +131,14 @@ function Nav({
 const styles = StyleSheet.create({
   side: {
     width: 220,
-    backgroundColor: tauri === null ? sideFallback : isDark ? '#0c0c0c' : 'transparent',
+    backgroundColor: sideBg,
     borderRightWidth: 1,
     borderRightColor: overlay.hair,
     paddingHorizontal: 8,
     gap: 2,
   },
   lights: { height: 52 },
+  top: { height: 12 },
   nav: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 32, paddingHorizontal: 8, borderRadius: 8 },
   navOn: { backgroundColor: overlay.selected },
   icon: { width: 20, alignItems: 'center' },

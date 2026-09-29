@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import type { Goal, Plan, PlanDetail } from '../api/types'
 import { category, itemStatus, planStatus } from '../labels'
 import { daysBetween, longDate, shortDate, todayYmd, ymdOf } from '../time'
-import { colors, font, size } from '../theme'
+import { colors, desktop, font, overlay, size, txAlpha } from '../theme'
 import { ProgressBar } from './ProgressBar'
 import { ReviewCard } from './Review'
 import { Card, Dot, Section, Tag } from './ui'
@@ -69,7 +69,13 @@ export function PlanBody({ detail, number }: { detail: PlanDetail; number: numbe
             {running ? ` · ${t('第 {day} / {total} 天', { day, total })}` : ` · ${planStatus[plan.status].label}`}
           </Text>
         </View>
-        {running ? (
+        {running && desktop ? (
+          // 电脑（docs/desktop-v2.md 逐页方案 2）：已过去的天是文字色 35%，今天是一道 2px 刻度
+          <View style={styles.timebarD}>
+            <View style={[styles.timefillD, { width: `${((day - 1) / total) * 100}%` }]} />
+            <View style={[styles.todayTick, { left: `${((day - 1) / total) * 100}%` }]} />
+          </View>
+        ) : running ? (
           <View style={styles.timebar}>
             <View style={[styles.timefill, { width: `${(day / total) * 100}%` }]} />
           </View>
@@ -114,6 +120,9 @@ const styles = StyleSheet.create({
   phMeta: { ...font.regular, fontSize: size.small, color: colors.tx2 },
   timebar: { height: 4, borderRadius: 2, backgroundColor: colors.raised, overflow: 'hidden' },
   timefill: { height: 4, backgroundColor: colors.tx2 },
+  timebarD: { height: 4, borderRadius: 2, backgroundColor: overlay.fill },
+  timefillD: { height: 4, borderRadius: 2, backgroundColor: txAlpha(0.35) },
+  todayTick: { position: 'absolute', top: -2, width: 2, height: 8, borderRadius: 1, backgroundColor: colors.tx },
   pi: { gap: 5, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },
   piTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   piTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },

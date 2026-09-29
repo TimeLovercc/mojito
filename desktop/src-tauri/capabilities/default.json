@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "主窗口和菜单栏面板：核心 API、开机自启开关、访问 hub（*.ts.net 等 HTTPS 地址）和本机假服务器",
+  "description": "主窗口和菜单栏面板：核心 API、开机自启开关（访问 hub 走自己的 hub_fetch 命令，见 src/fetch.rs）",
   "windows": [
     "main",
     "panel"
@@ -9,20 +9,6 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "autostart:default",
-    {
-      "identifier": "http:default",
-      "allow": [
-        {
-          "url": "https://*.ts.net/*"
-        },
-        {
-          "url": "http://localhost:*/*"
-        },
-        {
-          "url": "http://127.0.0.1:*/*"
-        }
-      ]
-    }
+    "autostart:default"
   ]
 }

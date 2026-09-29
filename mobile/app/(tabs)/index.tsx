@@ -1,28 +1,31 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { actions } from '../../src/api/client'
-import { useEffect, useState } from 'react'
-import type { CalEvent, FocusItem, GoalsList, Item, Job, Plan, Today } from '../../src/api/types'
+import { useState } from 'react'
+import type { CalEvent, FocusItem, GoalsList, Item, Plan, Today } from '../../src/api/types'
 import { ItemDecision, PlanApprove, ProjectDecision } from '../../src/components/Decision'
 import { DraftCard } from '../../src/components/DraftCard'
 import { FeedbackCard } from '../../src/components/FeedbackCard'
 import { PlanRevision } from '../../src/components/PlanRevision'
 import { ItemRow } from '../../src/components/ItemRow'
 import { Screen } from '../../src/components/Screen'
-import { Btn, Card, Consequences, Dot, Empty, Rows, Section } from '../../src/components/ui'
-import { category } from '../../src/labels'
+import { Btn, Card, Consequences, Empty, Rows, Section } from '../../src/components/ui'
 import { clock, daysBetween, greeting, longDate, shortDate, todayYmd, weekdayOf, ymdOf } from '../../src/time'
 import { colors, desktop, font, size } from '../../src/theme'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { useWide } from '../../src/wide'
-import { useConfig } from '../../src/config/context'
-import { useRefresh } from '../../src/refresh'
-import { useErrorToast, useToast } from '../../src/toast'
+import { useDeleteEvent } from '../../src/components/useDeleteEvent'
+import { TodayWide } from '../../src/desktop/TodayWide'
 import { hoverRow } from '../../src/web-data'
 import { t } from '../../src/i18n'
 
+// 电脑宽屏用 src/desktop/TodayWide.tsx；手机和浏览器窄屏用下面原来的页面
 export default function TodayScreen() {
+  const wide = useWide()
+  return wide && desktop ? <TodayWide /> : <TodayPhone />
+}
+
+function TodayPhone() {
   const view = useHub<Today>('/today')
   useViewTracking('today')
   const goals = useHub<GoalsList>('/goals')
@@ -198,44 +201,8 @@ export default function TodayScreen() {
 // 日程一行，点开原地展开"删除"（design.md 8.5：任何日程都能删，服务器 agent 真的从 Google 日历删掉，
 // 时间线留一条可撤销的记录）。删除任务跑完后重取今天页，这一行就消失了
 function EventRow({ event: e }: { event: CalEvent }) {
-  const { config } = useConfig()
-  const { bump } = useRefresh()
-  const toast = useToast()
-  const showError = useErrorToast()
   const [open, setOpen] = useState(false)
-  const [job, setJob] = useState<Job | null>(null)
-  const deleting = job !== null && job.status !== 'failed'
-
-  useEffect(() => {
-    if (job === null || job.status === 'done' || job.status === 'failed') return
-    const hub = config.hub
-    if (hub === null) throw new Error('没有 hub 配置')
-    const timer = setTimeout(() => {
-      actions
-        .getJob(hub, job.id)
-        .then((next) => {
-          setJob(next)
-          if (next.status === 'done') bump()
-          if (next.status === 'failed') toast(t('没删掉：{error}', { error: String(next.error) }), true)
-        })
-        .catch((err: Error) => showError(t('查不到删除进度'), err))
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [job])
-
-  const remove = async () => {
-    if (config.hub === null) {
-      toast(t('先到"系统"页填 hub 地址和令牌'), true)
-      return
-    }
-    try {
-      setJob(await actions.deleteEvent(config.hub, e.uid, e.start))
-      toast(t('正在从 Google 日历删除，删完时间线里可以撤销'), false)
-    } catch (err) {
-      if (!(err instanceof Error)) throw err
-      showError(t('没删掉'), err)
-    }
-  }
+  const { deleting, remove } = useDeleteEvent(e)
 
   return (
     <Pressable style={({ pressed }) => [styles.evWrap, pressed && { backgroundColor: colors.raised }]} onPress={() => setOpen(!open)}>

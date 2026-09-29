@@ -1,3 +1,4 @@
+mod fetch;
 mod notify;
 mod pulse;
 mod secrets;
@@ -126,7 +127,7 @@ fn enable_autostart_once(app: &tauri::AppHandle) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .manage(update::state().expect("取启动路径失败"))
-        .plugin(tauri_plugin_http::init())
+        .manage(fetch::state())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -136,7 +137,7 @@ pub fn run() {
             weblog::write(webview.app_handle(), &format!("{} web content process terminated, reloading", webview.label())).unwrap();
             webview.reload().unwrap();
         })
-        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme])
+        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, fetch::hub_fetch])
         .setup(|app| {
             build_main(app)?;
             tray::build(app)?;

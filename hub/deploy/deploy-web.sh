@@ -39,7 +39,7 @@ bad_ext=$(find "$OUT" -type f ! \( -name '*.html' -o -name '*.js' -o -name '*.cs
 [ -z "$bad_ext" ] || { echo "artifact check: file types not allowed:" >&2; echo "$bad_ext" >&2; exit 1; }
 bad_name=$(find "$OUT" \( -name '*.map' -o -name '.env*' -o -name 'google-services.json' -o -name '*.keystore' -o -name '*.jks' -o -name '*.apk' \))
 [ -z "$bad_name" ] || { echo "artifact check: forbidden files:" >&2; echo "$bad_name" >&2; exit 1; }
-for needle in sourceMappingURL EXPO_PUBLIC_ u.expo.dev; do
+for needle in sourceMappingURL EXPO_PUBLIC_ https://u.expo.dev; do
   if grep -rlF -- "$needle" "$OUT" >/dev/null; then
     echo "artifact check: '$needle' found in:" >&2; grep -rlF -- "$needle" "$OUT" >&2; exit 1
   fi

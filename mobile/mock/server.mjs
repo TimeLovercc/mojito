@@ -251,8 +251,8 @@ function advanceJob(job) {
         kind: 'log',
         tier: 'digest',
         item_id: null,
-        title: '更新好了',
-        body: '假服务器模拟的刷新完成。',
+        title: say('更新好了', 'Refreshed'),
+        body: say('假服务器模拟的刷新完成。', 'The demo hub simulated a refresh.'),
       })
     }
   }
@@ -264,15 +264,20 @@ function replyTo(job) {
   const msg = records.find((r) => r.id === job.record_id)
   const reply = (tier, body) =>
     addRecord({ author: 'system', source: 'server-agent', kind: 'chat', tier, item_id: msg.item_id, title: body.slice(0, 40), body })
-  if (/邮件|\bmail\b/i.test(msg.body)) {
-    reply('log', '需要读邮件 → 已转给 Mac，醒来后回你')
+  if (/邮件|\bmail\b|\bemail\b/i.test(msg.body)) {
+    reply('log', say('需要读邮件 → 已转给 Mac，醒来后回你', 'This needs your mail → passed to your Mac; it will answer when it wakes up'))
     newJob('chat_reply', 'mac', msg.id)
     return
   }
-  const about = msg.item_id === null ? '' : `（关于「${items.find((i) => i.id === msg.item_id).title}」）`
+  const topic = msg.item_id === null ? null : items.find((i) => i.id === msg.item_id).title
+  const images = msg.attachments.length
+  const got = [images === 0 ? null : `${images} image${images === 1 ? '' : 's'}`, msg.body === '' ? null : `"${msg.body.length > 40 ? `${msg.body.slice(0, 40)}…` : msg.body}"`]
   reply(
     'digest',
-    `假服务器回复${about}：收到${msg.attachments.length === 0 ? '' : ` ${msg.attachments.length} 张图`}${msg.body === '' ? '' : `「${msg.body.slice(0, 30)}」`}。真实回复由服务器 agent 看图/读文字后生成。`,
+    say(
+      `假服务器回复${topic === null ? '' : `（关于「${topic}」）`}：收到${images === 0 ? '' : ` ${images} 张图`}${msg.body === '' ? '' : `「${msg.body.slice(0, 30)}」`}。真实回复由服务器 agent 看图/读文字后生成。`,
+      `Demo reply${topic === null ? '' : ` (about "${topic}")`}: got ${got.filter((g) => g !== null).join(' and ')}. In a real instance, the agent on your server reads it and writes the answer.`,
+    ),
   )
 }
 
@@ -281,16 +286,16 @@ const advanceAll = () => jobs.forEach(advanceJob)
 // 模拟 Mac 整理笔记（docs/api.md"简化"）：提到"想法"就只留作笔记，其余直接变成进行中的事项，并写一条可撤销的"由笔记记成事项"
 function processNote(job) {
   const note = records.find((r) => r.id === job.record_id)
-  if (note.title.includes('想法')) return
+  if (/想法|\bidea\b/i.test(note.title)) return
   const item = {
     id: `note-${note.id}`,
     title: note.title,
     category: 'life',
     status: 'active',
-    next_step: '先定一个今天能做的小步',
+    next_step: say('先定一个今天能做的小步', 'Pick one small step you can do today'),
     next_at: null,
     owner: 'me',
-    done_definition: '这件事办完',
+    done_definition: say('这件事办完', 'This is done'),
     goal_id: null,
     progress: null,
     updated_at: now(),
@@ -305,11 +310,11 @@ function processNote(job) {
     kind: 'log',
     tier: 'log',
     item_id: item.id,
-    title: `由笔记记成事项：${item.title}`,
+    title: say(`由笔记记成事项：${item.title}`, `Turned the note into a task: ${item.title}`),
     body: '',
     undo: { type: 'item_create', item_id: item.id },
   })
-  addRecord({ author: 'system', source: 'worker', kind: 'chat', tier: 'log', item_id: null, title: `已记成事项：${item.title}`, body: '' })
+  addRecord({ author: 'system', source: 'worker', kind: 'chat', tier: 'log', item_id: null, title: say(`已记成事项：${item.title}`, `Saved as a task: ${item.title}`), body: '' })
 }
 
 // 模拟服务器 agent 撤销：反向操作后写一条说明，hub 在原记录上标 undone_at
@@ -346,7 +351,7 @@ function undoDone(job) {
     kind: 'log',
     tier: 'log',
     item_id: original.item_id,
-    title: `已撤销：${original.title}`,
+    title: say(`已撤销：${original.title}`, `Undone: ${original.title}`),
     body: '',
   })
 }
@@ -372,8 +377,8 @@ function draftReview() {
     kind: 'alert',
     tier: 'interrupt',
     item_id: null,
-    title: '该复盘了',
-    body: `第 ${active.start} 起的这期计划有了复盘草稿。`,
+    title: say('该复盘了', 'Time for a review'),
+    body: say(`第 ${active.start} 起的这期计划有了复盘草稿。`, `The plan starting ${active.start} has a review draft.`),
   })
 }
 
@@ -391,8 +396,8 @@ function calendarDeleted(job) {
     kind: 'log',
     tier: 'log',
     item_id: null,
-    title: `删除了日程：${ev.title}`,
-    body: `删除了日程：${ev.title}（${ev.start}）`,
+    title: say(`删除了日程：${ev.title}`, `Deleted the event: ${ev.title}`),
+    body: say(`删除了日程：${ev.title}（${ev.start}）`, `Deleted the event: ${ev.title} (${ev.start})`),
     undo: { type: 'calendar', op: 'delete', event_id: ev.uid, before: ev },
   })
 }
@@ -409,6 +414,8 @@ function allEvents() {
 
 // notify：按类型开关推送（design.md 8.6），迁移时补全为全开
 const settings = { ...seed.settings, language: LANGUAGE, notify: { brief: true, chat: true, alert: true, feedback: true, release: true, jobs: true } }
+// 假服务器自己写的文字跟界面语言走（settings.language 可在 app 里切换）
+const say = (zh, en) => (settings.language === 'en' ? en : zh)
 
 function findSubscription(id) {
   const sub = subscriptions.find((x) => x.id === id)

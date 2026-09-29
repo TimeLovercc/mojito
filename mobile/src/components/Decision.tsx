@@ -15,7 +15,7 @@ import { Btn } from './ui'
 import { t, tc } from '../i18n'
 
 // 拍板动作共用：发请求、提示结果、让页面重新取数据
-function useAct() {
+export function useAct() {
   const { config } = useConfig()
   const { bump } = useRefresh()
   const toast = useToast()
@@ -75,13 +75,8 @@ export function FeedbackDecision({ fb }: { fb: Feedback }) {
 
 // 事项详情顶部：进行中的一个"完成"按钮，"⋯"里是关闭（先确认一次）；已完成/已关闭的"⋯"里是重新打开。事项不删除
 export function ItemLifecycle({ item }: { item: Item }) {
-  const { act, busy } = useAct()
+  const { busy, decide } = useItemDecide(item)
   const [menu, setMenu] = useState(false)
-  const decide = (d: Decision, label: string) =>
-    act(label, (hub) => {
-      trackAction('decision', { action: d.action, object: 'item' })
-      return actions.decide(hub, item.id, d)
-    })
   const ended = item.status === 'done' || item.status === 'closed'
   return (
     <View style={styles.btns}>
@@ -89,33 +84,53 @@ export function ItemLifecycle({ item }: { item: Item }) {
       <Pressable accessibilityLabel={t('更多操作')} hitSlop={6} onPress={() => setMenu(true)} style={styles.more}>
         <Ellipsis size={18} color={colors.tx2} />
       </Pressable>
-      <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setMenu(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.heading}>{ended ? t('重新打开这件事？') : t('关闭这件事？')}</Text>
-            <Text style={styles.body}>
-              {ended
-                ? t('「{title}」会回到进行中。', { title: item.title })
-                : t('「{title}」会标成已关闭，不会删除，之后可以重新打开；动态里也能撤销。', { title: item.title })}
-            </Text>
-            <View style={styles.btns}>
-              <Btn label={t('取消')} onPress={() => setMenu(false)} />
-              <Btn
-                label={ended ? t('重新打开') : tc('按钮', '关闭')}
-                danger={!ended}
-                primary={ended}
-                disabled={busy}
-                onPress={() => {
-                  setMenu(false)
-                  if (ended) decide({ action: 'reopen' }, t('已重新打开'))
-                  else decide({ action: 'close' }, t('已关闭'))
-                }}
-              />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <LifecycleConfirm item={item} open={menu} onClose={() => setMenu(false)} />
     </View>
+  )
+}
+
+// 事项的完成 / 关闭 / 重新打开：手机事项详情和电脑顶栏共用
+export function useItemDecide(item: Item): { busy: boolean; decide: (d: Decision, label: string) => Promise<void> } {
+  const { act, busy } = useAct()
+  const decide = (d: Decision, label: string) =>
+    act(label, (hub) => {
+      trackAction('decision', { action: d.action, object: 'item' })
+      return actions.decide(hub, item.id, d)
+    })
+  return { busy, decide }
+}
+
+// 关闭 / 重新打开前的确认弹层（关闭不删除，可以重新打开，动态里也能撤销）
+export function LifecycleConfirm({ item, open, onClose }: { item: Item; open: boolean; onClose: () => void }) {
+  const { busy, decide } = useItemDecide(item)
+  const ended = item.status === 'done' || item.status === 'closed'
+  return (
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={() => {}}>
+          <Text style={styles.heading}>{ended ? t('重新打开这件事？') : t('关闭这件事？')}</Text>
+          <Text style={styles.body}>
+            {ended
+              ? t('「{title}」会回到进行中。', { title: item.title })
+              : t('「{title}」会标成已关闭，不会删除，之后可以重新打开；动态里也能撤销。', { title: item.title })}
+          </Text>
+          <View style={styles.btns}>
+            <Btn label={t('取消')} onPress={onClose} />
+            <Btn
+              label={ended ? t('重新打开') : tc('按钮', '关闭')}
+              danger={!ended}
+              primary={ended}
+              disabled={busy}
+              onPress={() => {
+                onClose()
+                if (ended) decide({ action: 'reopen' }, t('已重新打开'))
+                else decide({ action: 'close' }, t('已关闭'))
+              }}
+            />
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   )
 }
 
@@ -164,7 +179,7 @@ export function blockingReview(plans: Plan[], plan: Plan): Plan | undefined {
   return plans.find((p) => p.status !== 'draft' && p.end < plan.start && p.review_status !== 'done' && !replaced.has(p.id))
 }
 
-const projectActions: Record<
+export const projectActions: Record<
   Project['status'],
   { action: ProjectAction; label: string; done: string; primary: boolean; danger: boolean }[]
 > = {

@@ -108,8 +108,13 @@ export const secure = {
 ## 网络
 
 页面来源是 `tauri://localhost`，hub 不返回 CORS 头，WebView 自己的 fetch 会被拦。
-`src-tauri/src/shell.js` 在页面加载前把 `window.fetch` 换掉：`http(s)://` 请求改走 Tauri HTTP 插件（由 Rust 发出），`blob:` / `data:` 仍走 WebView。mobile 不用改。
-允许的地址在 `src-tauri/capabilities/default.json`：`https://*.ts.net/*`、`http://localhost:*`、`http://127.0.0.1:*`。hub 不在 Tailscale 域名下时，把你的 hub 域名加进去再构建。
+`src-tauri/src/shell.js` 在页面加载前把 `window.fetch` 换掉：`http(s)://` 请求改走 Rust 命令 `hub_fetch`（`src-tauri/src/fetch.rs`），`blob:` / `data:` 仍走 WebView。mobile 不用改。
+允许的地址写在 `fetch.rs`：`https://*.ts.net`、`http://localhost`、`http://127.0.0.1`。hub 不在 Tailscale 域名下时，把你的 hub 域名加进去再构建。
+
+- **不用 Tauri HTTP 插件**（2026-09-29 起）：插件每个请求新建一条连接、不设超时。页面并发十几个请求时，要同时和 Funnel 做十几次 TLS 握手，Funnel 接不过来：握手卡 7–19 秒后被关（`tls handshake eof`），页面上就是整批 "error sending request"、请求挂住、加载圈一直转、图片出不来。
+- `hub_fetch` 让所有窗口共用一个客户端，对 hub 直接用 HTTP/2（prior knowledge），并发请求等同一条连接、多路复用（实测 40 个并发 0.1–0.4 秒，插件要 22 秒）。连接每 10 秒心跳一次，断了 15 秒内能发现；发请求出错就换新客户端，所以睡眠唤醒、换网后会重新连。
+- 超时：建连 8 秒；GET 每次 9 秒，失败重发一次（最多 18 秒，在页面自己的 20 秒之内）；写操作 60 秒，不重发。页面的 AbortSignal 会让请求立即 reject。
+- /pulse 轮询用的是另一个客户端（`pulse.rs`），不留空闲连接，每轮重新连。
 
 ## 已知坑
 

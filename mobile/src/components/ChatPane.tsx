@@ -27,9 +27,8 @@ export function useServerStatus(): { text: string; bad: boolean } {
 
 export type ChatAbout = { itemId: string | null; projectId: string | null; cardId: string | null }
 
-// 对话主体：消息列表 + 上下文条 + 输入框。宽屏（对话整页）时三者都在居中、最宽 720 的一列里
-export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: ReactNode }) {
-  const wide = useWide()
+// 对话数据：最新一页 + 往前翻的 + 本次刚发出的，回复任务，有消息在等回复时轮询。手机对话页和电脑对话整页共用
+export function useChatData() {
   const { config } = useConfig()
   const showError = useErrorToast()
   const view = useHub<ChatPage>(`/chat?limit=${PAGE}`)
@@ -37,8 +36,6 @@ export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: 
   const [older, setOlder] = useState<HubRecord[]>([])
   const [sent, setSent] = useState<HubRecord[]>([])
   const [exhausted, setExhausted] = useState(false)
-  const scroll = useRef<ScrollView>(null)
-  const atBottom = useRef(true)
 
   const latest = view.data === null ? [] : view.data.records
   const records = mergeChat([...latest, ...older], sent)
@@ -49,12 +46,13 @@ export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: 
   }, [view.refresh, refreshJobs])
   useReplyPolling(records, byRecord, refreshAll)
 
-  const loadOlder = async () => {
+  // 往前翻一页；onLoaded 在追加前调用（手机页用它暂停自动滚到底）
+  const loadOlder = async (onLoaded: () => void) => {
     if (config.hub === null) throw new Error('没有 hub 配置')
     const oldest = records[0]
     try {
       const page = await hubRequest<ChatPage>(config.hub, 'GET', `/chat?limit=${PAGE}&before=${encodeURIComponent(oldest.id)}`)
-      atBottom.current = false
+      onLoaded()
       setOlder((prev) => [...prev, ...page.records])
       if (page.records.length < PAGE) setExhausted(true)
     } catch (err) {
@@ -62,6 +60,20 @@ export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: 
       showError(t('加载失败'), err)
     }
   }
+  const canLoadOlder = view.data !== null && view.data.records.length === PAGE && !exhausted
+  const addSent = (r: HubRecord) => {
+    setSent((prev) => [...prev, r])
+    refreshAll()
+  }
+  return { view, records, byRecord, loadOlder, canLoadOlder, addSent }
+}
+
+// 对话主体（手机、浏览器窄屏）：消息列表 + 上下文条 + 输入框。电脑宽屏见 src/desktop/ChatWide.tsx
+export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: ReactNode }) {
+  const wide = useWide()
+  const { view, records, byRecord, loadOlder, canLoadOlder, addSent } = useChatData()
+  const scroll = useRef<ScrollView>(null)
+  const atBottom = useRef(true)
 
   return (
     <>
@@ -80,9 +92,9 @@ export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: 
           }}
         >
           <StaleBanner view={view} />
-          {view.data !== null && view.data.records.length === PAGE && !exhausted ? (
+          {canLoadOlder ? (
             <View style={styles.older}>
-              <Btn label={t('更早的')} onPress={loadOlder} />
+              <Btn label={t('更早的')} onPress={() => loadOlder(() => (atBottom.current = false))} />
             </View>
           ) : null}
           {view.data !== null && records.length === 0 ? <Empty text={t('还没有对话。问点什么吧，比如“今天该先做什么？”')} /> : null}
@@ -93,7 +105,7 @@ export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: 
       </View>
       <View style={wide && styles.column}>{contextBar}</View>
       <BottomInset>
-        <View style={wide && styles.column}>
+        <View style={[wide && styles.column, desktop && styles.composerGap]}>
           <Composer
             // 不选项目、不分"反馈"：Claude 自己判断是问项目还是给 mojito 提意见（design.md 8.3）
             target={{
@@ -101,11 +113,11 @@ export function ChatBody({ about, contextBar }: { about: ChatAbout; contextBar: 
               ...about,
               onSent: (r) => {
                 atBottom.current = true
-                setSent((prev) => [...prev, r])
-                refreshAll()
+                addSent(r)
               },
             }}
             placeholder={t('发消息…')}
+            chips={null}
           />
         </View>
       </BottomInset>
@@ -136,6 +148,7 @@ const styles = StyleSheet.create({
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 24 },
   older: { flexDirection: 'row', justifyContent: 'center' },
   column: { width: '100%', maxWidth: 720, alignSelf: 'center' },
+  composerGap: { paddingHorizontal: 16, paddingBottom: 16 },
   ctx: {
     flexDirection: 'row',
     alignItems: 'center',

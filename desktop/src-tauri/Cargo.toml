@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["image-png", "macos-private-api", "tray-icon"] }
-tauri-plugin-http = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "charset"] }
 keyring = { version = "3", features = ["apple-native"] }
 serde_json = "1"
 tauri-plugin-autostart = "2.6.0"
