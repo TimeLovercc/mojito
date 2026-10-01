@@ -339,13 +339,47 @@ def paper(t: Lang, what: str, why: str, project_title: str | None) -> str:
     return summary if project_title is None else summary + t(f"\n相关项目：{project_title}", f"\nRelated project: {project_title}")
 
 
+def brief_body(t: Lang) -> str:
+    """Today's AI brief in the worker's layout (worker reports._brief_body): one line per item, the link text names the
+    source, papers as "what / for you"."""
+    none = t("今天没有", "Nothing today")
+    return "\n\n".join([
+        t("## 新模型发布", "## New models"),
+        t("- MobileNetV4：面向手机的通用骨干网络，在多种手机芯片上又快又准。 [arXiv](https://arxiv.org/abs/2404.10518)",
+          "- MobileNetV4: a general backbone for phones, fast and accurate across many phone chips. "
+          "[arXiv](https://arxiv.org/abs/2404.10518)"),
+        t("## 重要论文", "## Papers"),
+        t("- [SAM 2: Segment Anything in Images and Videos](https://arxiv.org/abs/2408.00714)：把按提示分割扩展到视频，"
+          "能跨帧跟住同一个物体。 和你有关：Loaflog 可以从转一圈的短视频里挑最清楚的切面来打分。",
+          "- [SAM 2: Segment Anything in Images and Videos](https://arxiv.org/abs/2408.00714): extends promptable "
+          "segmentation to video and follows one object across frames. For you: Loaflog could pick the clearest crumb "
+          "shot from a short turn-around video."),
+        t("## 开源项目", "## Open source"),
+        t("- ExecuTorch：PyTorch 的端侧推理运行时，训练好的模型可以直接部署到 iOS 和 Android。 "
+          "[GitHub](https://github.com/pytorch/executorch)",
+          "- ExecuTorch: PyTorch's on-device runtime; a trained model deploys straight to iOS and Android. "
+          "[GitHub](https://github.com/pytorch/executorch)"),
+        t("## 行业新闻", "## Industry news"),
+        none,
+        t("## 趋势解读", "## Trends"),
+        t("端侧视觉在往“小骨干 + 按提示分割”走：先把要看的部分抠出来再判断，比整张图分类更稳，也更省电。",
+          "On-device vision is moving to a small backbone plus promptable segmentation: cut out the part that matters, "
+          "then judge it. Steadier than classifying the whole photo, and lighter on the battery."),
+        t("## 实验室覆盖", "## Labs"),
+        "\n".join([t("- **Google**：MobileNetV4（见上）", "- **Google**: MobileNetV4 (see above)"),
+                   t("- **Meta**：SAM 2（见上）", "- **Meta**: SAM 2 (see above)"),
+                   t("- **Apple**：今天没有新发布", "- **Apple**: no new release today")]),
+    ])
+
+
 def cards_of(c: Clock, t: Lang) -> list[dict]:
-    """Paper titles and links are real public arXiv papers; every summary is our own words. Mail and the session
-    report are made up and carry no link."""
+    """Paper titles and links are real public arXiv papers, and the brief and the lab alert cite real public papers and
+    repositories; every summary is our own words, and none of it is news of the demo day. Mail and the session report
+    are made up and carry no link."""
     return [
         {"at": c.at(-1, "07:02"), "origin": "arxiv", "kind": "paper", "project_id": "p-loaflog",
          "title": "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications",
-         "link": "https://arxiv.org/abs/1704.04861", "dedupe_key": "1704.04861",
+         "link": "https://arxiv.org/abs/1704.04861", "dedupe_key": "1704.04861", "body": None,
          "summary": paper(t, t("为手机设计的轻量卷积网络：用深度可分离卷积大幅减少计算量，精度只掉一点。",
                                "Lightweight convolutional networks for phones: depthwise separable convolutions cut the "
                                "compute a lot for a small loss in accuracy."),
@@ -354,20 +388,26 @@ def cards_of(c: Clock, t: Lang) -> list[dict]:
                           "Loaflog")},
         {"at": c.at(0, "07:02"), "origin": "arxiv", "kind": "paper", "project_id": "p-loaflog",
          "title": "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks",
-         "link": "https://arxiv.org/abs/1905.11946", "dedupe_key": "1905.11946",
+         "link": "https://arxiv.org/abs/1905.11946", "dedupe_key": "1905.11946", "body": None,
          "summary": paper(t, t("按比例同时放大网络的深度、宽度和输入分辨率，用更少的参数得到更高的精度。",
                                "Scales network depth, width and input resolution together, getting better accuracy with "
                                "fewer parameters."),
                           t("如果 MobileNet 的精度不够，这是下一个要试的模型族。",
                             "If MobileNet is not accurate enough, this is the next family to try."), "Loaflog")},
         {"at": c.at(0, "07:04"), "origin": "hf-daily", "kind": "paper", "project_id": None,
-         "title": "Segment Anything", "link": "https://arxiv.org/abs/2304.02643", "dedupe_key": "2304.02643",
+         "title": "Segment Anything", "link": "https://arxiv.org/abs/2304.02643", "dedupe_key": "2304.02643", "body": None,
          "summary": paper(t, t("一个按提示分割图片里任意物体的通用模型，同时公开了大规模分割数据集。",
                                "A general model that segments any object in an image from a prompt, released with a "
                                "large segmentation dataset."),
                           t("可以先把面包切面从背景里抠出来，再打分。",
                             "It could cut the loaf's cross-section out of the background before scoring."), None)},
-        {"at": c.at(0, "07:31"), "origin": "gmail", "kind": "mail", "project_id": None,
+        {"at": c.at(0, "07:00"), "origin": "brief", "kind": "brief", "project_id": None,
+         "title": t(f"今日 AI 简报 · {c.day.month}/{c.day.day}", f"Daily AI brief · {c.day.month}/{c.day.day}"),
+         "link": None, "dedupe_key": f"brief-{c.ymd(0)}", "body": brief_body(t),
+         "summary": t("MobileNetV4：手机上的新通用骨干网络\nSAM 2 把按提示分割带到视频，挑切面用得上\n实验室：3 家里 2 家有动静",
+                      "MobileNetV4: a new general backbone for phones\nSAM 2 brings promptable segmentation to video, "
+                      "handy for picking crumb shots\nLabs: 2 of 3 had news")},
+        {"at": c.at(0, "07:31"), "origin": "gmail", "kind": "mail", "project_id": None, "body": None,
          "title": t("今日邮件：3 封值得看", "Today's mail: 3 worth reading"), "link": None, "dedupe_key": c.ymd(0),
          "summary": t("内测用户 Casey · 旧手机上传照片闪退 —— 附了崩溃日志，和「修复上传照片闪退」有关\n"
                       "Riley · 图标第二版 —— 三个方向选一个，今天 16:00 过图标时要定\n"
@@ -377,9 +417,27 @@ def cards_of(c: Clock, t: Lang) -> list[dict]:
                       "Riley · Icon options, round two — pick one of three directions at today's 16:00 icon review\n"
                       "Music school · Lesson time change — from now on 18:30 (your next guitar lesson is the day "
                       "after tomorrow)")},
+        {"at": c.at(0, "08:05"), "origin": "watch:Apple", "kind": "alert", "project_id": None,
+         "title": t("【确认】Apple 公开 FastVLM：手机上也能跑的视觉语言模型",
+                    "[Confirmed] Apple publishes FastVLM, a vision-language model that runs on phones"),
+         "link": "https://arxiv.org/abs/2412.13303", "dedupe_key": t("Apple:FastVLM 公开:confirmed", "Apple:FastVLM release:confirmed"),
+         "summary": t("官方论文和代码都已公开（Apple 研究团队）\n新的视觉编码器让高分辨率图片的响应快很多\n可以试试给切面照片自动写一句描述",
+                      "Official paper and code are public (Apple research)\nA new vision encoder answers much faster on "
+                      "high-resolution images\nWorth trying: one-line captions for crumb photos"),
+         "body": "\n\n".join([
+             t("Apple 研究团队公开了 FastVLM 的论文和代码。它用新的混合视觉编码器 FastViTHD，高分辨率图片产生的视觉 token "
+               "更少，第一个字出来得快很多，适合在手机上本地跑。对 Loaflog 来说，可以让它给切面照片写一句描述，和打分放在一起。",
+               "Apple's research team published the FastVLM paper and code. Its hybrid vision encoder, FastViTHD, turns "
+               "high-resolution images into fewer visual tokens, so the first word comes much sooner, which suits running "
+               "on a phone. For Loaflog, it could write a one-line caption for each crumb photo next to the score."),
+             t("## 相关链接", "## Links"),
+             t("- [arXiv：FastVLM: Efficient Vision Encoding for Vision…](https://arxiv.org/abs/2412.13303)\n"
+               "- [github.com：ml-fastvlm](https://github.com/apple-aiml-research/ml-fastvlm)",
+               "- [arXiv: FastVLM: Efficient Vision Encoding for Vision…](https://arxiv.org/abs/2412.13303)\n"
+               "- [github.com: ml-fastvlm](https://github.com/apple-aiml-research/ml-fastvlm)")])},
         {"at": c.at(0, "08:10"), "origin": "session:crash-fix", "kind": "report", "project_id": "p-loaflog",
          "title": t("闪退复现：5 个用例修好 3 个", "Crash repro: 3 of 5 cases fixed"), "link": None,
-         "dedupe_key": "crash-fix-1",
+         "dedupe_key": "crash-fix-1", "body": None,
          "summary": t("旧手机上一次选 10 张以上照片的 5 个复现用例，修好了 3 个：改成边选边压缩缩略图。"
                       "剩下 2 个和相册权限弹窗有关，明天接着看。",
                       "Of the 5 repro cases (10+ photos on older phones), 3 are fixed by compressing thumbnails while "
@@ -430,8 +488,14 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
         "taste": [(t("偏好附带代码或演示的论文", "Prefer papers that come with code or a demo"), c.at(-9, "22:00")),
                   (t("手机端的小模型优先；纯大模型评测不感兴趣", "On-device models first; not interested in pure LLM benchmarks"),
                    c.at(-6, "21:50"))],
-        "subscription_results": [("papers", t("发了 3 张卡片", "Posted 3 cards"), c.at(0, "07:04")),
+        "subscription_results": [("brief", t("简报写好：论文 1 篇、新闻 1 条", "Brief written: 1 paper, 1 news item"),
+                                  c.at(0, "07:00")),
+                                 ("watch", t("新动态 1 条：【确认】Apple 公开 FastVLM：手机上也能跑的视觉语言模型",
+                                             "1 lab update: [Confirmed] Apple publishes FastVLM, a vision-language model "
+                                             "that runs on phones"), c.at(0, "08:05")),
                                  ("mail", t("今日邮件：3 封值得看", "Today's mail: 3 worth reading"), c.at(0, "07:31"))],
+        # Sam's lab watch list (the hub starts every instance with its own default list)
+        "watch_config": {"labs": ["Google", "Meta", "Apple"], "every_hours": 8},
         "review": {"summary": t("4 件完成 3 件：注册流程、第一首歌、鞋柜都按时完成；定价没动。",
                                 "3 of 4 done: the sign-up flow, song one and the shoe rack on time; pricing didn't move."),
                    "completed_item_ids": ["i-prev-signup", "i-prev-song1", "i-prev-shoes"],
@@ -543,7 +607,6 @@ def mock_extra_of(c: Clock, t: Lang, app: str, seed: dict) -> dict:
             t("三行够吗？还是想要两行 + 点开看全文？", "Is three lines right, or two lines plus tap for more?"), None,
             feedback_id="f-demo-1"),
     ]
-    records.sort(key=lambda r: r["at"])  # the mock lists records in file order, oldest first
     revision_at = c.at(0, "07:00")
     plans = [
         {"id": f"p-{c.ymd(10)}", "start": c.ymd(10), "end": c.ymd(23), "goal_ids": cur["goal_ids"],
@@ -556,13 +619,22 @@ def mock_extra_of(c: Clock, t: Lang, app: str, seed: dict) -> dict:
     r = x["review"]
     card_extra = {"1704.04861": ("worker", "saved", None), "1905.11946": ("worker", "new", None),
                   "2304.02643": ("worker", "new", None), c.ymd(0): ("worker", "new", None),
+                  f"brief-{c.ymd(0)}": ("worker", "new", None),
+                  t("Apple:FastVLM 公开:confirmed", "Apple:FastVLM release:confirmed"): ("worker", "new", None),
                   "crash-fix-1": ("cards", "new", "a-mock-cover")}  # a-mock-cover: the mock serves an image for it
     cards = []
     for i, card in enumerate(cards_of(c, t), 1):
         source, status, image = card_extra[card["dedupe_key"]]
         cards.append({"id": f"c-demo-{i}", "at": card["at"].isoformat(timespec="seconds"), "source": source,
-                      **{k: card[k] for k in ("origin", "kind", "project_id", "title", "summary", "link", "dedupe_key")},
+                      **{k: card[k] for k in ("origin", "kind", "project_id", "title", "summary", "body", "link",
+                                              "dedupe_key")},
                       "status": status, "item_id": None, "image_attachment_id": image})
+    # the record the hub writes (and pushes) when an alert card arrives (api.md 信息流改成报告)
+    alert = next(card for card in cards if card["kind"] == "alert")
+    records.append(rec("r-demo-news", 0, "08:05", "system", "hub", "log", "digest", None,
+                       t(f"新动态：{alert['title']}", f"News: {alert['title']}"), alert["summary"], alert["link"],
+                       card_id=alert["id"], category="news"))
+    records.sort(key=lambda r: r["at"])  # the mock lists records in file order, oldest first
     return {
         "demo_day": c.ymd(0),
         "sources": [
@@ -621,14 +693,15 @@ def mock_extra_of(c: Clock, t: Lang, app: str, seed: dict) -> dict:
         "taste": [{"id": f"t-demo-{i}", "at": at.isoformat(timespec="seconds"), "text": text, "source": AGENT}
                   for i, (text, at) in enumerate(x["taste"], 1)],
         "subscriptions": [
-            {"id": sub_id, "name": name, "kind": sub_id, "at": at, "enabled": True, "config": {},
+            {"id": sub_id, "name": name, "kind": sub_id, "at": at, "enabled": True, "config": config,
              "last_run_at": ran.isoformat(timespec="seconds"), "last_result": result, "health": "ok"}
-            for (sub_id, result, ran), name, at in zip(x["subscription_results"],
-                                                        (t("每日论文", "Daily papers"), t("每日邮件", "Daily mail")),
-                                                        ("07:00", "07:30"), strict=True)],
+            for (sub_id, result, ran), name, at, config in zip(
+                x["subscription_results"],
+                (t("每日简报", "Daily brief"), t("实验室动态", "Lab watch"), t("每日邮件", "Daily mail")),
+                ("07:00", "08:00", "07:30"), ({}, x["watch_config"], {}), strict=True)],
         "events": [{"uid": e["uid"], "start": e["start"].isoformat(timespec="seconds"),
                     "end": e["end"].isoformat(timespec="seconds"), "all_day": e["all_day"], "title": e["title"],
-                    "location": e["location"]} for e in calendar_of(c, t)],
+                    "location": e["location"], "read_only": False} for e in calendar_of(c, t)],
         # what the mock writes when it pretends to draft a review (POST /jobs draft_review)
         "simulated_review": {"summary": t("（假服务器起草）这期 Loaflog 推进稳定，换琴弦一直没动。",
                                           "(mock draft) Loaflog moved steadily this period; the restring never happened."),
@@ -699,6 +772,7 @@ def cmd_build(a) -> None:
     (out / "calendar.ics").write_text(ics_of(c, t))
     (out / "attachments").mkdir(mode=0o700)
     (out / "web").mkdir()  # MOJITO_WEB_DIR: put a web build here to serve it at /app
+    (out / "ical-extra-urls").write_text("")  # MOJITO_ICAL_EXTRA_FILE: no subscribed calendars
     openssl("ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", str(out / "vapid.pem"))
     (out / "vapid.pem").chmod(stat.S_IRUSR | stat.S_IWUSR)
     tokens = {role: secrets.token_urlsafe(32) for role in ROLES}
@@ -706,7 +780,8 @@ def cmd_build(a) -> None:
     hub = f"http://127.0.0.1:{a.port}"
     write_private(out / "hub.env", "\n".join([
         f"MOJITO_DB={out / 'demo.db'}", f"MOJITO_TOKENS={out / 'tokens.json'}", f"MOJITO_SEED={out / 'seed.json'}",
-        f"MOJITO_ICAL_URL=file://{out / 'calendar.ics'}", f"MOJITO_FCM_CREDENTIALS={fcm}",
+        f"MOJITO_ICAL_URL=file://{out / 'calendar.ics'}",
+        f"MOJITO_ICAL_EXTRA_FILE={out / 'ical-extra-urls'}", f"MOJITO_FCM_CREDENTIALS={fcm}",
         f"MOJITO_ATTACHMENTS_DIR={out / 'attachments'}", f"MOJITO_VAPID_KEY_FILE={out / 'vapid.pem'}",
         f"MOJITO_VAPID_SUBJECT={a.public_url}", f"MOJITO_PUBLIC_URL={a.public_url}", f"MOJITO_WEB_DIR={out / 'web'}",
         f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_OWNER_NAME={OWNER_NAME}", f"MOJITO_CONTACT_EMAIL={CONTACT_EMAIL}"]) + "\n")
@@ -773,8 +848,13 @@ def cmd_load(a) -> None:
     done = {"load_start": db_ts(datetime.now(UTC) - timedelta(seconds=1)), "cards": [], "taste": [],
             "subscriptions": [], "feedback": []}
 
+    # Sam set the lab watch list in chat a few days ago (the hub records the change)
+    watch = next(s for s in hub.call("app", "GET", "/subscriptions", None)["subscriptions"] if s["id"] == "watch")
+    hub.call("worker", "PUT", "/subscriptions/watch", {"at": watch["at"], "config": x["watch_config"]})
+    new.tag(c.at(-4, "21:05"))
+
     for card in cards_of(c, t):
-        body = {k: card[k] for k in ("origin", "kind", "project_id", "title", "summary", "link", "dedupe_key")}
+        body = {k: card[k] for k in ("origin", "kind", "project_id", "title", "summary", "body", "link", "dedupe_key")}
         done["cards"].append([hub.call("source:cards", "POST", "/cards", body)["id"], db_ts(card["at"])])
         new.tag(card["at"])
 

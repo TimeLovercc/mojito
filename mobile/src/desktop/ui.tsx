@@ -62,13 +62,15 @@ export function Section({
   )
 }
 
-// 胶囊：高 20、左右 8、12/500、全圆角。状态色只表示状态（逾期 warn、被忘了 / 失败 bad、完成 ok），其余中性
-export type PillTone = 'neutral' | 'warn' | 'bad' | 'ok'
+// 胶囊：高 20、左右 8、12/500、全圆角。状态色只表示状态（逾期 warn、被忘了 / 失败 bad、完成 ok），其余中性；
+// brand 只给信息流的"新动态"（design.md 8.10）
+export type PillTone = 'neutral' | 'warn' | 'bad' | 'ok' | 'brand'
 const pillTone: Record<PillTone, { bg: string; fg: string }> = {
   neutral: { bg: overlay.fill, fg: colors.tx2 },
   warn: { bg: colors.warnSoft, fg: colors.warn },
   bad: { bg: colors.badSoft, fg: colors.bad },
   ok: { bg: colors.okSoft, fg: colors.ok },
+  brand: { bg: colors.brandSoft, fg: colors.brand },
 }
 // mono：纯时间 / 数字用 Geist Mono（菜单栏主块的"17:00"）
 export function Pill({ label, tone, mono }: { label: string; tone: PillTone; mono?: boolean }) {

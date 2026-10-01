@@ -17,6 +17,7 @@ const LABEL: Record<NotifyKind, { name: string; note: string }> = {
   brief: { name: t('早晚消息'), note: t('早上简报、晚间提问') },
   chat: { name: t('Claude 的回复'), note: t('对话里回你、转给 Mac 后的回复') },
   alert: { name: tc('通知类型', '告警'), note: t('授权失效、数据源失联、订阅出错') },
+  news: { name: t('新动态'), note: t('关注的实验室有新发布、开源、重要报告时即时报') },
   feedback: { name: t('反馈处理'), note: t('维护会话回复、已修复 / 没改') },
   release: { name: t('版本更新'), note: t('app 已更新、服务器已更新、新安装包') },
   jobs: { name: t('任务结果'), note: t('刷新完成、任务失败') },

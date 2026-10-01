@@ -2,7 +2,8 @@ import type { HubRecord, Item, JobStatus, Plan } from './api/types'
 import { t } from './i18n'
 import { colors } from './theme'
 
-export type Tone = 'g' | 'a' | 'r' | 'n'
+// b：品牌色，只给信息流的"新动态"标签（design.md 8.10 醒目）
+export type Tone = 'g' | 'a' | 'r' | 'n' | 'b'
 
 // 事项状态 → 标签文字和颜色（状态色只用绿 / 琥珀 / 红）
 export const itemStatus: Record<Item['status'], { label: string; tone: Tone }> = {

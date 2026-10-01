@@ -39,7 +39,6 @@ TITLE_CHARS = 40
 MAX_ATTACHMENTS = 4  # api.md: at most 4 images per chat message, each ≤1600px (keeps claude -p under MemoryMax)
 CARDS_PAGE = 100
 CHAT_CARDS = 10
-FEED_NEW_WINDOW = timedelta(hours=24)
 CALENDAR_AUTH = "google-calendar-write"
 EVENING_UNANSWERED_DAYS = 3
 
@@ -59,6 +58,26 @@ def _dump(obj) -> str:
 
 def _at(record: dict) -> datetime:
     return datetime.fromisoformat(record["at"])
+
+
+# Multi-line text (chat reply, draft body, morning brief body) comes back from Claude as a list of lines that the
+# script joins: inside one JSON string every line break is an escape the model writes itself, and it sometimes
+# over-escapes it, so the user got a literal "\n" (3 of 13 multi-line server replies by 2026-09-29).
+LINES_SCHEMA = {
+    "type": "array",
+    "items": {"type": "string"},
+    "description": "one element per line (Markdown allowed); an empty string is a blank line; no line breaks inside an element",
+}
+
+
+def _joined_lines(obj: dict, field: str, where: str) -> str:
+    lines = obj[field]
+    if not isinstance(lines, list) or not all(isinstance(line, str) for line in lines):
+        raise ValidationError(f"{where}: {field} must be a list of strings, got {lines!r}")
+    text = "\n".join(lines)
+    if not text.strip():
+        raise ValidationError(f"{where}: {field} is empty, got {lines!r}")
+    return text
 
 
 def _title(text: str) -> str:
@@ -84,8 +103,12 @@ DRAFT_FIELDS = ("title", "category", "next_step", "next_at", "owner", "done_defi
 CHAT_OUTPUTS = ("reply", "forward_to_mac", "calendar_actions", "drafts", "new_items", "item_updates", "plan_changes",
                 "goal_updates", "plan_updates", "project_updates", "settings_update", "card_actions", "note_links",
                 "taste_notes", "subscription_updates", "run_jobs", "feedback", "feedback_reply")
-# Jobs a chat can start right now (api.md 8.7); all run on the Mac. The hub dedups an already queued/running kind.
-RUN_JOB_KINDS = ("refresh", "sync_projects", "draft_review", "feed_papers", "feed_mail")
+# Jobs a chat can start right now (api.md 8.7, 信息流改成报告); all run on the Mac. The hub dedups an already queued/running kind.
+RUN_JOB_KINDS = ("refresh", "sync_projects", "draft_review", "feed_brief", "feed_watch", "feed_mail")
+# Report cards (api.md 信息流改成报告): summary is 3 lines of key points, body the full Markdown report.
+REPORT_CARD_KINDS = ("brief", "alert")
+# Card fields the chat sees when the user asks about one card ("问问这个").
+ASKED_CARD_FIELDS = ("id", "at", "kind", "origin", "project_id", "title", "summary", "body", "link", "status", "item_id")
 CHAT_NOTES = 10
 MAINTAINER_SOURCE = "maintainer"
 MAINTAINER_MESSAGES = 3
@@ -95,7 +118,7 @@ CHAT_SCHEMA = {
     "properties": {
         "item_updates": edits.ITEM_UPDATES_SCHEMA,
         "plan_changes": edits.PLAN_CHANGES_SCHEMA,
-        "reply": {"type": "string"},
+        "reply": LINES_SCHEMA,
         "forward_to_mac": {"type": "boolean"},
         "goal_updates": edits.GOAL_UPDATES_SCHEMA,
         "plan_updates": edits.PLAN_UPDATES_SCHEMA,
@@ -137,7 +160,7 @@ CHAT_SCHEMA = {
                     "channel": {"type": "string", "enum": list(DRAFT_CHANNELS)},
                     "to": {"type": "string"},
                     "subject": {"type": ["string", "null"]},
-                    "body": {"type": "string"},
+                    "body": LINES_SCHEMA,
                 },
                 "required": ["channel", "to", "subject", "body"],
                 "additionalProperties": False,
@@ -174,7 +197,7 @@ CHAT_PROMPT = """你是 mojito 的服务器轻量 agent，在手机 app 的对�
 
 你能做的：
 - 根据下面给出的 hub 数据（今天、日历、事项、计划、项目、目标、笔记、信息流、订阅、系统状态、对话记录）回答问题。只根据这些数据说事实；数据里没有的就直说不知道，推断要说明是推断。
-- run_jobs：用户要"现在跑 / 刷新 / 同步 / 复盘"时立刻开始对应任务（都在 Mac 上跑，Mac 睡着就等它醒）：刷新事项进展 → refresh；同步 Orca 项目 → sync_projects；现在复盘、起草下一期 → draft_review；论文 → feed_papers；每日邮件 → feed_mail；"信息流都跑一遍" → 论文、邮件两个都给。同一种任务已经在排队或在跑时不会重复跑（系统会合并），不用提醒用户会跑两次。reply 说"已开始，跑完会推送"（信息流类说"跑完进信息流"）。没有就给空数组。
+- run_jobs：用户要"现在跑 / 刷新 / 同步 / 复盘"时立刻开始对应任务（都在 Mac 上跑，Mac 睡着就等它醒）：刷新事项进展 → refresh；同步 Orca 项目 → sync_projects；现在复盘、起草下一期 → draft_review；今日 AI 简报（论文、新模型、开源、新闻）→ feed_brief；查实验室新动态 → feed_watch；每日邮件 → feed_mail；"信息流都跑一遍" → 简报、实验室动态、邮件三个都给。同一种任务已经在排队或在跑时不会重复跑（系统会合并），不用提醒用户会跑两次。reply 说"已开始，跑完会推送"（简报和邮件说"跑完进信息流"；实验室动态说"有新动态会推送，没有就不打扰"）。没有就给空数组。
 
 让下一步是"今天能做的一小步"：用户回复晚间提问"今天推进了什么？"、或聊到某件事的进展时，按回复内容、两周计划进度和日历，用 item_updates 把今日重点里相关事项的 next_step 改成今天（或下次）能做的一小步具体动作，必要时改 next_at；推进完了的改 status=done。回复里简短说一句改成了什么。
 
@@ -186,7 +209,9 @@ CHAT_PROMPT = """你是 mojito 的服务器轻量 agent，在手机 app 的对�
 - settings_update：改设置 {{changes: {{morning_at?, evening_at?（HH:MM 用户时区）, evening_enabled?}}}}，只放要改的字段；不改给 null。用户说不要晚间提问 → evening_enabled=false，要恢复 → true。当前设置：{settings}
 - card_actions：信息流卡片 {{card_id, status}}：收藏 → saved，不感兴趣 → dismissed，放回未读 → new。card_id 来自下面的卡片。
 - note_links：把用户的笔记挂到事项或项目 {{record_id, item_id, project_id}}（都可 null，null 表示不挂），record_id 来自下面"最近的笔记"。
-- subscription_updates：改订阅 {{id, changes: {{at?（HH:MM 用户时区）, enabled?, config?}}}}，id 来自下面"订阅"。论文、每日邮件各一个订阅；改推送时间给 at，开关给 enabled；论文和邮件都没有 config（不给 config）。
+- subscription_updates：改订阅 {{id, changes: {{at?（HH:MM 用户时区）, enabled?, config?}}}}，id 来自下面"订阅"。每日简报（brief）、实验室动态（watch）、每日邮件（mail）各一个订阅；开关给 enabled；at 对简报和邮件是每天几点出，对实验室动态是每天第一次查的时间。config 要给完整的新 config（没改的字段原样带上）：
+  - 实验室动态 config={{labs: [完整的实验室名单], every_hours: 几小时查一次（整数）}}：用户要加减盯的实验室、改查的频率时改这里（加一家要带上原来的名单）。
+  - 简报和邮件没有 config（不给 config）。
 - taste_notes：用户说出的读论文 / 信息流偏好（喜欢什么方向、不想看什么、关注哪位作者），每条一句话记进口味档案，用来挑以后的论文。只记用户明确表达的偏好。
 
 只在 Claude 自己想到、用户没要求时才走"等你拍板"（plan_changes）；新建事项直接建（new_items）：
@@ -197,7 +222,8 @@ CHAT_PROMPT = """你是 mojito 的服务器轻量 agent，在手机 app 的对�
 - 写 Google Calendar（用户已允许，直接做）：用户要约时间/建日程/改时间/取消时，在 calendar_actions 里给动作。
   - create：title、start、end 必填（location 可 null），event_id 为 null。只把有真实时间的事放进日历；事项的内部检查时间不进日历。
   - update：event_id 必须来自下面"mojito 建的日程"列表；只填要改的字段，其余 null，改时间时 start 和 end 都给。用户自己建的日程不能改，告诉用户自己去改。
-  - delete：任何日程都能删。mojito 建的日程用它的 event_id（start 给 null）；其他日程用"日历"里的 uid 作 event_id，并把那一次的 start 原样填进 start（重复日程只删这一次）。
+  - delete：read_only=false 的日程都能删。mojito 建的日程用它的 event_id（start 给 null）；其他日程用"日历"里的 uid 作 event_id，并把那一次的 start 原样填进 start（重复日程只删这一次）。
+  - "日历"里 read_only=true 的日程来自用户订阅的日历（比如工作或学校的 Outlook），mojito 不能改也不能删：不要给它任何 calendar_actions，reply 里说"这是你订阅的日历里的日程，mojito 改不了，请在原日历里改"。
   - 时间用 ISO-8601 带用户时区偏移（和上面"现在"里的偏移一致）；全天事件用 YYYY-MM-DD（end 是结束日的第二天）。
   - reply 里说清做了什么，并提一句可以在时间线上撤销。没有日历动作就给空数组。
 - 对外发送（邮件、给别人发消息）只起草：在 drafts 里给出 channel（email / message）、to（收件人，地址或名字）、subject（邮件主题，消息给 null）、body（完整正文）。草稿进"等你拍板"，用户复制后自己在原渠道发出；reply 里这样说。不要把对外发送写成 new_items。
@@ -249,14 +275,17 @@ new_items 字段要求：
 维护会话最近的消息（用户可能在回答它；feedback_id 用于 feedback_reply）：
 {maintainer}
 
-系统状态（数据源是否在线、结果健康、授权是否有效、正在排队和运行的任务）：
+系统状态（数据源是否在线、结果健康、授权是否有效）：
 {system}
 
-订阅（论文 / 每日邮件，每天按 at 推到信息流）：
+订阅（每日简报、每日邮件每天按 at 出一张卡进信息流；实验室动态从 at 起每 every_hours 小时查一次，有实质消息才发"新动态"卡并推送）：
 {subscriptions}
 
-信息流最近的卡片（新的和收藏的，最多 {cards_n} 张）。用户问信息流、论文、推荐读什么时，直接从这里列出（标题 + 一句为什么值得看 + 链接），并建议去"信息流"页签看全部；这里没有就说目前信息流里没有：
+信息流最近的卡片（新的和收藏的，最多 {cards_n} 张；brief = 每日 AI 简报，alert = 新动态，mail = 每日邮件，报告卡的 summary 是三行要点）。用户问信息流、论文、新闻、推荐读什么时，从这里和下面的简报全文里列出（标题 + 一句为什么值得看 + 链接），并建议去"信息流"页签看全部；这里没有就说目前信息流里没有：
 {cards}
+
+最新一期每日 AI 简报的全文（Markdown，分节带链接；用户问今天的论文、新模型、开源、新闻、实验室动态时从这里答；null = 最近的卡片里没有简报）：
+{latest_brief}
 
 未完成的事项（可用于 item_updates / plan_changes）：
 {open_items}
@@ -264,7 +293,7 @@ new_items 字段要求：
 当前两周计划（item_ids 是计划里的事项；null = 没有 active 计划）：
 {plan}
 
-日历（今天起 {days} 天，全部日程，只读）：
+日历（今天起 {days} 天，全部日程；read_only=true 的来自用户订阅的日历，不能改也不能删）：
 {calendar}
 
 {mojito_events}
@@ -281,6 +310,8 @@ new_items 字段要求：
 {message}
 
 {rules}
+
+reply 和草稿的 body 按行给：字符串数组，每个元素是一行（可带 Markdown），空字符串表示空行；元素里不要换行，也不要写 \\n。
 
 只输出符合 schema 的 JSON。"""
 
@@ -324,7 +355,6 @@ def _validate_calendar_action(action: dict, mojito_ids: set[str], calendar_uids:
 def _validate_chat(result: dict, goal_ids: set[str], project_ids: set[str], mojito_ids: set[str],
                    calendar_uids: set[str]) -> None:
     require_fields(result, CHAT_OUTPUTS, "claude chat")
-    require_nonempty_str(result, "reply", "claude chat")
     if not isinstance(result["forward_to_mac"], bool):
         raise ValidationError(f"claude chat: forward_to_mac must be bool, got {result['forward_to_mac']!r}")
     for kind in result["run_jobs"]:
@@ -342,7 +372,7 @@ def _validate_chat(result: dict, goal_ids: set[str], project_ids: set[str], moji
         require_fields(draft, ("channel", "to", "subject", "body"), where)
         require_enum(draft, "channel", DRAFT_CHANNELS, where)
         require_nonempty_str(draft, "to", where)
-        require_nonempty_str(draft, "body", where)
+        _joined_lines(draft, "body", where)
     for i, draft in enumerate(result["new_items"]):
         where = f"claude chat new_items[{i}]"
         require_fields(draft, DRAFT_FIELDS, where)
@@ -435,7 +465,7 @@ def _run_calendar_action(hub: Hub, cal: GoogleCalendar, action: dict, item_id: s
         undo = {"type": "calendar", "op": "delete", "event_id": original["id"], "before": restorable(original)}
         evidence = f"record:{record_id}"
     hub.post_event(kind="log", tier="digest", item_id=item_id, project_id=project_id, title=title,
-                   body=f"{body}\n{t(language, 'undo_hint')}", evidence=evidence, undo=undo, category=None)
+                   body=f"{body}\n{t(language, 'undo_hint')}", evidence=evidence, undo=undo, category=None, smoke=False)
 
 
 def _open_calendar(hub: Hub, config: Config) -> GoogleCalendar:
@@ -450,7 +480,8 @@ def _open_calendar(hub: Hub, config: Config) -> GoogleCalendar:
 
 
 def _card_brief(card: dict, project_titles: dict[str, str]) -> dict:
-    """Compact card for the chat context: title, kind, project, first sentence of the summary, link."""
+    """Compact card for the chat context: title, kind, project, summary (report cards: all 3 key-point lines;
+    others: the first sentence), link."""
     project = card["project_id"]
     return {
         "card_id": card["id"],
@@ -458,7 +489,7 @@ def _card_brief(card: dict, project_titles: dict[str, str]) -> dict:
         "kind": card["kind"],
         "status": card["status"],
         "project": project_titles[project] if project in project_titles else project,
-        "summary": card["summary"].split("。")[0][:200],
+        "summary": card["summary"] if card["kind"] in REPORT_CARD_KINDS else card["summary"].split("。")[0][:200],
         "link": card["link"],
     }
 
@@ -478,7 +509,9 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         project = f"\n这条消息属于这个项目（项目、事项、Orca 快照、最近记录）：\n{_dump(hub.get_project(project_id))}\n"
     card = ""
     if message["card_id"] is not None:
-        card = f"\n用户在问信息流里的这张卡片：\n{_dump(hub.get_card(message['card_id']))}\n"
+        asked = hub.get_card(message["card_id"])
+        card = (f"\n用户在问信息流里的这张卡片（body 是报告卡的全文，其他卡片为 null）：\n"
+                f"{_dump({k: asked[k] for k in ASKED_CARD_FIELDS})}\n")
     projects = hub.list_projects(status="active")
     all_projects = {p["id"]: p for p in hub.list_projects(status=None)}
     project_titles = {p["id"]: p["title"] for p in all_projects.values()}
@@ -491,6 +524,7 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
     notes = hub.list_notes(limit=CHAT_NOTES)
     subscriptions = {sub["id"]: sub for sub in hub.list_subscriptions()}
     recent_cards = hub.list_cards(limit=CHAT_CARDS, before=None, status=None)
+    recent_briefs = [c for c in recent_cards if c["kind"] == "brief"]
     card_ids = {c["id"] for c in recent_cards}
     if message["card_id"] is not None:
         card_ids.add(message["card_id"])
@@ -530,13 +564,12 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         system=_dump({
             "sources": [{k: src[k] for k in ("name", "alive", "last_seen_at", "health", "health_detail")} for src in hub.list_sources()],
             "auth": [{k: a[k] for k in ("name", "ok", "detail", "checked_at")} for a in hub.auth_status()],
-            "jobs": [{k: j[k] for k in ("kind", "runner", "status", "requested_at")}
-                     for status in ("queued", "running") for j in hub.list_jobs(status=status)],
         }),
         subscriptions=_dump([{k: sub[k] for k in ("id", "name", "kind", "at", "enabled", "config", "last_result", "health")}
                              for sub in subscriptions.values()]),
         cards_n=CHAT_CARDS,
         cards=_dump([_card_brief(c, project_titles) for c in recent_cards]),
+        latest_brief=recent_briefs[0]["body"] if recent_briefs else "null",
         open_items=_dump([{k: i[k] for k in ("id", "title", "status", "next_step", "next_at", "owner", "project_id")}
                           for i in items_by_id.values() if i["status"] in edits.OPEN_STATUSES]),
         plan=_dump(None if plan is None else {k: plan["plan"][k] for k in ("id", "start", "end", "goal_ids", "item_ids")}),
@@ -558,9 +591,19 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         raise ValidationError(f"message {record_id}: {len(message['attachments'])} attachments > {MAX_ATTACHMENTS}")
     images = [hub.get_attachment(a["id"]) for a in message["attachments"]]
     result = claude.ask_json(config.claude_bin, prompt, CHAT_SCHEMA, images)
-    reply = result["reply"]
+    reply = _joined_lines(result, "reply", "claude chat")
     log.info("chat %s actions: %s", record_id,
              json.dumps({k: v for k, v in result.items() if k != "reply" and v}, ensure_ascii=False))
+    # Subscribed calendars are read-only (api.md 订阅日历): drop any action on their events and say why. A uid that also
+    # has an occurrence in the primary calendar is left to Google, which only ever touches the primary calendar.
+    read_only_uids = ({e["uid"] for e in calendar_events if e["read_only"]}
+                      - {e["uid"] for e in calendar_events if not e["read_only"]})
+    blocked = [a for a in result["calendar_actions"] if a["event_id"] in read_only_uids]
+    if blocked:
+        log.info("chat %s dropped actions on subscribed-calendar events: %s", record_id, json.dumps(blocked, ensure_ascii=False))
+        result["calendar_actions"] = [a for a in result["calendar_actions"] if a["event_id"] not in read_only_uids]
+        if not mentions(language, "read_only_marker", reply):
+            reply = f"{reply}\n{t(language, 'read_only_note')}"
     if cal is None:
         # Calendar is down: never execute (or validate) calendar actions; make sure the reply says so.
         if result["calendar_actions"] and not mentions(language, "calendar_down_marker", reply):
@@ -584,6 +627,12 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         raise ValidationError(f"claude chat feedback_reply: feedback_id={result['feedback_reply']['feedback_id']!r} "
                               f"not among recent maintainer messages {sorted(maintainer_feedback_ids)}")
 
+    if message["smoke"]:
+        # Deploy smoke check (api.md 部署冒烟检查): context and claude -p ran for real; write only the reply, act on nothing.
+        hub.post_event(kind="chat", tier="digest", item_id=item_id, project_id=project_id, title=_title(reply), body=reply,
+                       evidence="inferred", undo=None, category=None, smoke=True)
+        return
+
     # Direct edits (the hub records each with an undo), then the "等你拍板" proposals.
     edits.apply_item_updates(hub, result["item_updates"], items_by_id)
     edits.apply_goal_updates(hub, result["goal_updates"], goals_by_id)
@@ -604,7 +653,7 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
 
     for n, draft in enumerate(result["drafts"], start=1):
         hub.put_draft(f"chat-{record_id}-d{n}", channel=draft["channel"], to=draft["to"], subject=draft["subject"],
-                      body=draft["body"], item_id=item_id)
+                      body="\n".join(draft["body"]), item_id=item_id)
 
     # Items the user asked for in chat are created active directly (api.md 第 5 节补充); the hub writes no record on
     # creation, so the agent notes where it came from.
@@ -621,6 +670,7 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
             evidence=f"record:{record_id}",
             undo=None,
             category=None,
+            smoke=False,
         )
 
     for kind in result["run_jobs"]:
@@ -640,18 +690,18 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
 
     if result["forward_to_mac"]:
         hub.post_event(kind="chat", tier="log", item_id=item_id, project_id=project_id, title=t(language, "forwarded_title"), body=reply,
-                       evidence="inferred", undo=None, category=None)
+                       evidence="inferred", undo=None, category=None, smoke=False)
         hub.create_job(kind="chat_reply", runner="mac", record_id=record_id)
         return
     hub.post_event(kind="chat", tier="digest", item_id=item_id, project_id=project_id, title=_title(reply), body=reply,
-                   evidence="inferred", undo=None, category=None)
+                   evidence="inferred", undo=None, category=None, smoke=False)
 
 
 # ---------------------------------------------------------------- morning_brief
 
 BRIEF_SCHEMA = {
     "type": "object",
-    "properties": {"title": {"type": "string"}, "body": {"type": "string"}},
+    "properties": {"title": {"type": "string"}, "body": LINES_SCHEMA},
     "required": ["title", "body"],
     "additionalProperties": False,
 }
@@ -662,13 +712,13 @@ BRIEF_PROMPT = """你是 mojito 的服务器轻量 agent，给用户写今天的
 
 要求：
 - 内容就是答案，不寒暄。中文，手机上一屏读完。
-- body 按顺序：
+- body 按行给（字符串数组，每个元素一行，空字符串是空行；元素里不要换行，也不要写 \\n），按顺序：
   1. 今天日程（时间 + 标题，用户时区的时间）。
   2. 今日重点，按项目归类：就是 focus 里的事项，一件不漏、不从别处补。每条写下一步和时间；days_until > 0 的写"还有 N 天"。每个有 summary 或有今日重点的项目一小段——项目名：summary 一句（没有 summary 就省略这句）。事项按 project_id 归到项目，不属于任何项目的放"其他"。stale 的项目可以提一句"一周没动静"。
   3. 逾期（overdue，还在做只是过了时间）和被忘了（forgotten，没有下一步时间或长期没动静）分开说：各提数量和最要紧的一件，没有就不提。
   4. 夜里的要事（未读告警，没有就不提）。
   5. 等你拍板的数量（事项、计划、草稿、新项目），没有就不提。
-  6. 信息流新增的卡片数，一句话，如"信息流新增 3 张"（为 0 就不提）。
+  6. 今日 AI 简报的要点，一句话（从下面简报卡的三行要点里挑最要紧的），末尾说"全文在信息流"；没有简报卡就不提。
   某一块没有内容就整块省略。
 - title：一行概括今天最重要的一件事，不超过 20 字。
 - 只根据下面的数据写，不编造。
@@ -679,7 +729,8 @@ BRIEF_PROMPT = """你是 mojito 的服务器轻量 agent，给用户写今天的
 进行中的项目：
 {projects}
 
-信息流过去 24 小时新增的卡片数：{feed_new}
+今天的每日 AI 简报卡（title + summary 三行要点；null = 今天还没有）：
+{ai_brief}
 
 {rules}
 
@@ -691,21 +742,23 @@ def morning_brief(hub: Hub, config: Config, job: dict) -> None:
     today = hub.today()
     projects = [{k: p[k] for k in ("id", "title", "area", "summary", "stale", "open_items")}
                 for p in hub.list_projects(status="active")]
-    since = _now() - FEED_NEW_WINDOW
-    feed_new = sum(1 for c in hub.list_cards(limit=CARDS_PAGE, before=None, status="new") if _at(c) >= since)
+    today_date = _now().date()
+    briefs = [c for c in hub.list_cards(limit=CARDS_PAGE, before=None, status=None)
+              if c["kind"] == "brief" and _at(c).astimezone(NY).date() == today_date]
+    ai_brief = {"title": briefs[0]["title"], "summary": briefs[0]["summary"]} if briefs else None
     needs_you = today["needs_you"]
     if not (today["schedule"] or today["focus"] or today["overdue"] or today["forgotten"] or today["alerts"]
             or any(needs_you.values())
-            or any(p["summary"] for p in projects) or feed_new):
+            or any(p["summary"] for p in projects) or ai_brief is not None):
         return
-    prompt = BRIEF_PROMPT.format(now=_now_context(), today=_dump(today), projects=_dump(projects), feed_new=feed_new,
+    prompt = BRIEF_PROMPT.format(now=_now_context(), today=_dump(today), projects=_dump(projects), ai_brief=_dump(ai_brief),
                                  rules=_rules(language))
     result = claude.ask_json(config.claude_bin, prompt, BRIEF_SCHEMA, [])
     require_fields(result, ("title", "body"), "claude brief")
     require_nonempty_str(result, "title", "claude brief")
-    require_nonempty_str(result, "body", "claude brief")
-    hub.post_event(kind="chat", tier="digest", item_id=None, project_id=None, title=result["title"], body=result["body"],
-                   evidence="inferred", undo=None, category="brief")
+    body = _joined_lines(result, "body", "claude brief")
+    hub.post_event(kind="chat", tier="digest", item_id=None, project_id=None, title=result["title"], body=body,
+                   evidence="inferred", undo=None, category="brief", smoke=False)
 
 
 # ---------------------------------------------------------------- evening_prompt (rules only, no Claude)
@@ -715,9 +768,9 @@ def _start_of_day(day: date) -> datetime:
 
 
 def evening_prompt(hub: Hub, config: Config, job: dict) -> None:
-    """Ask the evening question ("今天推进了什么？") unless: evening prompts are turned off in settings, the user already wrote something today, it was already asked today,
-    or we already asked whether to continue and got no answer. After 3 unanswered prompts in a row,
-    ask once whether to continue instead."""
+    """Ask the evening question ("今天推进了什么？") unless: evening prompts are turned off in settings, it was already
+    asked today, or we already asked whether to continue and got no answer. After 3 unanswered prompts in a row,
+    ask once whether to continue instead. Records the user wrote during the day do not stop it (api.md 早晚通知)."""
     settings = hub.get_settings()
     if not settings["evening_enabled"]:
         return
@@ -729,28 +782,25 @@ def evening_prompt(hub: Hub, config: Config, job: dict) -> None:
             if r["source"] == SOURCE_NAME and r["title"] in asked_titles | ask_titles]
     prompts = [r for r in ours if r["title"] in asked_titles][:EVENING_UNANSWERED_DAYS]
 
-    cutoff = today_start
+    if ours and _at(ours[0]) >= today_start:
+        return
+    # answered_since looks only after our own questions: fetch the user's records back to the oldest one it checks.
+    mine = []
     if ours:
-        cutoff = min(cutoff, _at(ours[0]))
-    if len(prompts) == EVENING_UNANSWERED_DAYS:
-        cutoff = min(cutoff, _at(prompts[-1]))
-    mine = [r for r in _records_since(hub, cutoff) if r["author"] == "me"]
+        cutoff = _at(prompts[-1]) if len(prompts) == EVENING_UNANSWERED_DAYS else _at(ours[0])
+        mine = [r for r in _records_since(hub, cutoff) if r["author"] == "me"]
 
     def answered_since(at: datetime) -> bool:
         return any(_at(r) > at for r in mine)
 
-    if any(_at(r) >= today_start for r in mine):
-        return
-    if ours and _at(ours[0]) >= today_start:
-        return
     if ours and ours[0]["title"] in ask_titles and not answered_since(_at(ours[0])):
         return
     if len(prompts) == EVENING_UNANSWERED_DAYS and not answered_since(_at(prompts[-1])):
         hub.post_event(kind="chat", tier="digest", item_id=None, project_id=None, title=t(language, "evening_ask_title"),
-                       body=t(language, "evening_ask_body"), evidence=None, undo=None, category="brief")
+                       body=t(language, "evening_ask_body"), evidence=None, undo=None, category="brief", smoke=False)
         return
     hub.post_event(kind="chat", tier="digest", item_id=None, project_id=None, title=t(language, "evening_title"),
-                   body=t(language, "evening_body"), evidence=None, undo=None, category="brief")
+                   body=t(language, "evening_body"), evidence=None, undo=None, category="brief", smoke=False)
 
 
 # ---------------------------------------------------------------- undo (calendar)
@@ -785,7 +835,7 @@ def undo(hub: Hub, config: Config, job: dict) -> None:
         raise ValidationError(f"record {record['id']}: unknown calendar undo op {u['op']!r}")
     hub.post_event(kind="log", tier="log", item_id=record["item_id"], project_id=record["project_id"],
                    title=t(language, "undone_title", title=record["title"]), body=body,
-                   evidence=f"record:{record['id']}", undo=None, category=None)
+                   evidence=f"record:{record['id']}", undo=None, category=None, smoke=False)
     hub.refresh_calendar()
 
 
@@ -827,7 +877,7 @@ def calendar_delete(hub: Hub, config: Config, job: dict) -> None:
                    title=t(language, "deleted_event_title", event=_describe(before, language)),
                    body=t(language, "deleted_event_body"), evidence=None,
                    undo={"type": "calendar", "op": "delete", "event_id": original["id"], "before": restorable(original)},
-                   category=None)
+                   category=None, smoke=False)
     hub.refresh_calendar()
 
 

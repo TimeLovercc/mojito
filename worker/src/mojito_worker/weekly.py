@@ -6,15 +6,15 @@ from mojito_worker import claude, local_facts
 from mojito_worker.config import TIMEZONE
 from mojito_worker.hub import Hub
 from mojito_worker.i18n import say
-from mojito_worker.prompting import user_text_rules, dump, now_context
-from mojito_worker.validate import require_fields, require_nonempty_str
+from mojito_worker.prompting import LINES_RULE, LINES_SCHEMA, dump, joined_lines, now_context, user_text_rules
+from mojito_worker.validate import require_fields
 
 WEEK = timedelta(days=7)
 PAGE = 100
 
 SCHEMA = {
     "type": "object",
-    "properties": {"summary": {"type": "string"}},
+    "properties": {"summary": LINES_SCHEMA},
     "required": ["summary"],
     "additionalProperties": False,
 }
@@ -41,6 +41,7 @@ PROMPT = """你在为用户写 mojito 的每周总结，会作为一条对话消
 要求：简洁。开头先写使用情况：本周每天打开次数、晚间提问回了几次（x/y），和上周比是多了还是少了——这是检验 mojito 有没有用的两个数，照实写，不评价用户。
 然后按"推进了什么 / 卡住或拖着的 / 下周最该做的 1-3 件"组织；每点尽量带出处（事项名、仓库、记录日期）；
 推断的内容说明是推断；没数据的部分直接说没有，不要编。
+summary {lines}
 {rules}
 只输出符合 schema 的 JSON。"""
 
@@ -74,9 +75,10 @@ def weekly_summary(hub: Hub, job: dict, lang: str) -> None:
         plan=dump(_active_plan(hub)),
         metrics=dump(hub.metrics((today - timedelta(days=6)).isoformat(), today.isoformat())),
         metrics_prev=dump(hub.metrics((today - timedelta(days=13)).isoformat(), (today - timedelta(days=7)).isoformat())),
+        lines=LINES_RULE,
         rules=user_text_rules(lang),
     )
     result = claude.ask_json(prompt, SCHEMA)
     require_fields(result, ("summary",), "claude weekly")
-    require_nonempty_str(result, "summary", "claude weekly")
-    hub.post_event(kind="chat", tier="digest", item_id=None, project_id=None, title=say(lang, "本周总结"), body=result["summary"].strip(), evidence="inferred")
+    summary = joined_lines(result, "summary", "claude weekly")
+    hub.post_event(kind="chat", tier="digest", item_id=None, project_id=None, title=say(lang, "本周总结"), body=summary, evidence="inferred")

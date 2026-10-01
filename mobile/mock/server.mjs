@@ -93,11 +93,18 @@ const records = [...seed.records, ...extra.records].map((r) => ({
   at: toUtc(r.at),
 }))
   .sort((a, b) => a.at.localeCompare(b.at)) // 列表按数组顺序，旧的在前
-const cards = extra.cards.map((c) => ({ ...c, at: toUtc(c.at) }))
+// 简报标题里的日期（worker 写成"今日 AI 简报 · 9/30"）跟着示例数据一起平移到今天
+const shiftedTitle = (c) => {
+  if (c.kind !== 'brief') return c.title
+  const [, m, d] = shiftYmd(c.at.slice(0, 10)).split('-')
+  return c.title.replace(/\d+\/\d+$/, `${Number(m)}/${Number(d)}`)
+}
+const cards = extra.cards.map((c) => ({ body: null, ...c, at: toUtc(c.at), title: shiftedTitle(c) }))
+// 信息流改成报告（design.md 8.10）：每日 AI 简报、实验室新动态卡和那条新动态推送记录都在 extra.json（上面已读进来）
 // 卡片配图（design.md 8.5）：假服务器拿 widget 小图标当配图，挂在附件里
 const MOCK_COVER = 'a-mock-cover'
 const mockCoverData = readFileSync(join(here, '../assets/widget-avatar.png'))
-// 订阅（design.md 8.5）：和 hub 迁移时建的一样（论文、每日邮件），内容在 extra.json
+// 订阅（design.md 8.10）：每日 AI 简报、实验室动态、每日邮件，和 hub 一样；内容（名称按语言）在 extra.json
 const subscriptions = extra.subscriptions.map((s) => ({ ...s, last_run_at: toUtc(s.last_run_at) }))
 const feedback = extra.feedback.map((f) => ({ ...f, at: toUtc(f.at), updated_at: toUtc(f.updated_at) }))
 const feedbackMessages = extra.feedback_messages.map((m) => ({ ...m, at: toUtc(m.at) }))
@@ -406,14 +413,14 @@ function mockEvents() {
   return allEvents().filter((e) => !deletedEvents.has(`${e.uid}@${e.start}`))
 }
 
-// 假日程：extra.json 的 events（和 demo hub 的 calendar.ics 同一份），和其他示例数据一起平移
+// 假日程：extra.json 的 events（和 demo hub 的 calendar.ics 同一份，都不是订阅日历：read_only=false），和其他示例数据一起平移
 const EVENTS = extra.events.map((e) => ({ ...e, start: toUtc(e.start), end: toUtc(e.end) }))
 function allEvents() {
   return EVENTS
 }
 
 // notify：按类型开关推送（design.md 8.6），迁移时补全为全开
-const settings = { ...seed.settings, language: LANGUAGE, notify: { brief: true, chat: true, alert: true, feedback: true, release: true, jobs: true } }
+const settings = { ...seed.settings, language: LANGUAGE, notify: { brief: true, chat: true, alert: true, news: true, feedback: true, release: true, jobs: true } }
 // 假服务器自己写的文字跟界面语言走（settings.language 可在 app 里切换）
 const say = (zh, en) => (settings.language === 'en' ? en : zh)
 
@@ -1183,7 +1190,9 @@ const routes = [
     (m, q, body) => {
       const uid = decodeURIComponent(m[1])
       const start = require(body, 'start')
-      if (!mockEvents().some((e) => e.uid === uid && e.start === start)) throw new HttpError(404, `日程 ${uid} @ ${start} 不存在`)
+      const ev = mockEvents().find((e) => e.uid === uid && e.start === start)
+      if (ev === undefined) throw new HttpError(404, `日程 ${uid} @ ${start} 不存在`)
+      if (ev.read_only) throw new HttpError(409, '这是订阅来的日历，只能在原日历里改')
       const job = newJob('calendar_delete', 'server', null)
       job.payload = { uid, start }
       return job

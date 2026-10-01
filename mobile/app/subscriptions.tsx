@@ -16,7 +16,8 @@ import { t } from '../src/i18n'
 
 const healthColor = { ok: colors.ok, warn: colors.warn, error: colors.bad } as const
 
-// 订阅（design.md 8.5）：信息流每天从哪里来。这里只有开关；改时间、改关注什么，点"调整"进对话说一句，Claude 改。
+// 订阅（design.md 8.5、8.10）：信息流从哪里来——每日 AI 简报、实验室动态（每 8 小时查一次）、每日邮件。
+// 这里只有开关；改时间、改关注什么（实验室名单），点"调整"进对话说一句，Claude 改。名称由 hub 按语言给
 export default function SubscriptionsScreen() {
   const view = useHub<SubscriptionsList>('/subscriptions')
   const router = useRouter()
@@ -37,7 +38,9 @@ export default function SubscriptionsScreen() {
               </Rows>
             </Card>
           )}
-          <Text style={styles.hint}>{t('改时间、改关注什么（比如"论文少推综述"），点"调整"在对话里说一句。')}</Text>
+          <Text style={styles.hint}>
+            {t('改时间、改关注什么（比如"实验室名单加上 Mistral"），点"调整"在对话里说一句。')}
+          </Text>
         </>
       )}
     </Screen>
@@ -51,6 +54,8 @@ function SubRow({ sub, onAdjust }: { sub: Subscription; onAdjust: () => void }) 
   const showError = useErrorToast()
   const [busy, setBusy] = useState(false)
   const [running, setRunning] = useState(false)
+  // 只读展示：实验室动态的名单
+  const labs = sub.kind === 'watch' ? (sub.config.labs as string[]) : null
 
   const toggle = async (enabled: boolean) => {
     if (config.hub === null) {
@@ -91,10 +96,13 @@ function SubRow({ sub, onAdjust }: { sub: Subscription; onAdjust: () => void }) 
     <View style={styles.row}>
       <View style={styles.top}>
         <Text style={[styles.name, !sub.enabled && { color: colors.tx2 }]}>{sub.name}</Text>
-        <Text style={styles.at}>{t('每天 {at}', { at: sub.at })}</Text>
+        <Text style={styles.at}>
+          {sub.kind === 'watch' ? t('每 {n} 小时', { n: sub.config.every_hours as number }) : t('每天 {at}', { at: sub.at })}
+        </Text>
         <View style={{ flex: 1 }} />
         <Toggle value={sub.enabled} disabled={busy} onChange={toggle} />
       </View>
+      {labs === null ? null : <Text style={styles.meta}>{t('实验室：{labs}', { labs: labs.join(t('、')) })}</Text>}
       <View style={styles.top}>
         {sub.health === null ? null : <View style={[styles.dot, { backgroundColor: healthColor[sub.health] }]} />}
         <Text style={styles.meta} numberOfLines={2}>

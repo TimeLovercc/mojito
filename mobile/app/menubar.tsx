@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, type ReactNode } from 'react'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter, type Href } from 'expo-router'
 import { actions } from '../src/api/client'
 import type { AuthList, FocusItem, Item, Plan, PlansList, Project, SourcesList, Today } from '../src/api/types'
@@ -9,7 +9,7 @@ import { useConfig } from '../src/config/context'
 import { BtnD, Pill } from '../src/desktop/ui'
 import { t as tr } from '../src/i18n'
 import { problemsOf } from '../src/problems'
-import { clock, shortDate, todayYmd, ymdOf } from '../src/time'
+import { clock, shortDate, todayYmd, weekdayOf, ymdOf } from '../src/time'
 import { colors, font, overlay, popoverTint, size } from '../src/theme'
 import { tauri } from '../src/tauri'
 import { useErrorToast } from '../src/toast'
@@ -38,18 +38,24 @@ export default function MenubarScreen() {
   const tone = problems === null ? colors.tx3 : problems.length === 0 ? colors.ok : problems.some((p) => p.bad) ? colors.bad : colors.warn
   const today = view.data
   const ymd = todayYmd()
+  useNoStuckHover()
+  // 全部内容（头部到页脚）在 #menubar-content 里，按内容自然高度排；desktop 量它的高度把面板窗口设成一样高
+  // （最高 560，超出在这里滚动），所以这一层不能撑满
   return (
-    <View style={styles.page}>
-      <View style={styles.head}>
-        <Text style={styles.headTitle}>
-          {tr('今天')}
-          <Text style={styles.headDate}> {shortDate(ymd)}</Text>
-        </Text>
-        {view.fetchedAt === null ? null : (
-          <Text style={styles.headMeta}>{tr('{time} 更新', { time: clock(view.fetchedAt) })}</Text>
-        )}
-      </View>
-      <ScrollView style={styles.scroll}>
+    <ScrollView style={styles.page}>
+      <View nativeID="menubar-content">
+        <View style={styles.head}>
+          <Text style={styles.headTitle}>
+            {tr('今天')}
+            <Text style={styles.headDate}>
+              {' '}
+              {weekdayOf(ymd)} {shortDate(ymd)}
+            </Text>
+          </Text>
+          {view.fetchedAt === null ? null : (
+            <Text style={styles.headMeta}>{tr('{time} 更新', { time: clock(view.fetchedAt) })}</Text>
+          )}
+        </View>
         <StaleBanner view={view} />
         {today === null ? null : (
           <>
@@ -68,16 +74,38 @@ export default function MenubarScreen() {
             <NeedsYou today={today} open={open} />
           </>
         )}
-      </ScrollView>
-      <Pressable style={styles.foot} onPress={() => open('/')}>
-        <Text style={styles.footText}>{tr('打开 Mojito')}</Text>
-        <Pressable style={styles.status} onPress={() => open('/system')}>
-          <View style={[styles.dot, { backgroundColor: tone }]} />
-          <Text style={styles.statusText}>{status}</Text>
+        <Pressable style={styles.foot} onPress={() => open('/')}>
+          <Text style={styles.footText}>{tr('打开 Mojito')}</Text>
+          <Pressable style={styles.status} onPress={() => open('/system')}>
+            <View style={[styles.dot, { backgroundColor: tone }]} />
+            <Text style={styles.statusText}>{status}</Text>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </View>
+      </View>
+    </ScrollView>
   )
+}
+
+// 面板在鼠标停在某行上时被收起（点了行、点了别处），WebKit 会把这行的 :hover 一直留到下次鼠标移动，
+// 再打开时那行像被选中一样灰着。窗口失焦、隐藏或鼠标离开页面时关掉悬停底色，鼠标一动再恢复
+function useNoStuckHover() {
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const root = document.documentElement
+    const off = () => root.setAttribute('data-nohover', '')
+    const on = () => root.removeAttribute('data-nohover')
+    const onVisibility = () => (document.visibilityState === 'hidden' ? off() : undefined)
+    window.addEventListener('blur', off)
+    document.addEventListener('mouseleave', off)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('mousemove', on)
+    return () => {
+      window.removeEventListener('blur', off)
+      document.removeEventListener('mouseleave', off)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('mousemove', on)
+    }
+  }, [])
 }
 
 const dateOf = (i: Item) => (i.next_at === null ? '' : shortDate(ymdOf(new Date(i.next_at))))
@@ -221,7 +249,6 @@ const styles = StyleSheet.create({
   headTitle: { ...font.semibold, fontSize: size.secondary, color: colors.tx },
   headDate: { ...font.regular, fontSize: size.small, color: colors.tx3 },
   headMeta: { ...font.regular, fontSize: size.small, color: colors.tx3 },
-  scroll: { flex: 1 },
   none: {
     ...font.regular,
     fontSize: size.secondary,

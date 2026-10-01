@@ -18,7 +18,7 @@ import { useChatSubject, useWide } from '../../src/wide'
 import { ItemToolsD } from '../../src/desktop/ItemTools'
 import { t } from '../../src/i18n'
 
-const toneColor = { g: colors.ok, a: colors.warn, r: colors.bad, n: colors.tx2 } as const
+const toneColor = { g: colors.ok, a: colors.warn, r: colors.bad, n: colors.tx2, b: colors.brand } as const
 
 export default function ItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()

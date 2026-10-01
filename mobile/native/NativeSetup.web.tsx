@@ -189,7 +189,7 @@ function PwaSetup({ app, hub }: { app: Pwa; hub: HubConfig }) {
           style={styles.banner}
           onPress={() => {
             setReceived(null)
-            router.push(routeOf({ record_id: received.id, kind: received.kind, item_id: received.item_id }))
+            router.push(routeOf({ record_id: received.id, kind: received.kind, item_id: received.item_id, card_id: received.card_id }))
           }}
         >
           <Text style={styles.bannerText} numberOfLines={1}>

@@ -9,7 +9,7 @@ import re
 
 from mojito_worker import claude, edits, local_facts
 from mojito_worker.hub import Hub
-from mojito_worker.prompting import user_text_rules, dump, now_context
+from mojito_worker.prompting import LINES_RULE, LINES_SCHEMA, dump, joined_lines, now_context, user_text_rules
 from mojito_worker.tools import (
     ACTION_SCHEMA,
     LocalTools,
@@ -45,7 +45,7 @@ PLAN_SCHEMA = {
 REPLY_SCHEMA = {
     "type": "object",
     "properties": {
-        "reply": {"type": "string"},
+        "reply": LINES_SCHEMA,
         "drafts": {
             "type": "array",
             "items": {
@@ -54,7 +54,7 @@ REPLY_SCHEMA = {
                     "channel": {"type": "string", "enum": list(DRAFT_CHANNELS)},
                     "to": {"type": "string"},
                     "subject": {"type": ["string", "null"]},
-                    "body": {"type": "string"},
+                    "body": LINES_SCHEMA,
                 },
                 "required": ["channel", "to", "subject", "body"],
                 "additionalProperties": False,
@@ -95,7 +95,7 @@ hub 上的今天（/today）：
 项目：{projects}
 可以改的计划（进行中和草稿）：{plans}
 设置：{settings}
-订阅（信息流的来源，改时间 / 开关用这里的 id）：{subscriptions}
+订阅（信息流的来源，改时间 / 开关 / 实验室名单用这里的 id）：{subscriptions}
 
 信息流里最近的卡片（新的和收藏的，最多 {cards_n} 张）：
 {cards}
@@ -121,6 +121,7 @@ REPLY_INSTRUCTIONS = """
 - 格式：短段落和列表，重点用 Markdown **粗体**，可以用 Markdown 链接；app 会正确显示。
 - drafts：只有用户要回信或给别人发消息时才写（channel=email 时 to 写邮箱、subject 写主题；channel=message 时 to 写对方和平台，subject 为 null）；
   写了草稿就在 reply 里说"草稿放在等你拍板里了，你确认后自己发"。其他情况 drafts 为空数组。
+- reply 和草稿的 body {lines}
 {edits}
 {rules}
 只输出符合 schema 的 JSON。"""
@@ -142,15 +143,18 @@ def _validate_plan(plan: dict) -> list[dict]:
     return plan["actions"]
 
 
-def _validate_answer(answer: dict) -> None:
+def _validated_answer(answer: dict) -> tuple[str, list[str]]:
+    """(reply, draft bodies), each joined from its lines."""
     require_fields(answer, ("reply", "drafts"), "claude reply")
-    require_nonempty_str(answer, "reply", "claude reply")
+    reply = joined_lines(answer, "reply", "claude reply")
+    bodies = []
     for i, d in enumerate(answer["drafts"]):
         where = f"claude reply drafts[{i}]"
         require_fields(d, ("channel", "to", "subject", "body"), where)
         require_enum(d, "channel", DRAFT_CHANNELS, where)
         require_nonempty_str(d, "to", where)
-        require_nonempty_str(d, "body", where)
+        bodies.append(joined_lines(d, "body", where))
+    return reply, bodies
 
 
 def chat_reply(hub: Hub, job: dict, lang: str) -> None:
@@ -213,8 +217,8 @@ def chat_reply(hub: Hub, job: dict, lang: str) -> None:
         results.extend(tools.run(a) for a in actions)
 
     results_text = f"查到的本地数据：\n{dump(results)}\n" if results else ""
-    answer = claude.ask_json_with_images(context + REPLY_INSTRUCTIONS.format(results=results_text, edits=edits.INSTRUCTIONS, rules=user_text_rules(lang)), images, REPLY_SCHEMA)
-    _validate_answer(answer)
+    answer = claude.ask_json_with_images(context + REPLY_INSTRUCTIONS.format(results=results_text, lines=LINES_RULE, edits=edits.INSTRUCTIONS, rules=user_text_rules(lang)), images, REPLY_SCHEMA)
+    reply, draft_bodies = _validated_answer(answer)
     edits.validate(answer, edit_ctx, hub)
     edits.apply(hub, answer, edit_ctx)
 
@@ -223,10 +227,9 @@ def chat_reply(hub: Hub, job: dict, lang: str) -> None:
             "channel": d["channel"],
             "to": d["to"],
             "subject": d["subject"],
-            "body": d["body"],
+            "body": draft_bodies[i],
             "item_id": message["item_id"],
         })
-    reply = answer["reply"].strip()
     hub.post_event(
         kind="chat",
         tier="digest",

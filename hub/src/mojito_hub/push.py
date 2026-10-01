@@ -21,14 +21,16 @@ _tasks: set[asyncio.Task] = set()  # keep strong refs until done
 
 
 def push_data(record: Record) -> dict[str, str]:
-    """Shared data of both channels. Values must be strings (FCM); item_id is omitted when
-    null. reply=true marks agent chat messages (e.g. the evening question) the app can answer."""
+    """Shared data of both channels. Values must be strings (FCM); item_id and card_id are
+    omitted when null. reply=true marks agent chat messages (e.g. the evening question) the app can answer."""
     data = {
         "record_id": record.id, "headline": record.title, "tier": record.tier, "kind": record.kind,
         "reply": "true" if record.kind == "chat" and record.author == "system" else "false",
     }
     if record.item_id is not None:
         data["item_id"] = record.item_id
+    if record.card_id is not None:
+        data["card_id"] = record.card_id
     return data
 
 
@@ -37,6 +39,8 @@ def webpush_payload(record: Record) -> dict:
     query = {"record_id": record.id, "kind": record.kind}
     if record.item_id is not None:
         query["item_id"] = record.item_id
+    if record.card_id is not None:
+        query["card_id"] = record.card_id
     return {
         "web_push": 8030,
         "notification": {
@@ -88,8 +92,8 @@ def _start(coro, channel: str) -> None:
 
 
 def push(record: Record) -> None:
-    if record.tier == "log":
-        return
+    if record.tier == "log" or record.smoke:
+        return  # smoke records are never pushed (api.md 冒烟标记)
     notify = json.loads(db.one("SELECT notify FROM settings WHERE id = 1")["notify"])
     if not notify[record.category]:
         return  # the user turned this category off; the record itself stays

@@ -22,6 +22,8 @@ ZOTERO_DB = os.environ["MOJITO_ZOTERO_DB"]
 # arXiv categories of the daily paper feed, comma-separated (e.g. cs.AI,cs.HC).
 ARXIV_CATEGORIES = tuple(c.strip() for c in os.environ["MOJITO_ARXIV_CATEGORIES"].split(","))
 ORCA_BIN = "orca"
+# Local state kept between runs (feed_watch: last successful run, reported event keys).
+STATE_DIR = Path.home() / ".mojito-worker"
 POLL_INTERVAL_S = 15
 HEARTBEAT_INTERVAL_S = 86400
 CLAUDE_TIMEOUT_S = 600

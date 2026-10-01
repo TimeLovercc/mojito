@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { actions, hubRequest } from '../api/client'
 import type { Card, CardsPage, Project, ProjectsList } from '../api/types'
 import { AuthImage } from '../components/AuthImage'
-import { kindLabel, originLabel } from '../components/CardView'
+import { isReport, kindLabel, originLabel, pinTodayBrief } from '../components/CardView'
 import { Markdown, plainText } from '../components/RichText'
 import { StaleBanner } from '../components/Screen'
 import { useConfig } from '../config/context'
@@ -51,7 +51,12 @@ export function FeedWide() {
   const all = page === null ? [] : [...page.cards, ...older]
   const cut = page === null || page.last_read_id === null ? -1 : all.findIndex((c) => c.id === page.last_read_id)
   const freshCount = page === null ? null : cut === -1 ? all.length : cut
-  const selected = picked !== null && all.some((c) => c.id === picked) ? picked : all.length === 0 ? null : all[0].id
+  // 当天的每日简报排在最上面（design.md 8.10）；"上次读到这里"仍按原顺序算哪些是新的，画在置顶那张之后第一张看过的卡片前
+  const ordered = pinTodayBrief(all)
+  const pinned = ordered.length > 0 && ordered[0] !== all[0]
+  const freshIds = new Set((cut === -1 ? all : all.slice(0, cut)).map((c) => c.id))
+  const markAt = cut === -1 ? -1 : ordered.findIndex((c, i) => !(pinned && i === 0) && !freshIds.has(c.id))
+  const selected = picked !== null && all.some((c) => c.id === picked) ? picked : ordered.length === 0 ? null : ordered[0].id
   const shown = all.find((c) => c.id === selected)
   const projectOf = (id: string | null): Project | null => {
     if (id === null || projects.data === null) return null
@@ -98,20 +103,20 @@ export function FeedWide() {
         >
           <StaleBanner view={view} />
           {page !== null && all.length === 0 ? <Text style={styles.none}>{t('还没有卡片')}</Text> : null}
-          {all.map((c, i) => {
+          {ordered.map((c, i) => {
             const day = ymdOf(new Date(c.at))
-            const newDay = i === 0 || ymdOf(new Date(all[i - 1].at)) !== day
-            const prevSelected = i > 0 && all[i - 1].id === selected
+            const newDay = i === 0 || ymdOf(new Date(ordered[i - 1].at)) !== day
+            const prevSelected = i > 0 && ordered[i - 1].id === selected
             return (
               <Fragment key={c.id}>
-                {i === cut && cut !== -1 ? <ReadMark /> : null}
+                {i === markAt ? <ReadMark /> : null}
                 {newDay ? <Text style={styles.groupHead}>{dayLabel(day)}</Text> : null}
                 <Row
                   card={c}
                   project={projectOf(c.project_id)}
                   selected={c.id === selected}
                   // 行间 hair 分隔：组的第一行、选中行和它下面一行不画
-                  line={!newDay && !(i === cut) && c.id !== selected && !prevSelected}
+                  line={!newDay && !(i === markAt) && c.id !== selected && !prevSelected}
                   onPress={() => setPicked(c.id)}
                 />
               </Fragment>
@@ -166,13 +171,21 @@ function Row({
     <Pressable onPress={onPress} style={[styles.row, selected && styles.rowOn]} {...hoverRow}>
       {line ? <View style={styles.rowLine} /> : null}
       <View style={styles.rowMain}>
-        <Text style={styles.src}>
-          {originLabel(card.origin)} · {kindLabel[card.kind]}
-        </Text>
+        {card.kind === 'alert' ? (
+          <View style={styles.srcRow}>
+            <Pill label={t('新动态')} tone="brand" />
+            <Text style={styles.src}>{originLabel(card.origin)}</Text>
+          </View>
+        ) : (
+          <Text style={styles.src}>
+            {originLabel(card.origin)} · {kindLabel[card.kind]}
+          </Text>
+        )}
         <Text style={styles.rowTitle} numberOfLines={2}>
           {card.title}
         </Text>
-        <Text style={styles.sum} numberOfLines={2}>
+        {/* 报告卡是 3 行要点，全部显示；其余 2 行 */}
+        <Text style={styles.sum} numberOfLines={isReport(card) ? 3 : 2}>
           {plainText(card.summary)}
         </Text>
         {project === null ? null : (
@@ -226,8 +239,9 @@ function Reader({ card }: { card: Card }) {
             <AuthImage id={card.image_attachment_id} style={styles.coverImg} contain />
           </View>
         )}
+        {/* 报告显示 body 全文（design.md 8.10）；旧卡片和没写 body 的显示摘要 */}
         <View style={styles.md}>
-          <Markdown text={card.summary} style={styles.reading} />
+          <Markdown text={card.body === null ? card.summary : card.body} style={styles.reading} />
         </View>
       </View>
     </ScrollView>
@@ -254,6 +268,7 @@ const styles = StyleSheet.create({
   rowLine: { position: 'absolute', top: 0, left: 16, right: 16, height: 1, backgroundColor: overlay.rowLine },
   rowMain: { flex: 1, minWidth: 0 },
   src: { ...font.regular, fontSize: size.small, lineHeight: dt.line.small, color: colors.tx3 },
+  srcRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowTitle: { ...font.medium, fontSize: size.body, lineHeight: dt.line.body, color: colors.tx, marginTop: 2 },
   sum: { ...font.regular, fontSize: size.secondary, lineHeight: dt.line.secondary, color: colors.tx2, marginTop: 2 },
   pill: { flexDirection: 'row', marginTop: 6 },

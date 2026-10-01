@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router'
 import { actions, hubRequest } from '../../src/api/client'
 import type { Card, CardsPage, ProjectsList } from '../../src/api/types'
 import { AuthImage } from '../../src/components/AuthImage'
-import { CardView, kindLabel, originLabel } from '../../src/components/CardView'
+import { CardView, isReport, kindLabel, originLabel, pinTodayBrief } from '../../src/components/CardView'
 import { Markdown, plainText } from '../../src/components/RichText'
 import { Screen, TopBar } from '../../src/components/Screen'
-import { Btn, Empty, Filter } from '../../src/components/ui'
+import { Btn, Empty, Filter, Tag } from '../../src/components/ui'
 import { useConfig } from '../../src/config/context'
 import { useErrorToast, useToast } from '../../src/toast'
 import { colors, desktop, font, size } from '../../src/theme'
@@ -82,7 +82,8 @@ function CardsList() {
   )
 
   // 宽屏阅读区显示的卡片：点过的，或最上面一张
-  const selectedOf = (all: Card[]) => (picked !== null && all.some((c) => c.id === picked) ? picked : all.length === 0 ? null : all[0].id)
+  const selectedOf = (all: Card[]) =>
+    picked !== null && all.some((c) => c.id === picked) ? picked : all.length === 0 ? null : pinTodayBrief(all)[0].id
   const shown = (() => {
     if (page === null) return null
     const all = [...page.cards, ...older]
@@ -96,8 +97,12 @@ function CardsList() {
       {({ cards, last_read_id }) => {
         const all = [...cards, ...older]
         const cut = last_read_id === null ? -1 : all.findIndex((c) => c.id === last_read_id)
-        const fresh = cut === -1 ? all : all.slice(0, cut)
-        const read = cut === -1 ? [] : all.slice(cut)
+        // 当天的每日简报排在最上面（design.md 8.10），看过了也不沉到"上次读到这里"下面
+        const ordered = pinTodayBrief(all)
+        const pinned = ordered.length > 0 && ordered[0] !== all[0] ? ordered[0] : null
+        const unpinned = (list: Card[]) => (pinned === null ? list : list.filter((c) => c.id !== pinned.id))
+        const fresh = [...(pinned === null ? [] : [pinned]), ...unpinned(cut === -1 ? all : all.slice(0, cut))]
+        const read = unpinned(cut === -1 ? [] : all.slice(cut))
         return (
           <View style={styles.list}>
             {fresh.length === 0 ? (
@@ -176,8 +181,13 @@ function CardRow({ card, selected, onPress }: { card: Card; selected: boolean; o
     <Pressable onPress={onPress} style={[styles.row, selected && styles.rowOn]} {...hoverRow}>
       {card.image_attachment_id === null ? null : <AuthImage id={card.image_attachment_id} style={styles.thumb} contain={false} />}
       <View style={styles.rowText}>
+        {card.kind === 'alert' ? (
+          <View style={styles.tagRow}>
+            <Tag label={t('新动态')} tone="b" />
+          </View>
+        ) : null}
         <Text style={styles.rowTitle}>{card.title}</Text>
-        <Text style={styles.rowSum} numberOfLines={2}>
+        <Text style={styles.rowSum} numberOfLines={isReport(card) ? 3 : 2}>
           {plainText(card.summary)}
         </Text>
         <Text style={styles.rowMeta}>
@@ -201,7 +211,7 @@ function Reader({ card, project }: { card: Card; project: ProjectsList['projects
       </Text>
       <Text style={styles.readerTitle}>{card.title}</Text>
       {card.image_attachment_id === null ? null : <AuthImage id={card.image_attachment_id} style={styles.cover} contain={false} />}
-      <Markdown text={card.summary} style={styles.para} />
+      <Markdown text={card.body === null ? card.summary : card.body} style={styles.para} />
       {project === null ? null : <Text style={styles.kick}>{t('项目：{title}', { title: project.title })}</Text>}
       <View style={styles.acts}>
         {link === null ? null : (
@@ -249,6 +259,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
   },
   rowText: { flex: 1, gap: 5 },
+  tagRow: { flexDirection: 'row' },
   thumb: { width: 48, height: 64, borderRadius: 6, backgroundColor: colors.raised },
   rowOn: { backgroundColor: colors.brandSoft },
   rowTitle: { ...font.medium, fontSize: size.body, color: colors.tx },

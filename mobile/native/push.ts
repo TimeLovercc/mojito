@@ -9,7 +9,7 @@ export { routeOf, type Target } from '../src/push-route'
 
 // FCM data 消息（docs/api.md "FCM 推送"）：值都是字符串，item_id 为 null 时不带，reply 是 "true" / "false"。
 // 标题键叫 headline：data 里如果有 title 键，expo-notifications 在后台会自己再弹一条（同一条推送显示两次）。
-export type PushData = { record_id: string; headline: string; tier: string; kind: string; reply: string; item_id?: string }
+export type PushData = { record_id: string; headline: string; tier: string; kind: string; reply: string; item_id?: string; card_id?: string }
 
 const TIERS = ['interrupt', 'digest', 'quiet'] as const
 type Tier = (typeof TIERS)[number]
@@ -66,7 +66,12 @@ function asTier(tier: string): Tier {
 // hub 只发 data 消息，由 app 按 tier 选渠道显示。前台、后台、进程被杀时都走这里（后台任务）。
 export async function present(data: PushData): Promise<void> {
   await ensureChannels()
-  const target: Target = { record_id: data.record_id, kind: data.kind, item_id: data.item_id === undefined ? null : data.item_id }
+  const target: Target = {
+    record_id: data.record_id,
+    kind: data.kind,
+    item_id: data.item_id === undefined ? null : data.item_id,
+    card_id: data.card_id === undefined ? null : data.card_id,
+  }
   const reply = data.reply === 'true'
   await Notifications.scheduleNotificationAsync({
     identifier: data.record_id,

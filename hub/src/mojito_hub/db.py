@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS schedule_runs (
     kind TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY (kind, day));
 CREATE TABLE IF NOT EXISTS calendar_events (
     uid TEXT NOT NULL, start TEXT NOT NULL, "end" TEXT NOT NULL, all_day INTEGER NOT NULL,
-    title TEXT NOT NULL, location TEXT);
+    title TEXT NOT NULL, location TEXT, read_only INTEGER NOT NULL, feed TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS calendar_start ON calendar_events (start);
 CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, area TEXT NOT NULL, status TEXT NOT NULL,
@@ -177,18 +177,30 @@ def migrate() -> None:
                        ("attachments", "message_id"), ("sources", "health"), ("sources", "health_detail"),
                        ("sources", "health_at"), ("records", "hidden_at"), ("jobs", "payload"),
                        ("cards", "image_attachment_id"), ("records", "category"), ("settings", "notify"),
-                       ("settings", "language")):
+                       ("settings", "language"), ("cards", "body")):
         cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if col not in cols:
             with conn:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+    if "smoke" not in {r["name"] for r in conn.execute("PRAGMA table_info(records)")}:
+        with conn:
+            # api.md 冒烟标记: records before it are real.
+            conn.execute("ALTER TABLE records ADD COLUMN smoke INTEGER")
+            conn.execute("UPDATE records SET smoke = 0")
+    if "read_only" not in {r["name"] for r in conn.execute("PRAGMA table_info(calendar_events)")}:
+        with conn:
+            # api.md 订阅日历: events before it all came from the main calendar.
+            conn.execute("ALTER TABLE calendar_events ADD COLUMN read_only INTEGER")
+            conn.execute("ALTER TABLE calendar_events ADD COLUMN feed TEXT")
+            conn.execute("UPDATE calendar_events SET read_only = 0, feed = ?", (config.token_ref(config.ICAL_URL),))
     if one("SELECT 1 FROM subscriptions LIMIT 1") is None:
         with conn:
-            # api.md 删日程、订阅…: the two initial subscriptions.
+            # api.md 删日程、订阅… as changed by 信息流改成报告: the three initial subscriptions.
             conn.executemany(
                 "INSERT INTO subscriptions (id, name, kind, at, enabled, config, last_run_at, last_result, health)"
                 " VALUES (?, ?, ?, ?, 1, ?, NULL, NULL, NULL)",
-                [("papers", "论文", "papers", "07:00", "{}"), ("mail", "每日邮件", "mail", "07:30", "{}")],
+                [("brief", "每日简报", "brief", "07:00", "{}"),
+                 ("mail", "每日邮件", "mail", "07:30", "{}"), WATCH_SUBSCRIPTION],
             )
     with conn:
         # api.md 通知设置: every category on for settings that predate `notify`.
@@ -209,6 +221,37 @@ def migrate() -> None:
                              (infer_category(tier=r["tier"], source=r["source"], kind=r["kind"], title=r["title"]),
                               r["id"]))
         conn.execute("PRAGMA user_version = 2")
+    if conn.execute("PRAGMA user_version").fetchone()[0] < 3:
+        with conn:
+            migrate_feed_to_reports()
+        conn.execute("PRAGMA user_version = 3")
+
+
+# api.md 信息流改成报告: the lab watch subscription (id, name, kind, at, config).
+WATCH_SUBSCRIPTION = ("watch", "实验室动态", "watch", "08:00", json.dumps(
+    {"labs": ["OpenAI", "Anthropic", "DeepMind/Gemini", "DeepSeek", "Qwen", "Kimi"], "every_hours": 8}, ensure_ascii=False))
+
+
+def migrate_feed_to_reports() -> None:
+    """api.md 信息流改成报告: papers → brief (keeps at/enabled), watch created; notify gains news.
+    Undo of earlier changes to papers is dropped, since that subscription no longer exists in that shape.
+    A database created with the new initial subscriptions has no papers row."""
+    papers = one("SELECT * FROM subscriptions WHERE id = 'papers'")
+    if papers is not None:
+        conn.execute(
+            "UPDATE subscriptions SET id = 'brief', name = '每日简报', kind = 'brief', config = '{}',"
+            " last_run_at = NULL, last_result = NULL, health = NULL WHERE id = 'papers'")
+        conn.execute(
+            "INSERT INTO subscriptions (id, name, kind, at, enabled, config, last_run_at, last_result, health)"
+            " VALUES (?, ?, ?, ?, 1, ?, NULL, NULL, NULL)", WATCH_SUBSCRIPTION)
+        for r in all_("SELECT id, undo FROM records WHERE undo IS NOT NULL"):
+            undo = json.loads(r["undo"])
+            if undo["type"] == "subscription" and undo["subscription_id"] == "papers":
+                conn.execute("UPDATE records SET undo = NULL WHERE id = ?", (r["id"],))
+    for r in all_("SELECT notify FROM settings WHERE id = 1"):
+        notify = json.loads(r["notify"])
+        if "news" not in notify:
+            conn.execute("UPDATE settings SET notify = ? WHERE id = 1", (json.dumps({**notify, "news": True}),))
 
 
 def local_day_bounds(day: date) -> tuple[str, str]:
@@ -298,7 +341,7 @@ def record_of(row: sqlite3.Row) -> Record:
         attachments=[attachment_of(a) for a in all_("SELECT * FROM attachments WHERE record_id = ? ORDER BY rowid",
                                                      row["id"])],
         card_id=row["card_id"], feedback_id=row["feedback_id"], hidden_at=parse(row["hidden_at"]),
-        category=row["category"],
+        category=row["category"], smoke=bool(row["smoke"]),
     )
 
 
@@ -327,7 +370,7 @@ def taste_note_of(row: sqlite3.Row) -> TasteNote:
 def card_of(row: sqlite3.Row) -> Card:
     return Card(
         id=row["id"], at=parse(row["at"]), source=row["source"], origin=row["origin"], kind=row["kind"],
-        project_id=row["project_id"], title=row["title"], summary=row["summary"], link=row["link"],
+        project_id=row["project_id"], title=row["title"], summary=row["summary"], body=row["body"], link=row["link"],
         dedupe_key=row["dedupe_key"], status=row["status"], item_id=row["item_id"],
         image_attachment_id=row["image_attachment_id"],
     )
@@ -370,10 +413,12 @@ def job_of(row: sqlite3.Row) -> Job:
 
 def event_of(row: sqlite3.Row) -> Event:
     return Event(uid=row["uid"], start=parse(row["start"]), end=parse(row["end"]),
-                 all_day=bool(row["all_day"]), title=row["title"], location=row["location"])
+                 all_day=bool(row["all_day"]), title=row["title"], location=row["location"],
+                 read_only=bool(row["read_only"]))
 
 
-NOTIFY_ALL_ON = {"brief": True, "chat": True, "alert": True, "feedback": True, "release": True, "jobs": True}
+NOTIFY_ALL_ON = {"brief": True, "chat": True, "alert": True, "feedback": True, "release": True, "jobs": True,
+                 "news": True}
 
 
 def settings_of(row: sqlite3.Row) -> Settings:
@@ -472,7 +517,7 @@ def exists(table: str, id_: str) -> bool:
 def insert_record(*, at: datetime, author: str, source: str, kind: str, tier: str,
                   item_id: str | None, project_id: str | None, title: str, body: str,
                   evidence: str | None, needs_processing: bool, undo: dict | None,
-                  card_id: str | None, category: str | None) -> Record:
+                  card_id: str | None, category: str | None, smoke: bool) -> Record:
     """A record on an item inherits the item's project; `project_id` applies only without one.
     Pushed tiers get a notification category: `category` if given, else inferred."""
     if item_id is not None:
@@ -484,10 +529,10 @@ def insert_record(*, at: datetime, author: str, source: str, kind: str, tier: st
     rid = new_id("r")
     conn.execute(
         "INSERT INTO records (id, at, author, source, kind, tier, item_id, project_id, title, body,"
-        " evidence, needs_processing, undo, undone_at, card_id, category)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)",
+        " evidence, needs_processing, undo, undone_at, card_id, category, smoke)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)",
         (rid, ts(at), author, source, kind, tier, item_id, project_id, title, body, evidence,
-         int(needs_processing), None if undo is None else json.dumps(undo), card_id, category),
+         int(needs_processing), None if undo is None else json.dumps(undo), card_id, category, int(smoke)),
     )
     return record_of(one("SELECT * FROM records WHERE id = ?", rid))
 
@@ -598,10 +643,11 @@ def seed_if_empty(path: str) -> bool:
             )
         for r in seed["records"]:
             Record.model_validate({**r, "undo": None, "undone_at": None, "project_id": None, "attachments": [],
-                                   "card_id": None, "feedback_id": None, "hidden_at": None, "category": None})
+                                   "card_id": None, "feedback_id": None, "hidden_at": None, "category": None,
+                                   "smoke": False})
             conn.execute(
                 "INSERT INTO records (id, at, author, source, kind, tier, item_id, title, body,"
-                " evidence, needs_processing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " evidence, needs_processing, smoke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
                 (r["id"], ts(parse(r["at"])), r["author"], r["source"], r["kind"], r["tier"],
                  r["item_id"], r["title"], r["body"], r["evidence"], int(r["needs_processing"])),
             )

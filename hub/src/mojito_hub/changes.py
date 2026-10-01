@@ -98,6 +98,7 @@ def record(entity: str, id_, old: sqlite3.Row, at: datetime, *, author: str, sou
         at=at, author=author, source=source, kind="log", tier="log", item_id=None,
         project_id=id_ if entity == "project" else None, title=title, body="", evidence=None,
         needs_processing=False, undo=undo, card_id=None, category=None,
+        smoke=entity == "note" and bool(new["smoke"]),  # re-linking a smoke note stays smoke
     )
     db.conn.execute("INSERT INTO undo_marks (record_id, change_seq) VALUES (?, ?)", (rec.id, _last_seq()))
     return rec
@@ -130,7 +131,7 @@ def undo(rec: sqlite3.Row, spec: dict, at: datetime) -> None:
         body=labels.t("restored", x=labels.t("parts_sep").join(
             labels.t("field_value", field=labels.entity_field(entity, f), value=restored_text(entity, f, v))
             for f, v in before.items())),
-        evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+        evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=bool(rec["smoke"]),
     )
 
 

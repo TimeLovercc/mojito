@@ -125,13 +125,15 @@ export type Today = {
 }
 
 // 日历事件（只读）。全天事件的 start 是本地当天 00:00
-export type CalEvent = { uid: string; start: string; end: string; all_day: boolean; title: string; location: string | null }
+// read_only：订阅来的日历（如工作或学校的 Outlook），只读，不能删（api.md"订阅日历"）
+export type CalEvent = { uid: string; start: string; end: string; all_day: boolean; title: string; location: string | null; read_only: boolean }
 
-// 信息流的订阅（design.md 8.5）：app 只能开关；改时间、改关注什么在对话里说
+// 信息流的订阅（design.md 8.5、8.10）：app 只能开关；改时间、改关注什么在对话里说。
+// brief：每日 AI 简报（没有 config）；watch：实验室动态（config.labs、config.every_hours）；mail：每日邮件。name 由 hub 按语言给
 export type Subscription = {
   id: string
   name: string
-  kind: 'papers' | 'mail'
+  kind: 'brief' | 'watch' | 'mail'
   at: string
   enabled: boolean
   config: Record<string, unknown>
@@ -142,7 +144,7 @@ export type Subscription = {
 export type SubscriptionsList = { subscriptions: Subscription[] }
 
 // notify：按类型开关推送（手机和 Mac 都按它过滤；关掉只是不推，记录照常进时间线，design.md 8.6）
-export const NOTIFY_KINDS = ['brief', 'chat', 'alert', 'feedback', 'release', 'jobs'] as const
+export const NOTIFY_KINDS = ['brief', 'chat', 'alert', 'news', 'feedback', 'release', 'jobs'] as const
 export type NotifyKind = (typeof NOTIFY_KINDS)[number]
 export type Language = 'zh' | 'en'
 // language：界面语言（design.md 8.9）；8.9 之前的 hub 不返回这个字段
@@ -202,17 +204,19 @@ export type AuthList = { auth: AuthStatus[] }
 
 export type UsageEvent = { at: string; kind: 'view' | 'action'; name: string; detail: object | null }
 
-// 信息流卡片：值得读的东西
+// 信息流卡片：值得读的东西。design.md 8.10 起是报告：brief 每日 AI 简报、alert 新动态即时报，
+// summary 是 3 行要点，body 是 Markdown 全文；旧的 paper / post 等卡片照常显示（body 为 null）
 export type Card = {
   id: string
   at: string
   source: string
   origin: string
   // mail：每日邮件（summary 每封一行，带 [打开](Gmail 链接)）；post：帖子类内容（有封面，来自自己加的数据源）
-  kind: 'paper' | 'idea' | 'report' | 'other' | 'mail' | 'post'
+  kind: 'brief' | 'alert' | 'paper' | 'idea' | 'report' | 'other' | 'mail' | 'post'
   project_id: string | null
   title: string
   summary: string
+  body: string | null
   link: string | null
   dedupe_key: string
   status: 'new' | 'saved' | 'dismissed'

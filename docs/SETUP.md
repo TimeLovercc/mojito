@@ -81,7 +81,7 @@ sudo -u mojito git clone <URL of your private repository> /opt/mojito
 
 ### Or let the scripts do it
 
-`hub/deploy/` holds the scripts the reference instance uses to run layout A from your computer over SSH. Fill in [`hub/deploy/deploy.env.example`](../hub/deploy/deploy.env.example), save it as `~/.config/mojito/deploy.env`, load it with `set -a; . ~/.config/mojito/deploy.env; set +a`, and put the secret files it lists into `$MOJITO_SECRETS_DIR`. `install-secrets.sh` needs `claude-oauth-token` (section 5), `ical-url` (section 3.2; without a calendar it holds `file:///var/lib/mojito/empty.ics`, which `setup-server.sh` creates) and `fcm-service-account.json` (section 3.3, a placeholder works); `google-oauth-calendar.json` is optional. `setup-server.sh` also writes an empty seed to `/var/lib/mojito/seed.json` (section 3.4). Then run, in order:
+`hub/deploy/` holds the scripts the reference instance uses to run layout A from your computer over SSH. Fill in [`hub/deploy/deploy.env.example`](../hub/deploy/deploy.env.example), save it as `~/.config/mojito/deploy.env`, load it with `set -a; . ~/.config/mojito/deploy.env; set +a`, and put the secret files it lists into `$MOJITO_SECRETS_DIR`. `install-secrets.sh` needs `claude-oauth-token` (section 5), `ical-url` (section 3.2; without a calendar it holds `file:///var/lib/mojito/empty.ics`, which `setup-server.sh` creates), `ical-extra-urls` (section 3.2; an empty file when you subscribe to no other calendar) and `fcm-service-account.json` (section 3.3, a placeholder works); `google-oauth-calendar.json` is optional. `setup-server.sh` also writes an empty seed to `/var/lib/mojito/seed.json` (section 3.4). Then run, in order:
 
 ```sh
 ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/setup-server.sh   # user, directories, env files, bare repo, uv, Claude Code
@@ -157,6 +157,13 @@ The hub fetches one ICS feed every 15 minutes and keeps events from yesterday th
   # MOJITO_ICAL_URL=file:///var/lib/mojito/empty.ics  (setup-server.sh already creates this file)
   ```
 
+**Subscribed calendars (read-only).** Calendars you only subscribe to, such as a work or school Outlook calendar published as ICS, go in a separate text file, one `https://` or `webcal://` link per line (`webcal` is fetched as `https`, blank lines are ignored). The file is required but may be empty. The hub re-reads it on every fetch, so edits need no restart. Treat the links like passwords: logs and errors name only the host or the line number. Their events show up in Today and in chat with `read_only: true`: the agent won't move or delete them and tells you to change them in the calendar they come from.
+
+```sh
+sudo -u mojito install -m 600 /dev/null /var/lib/mojito/ical-extra-urls   # empty: no subscribed calendars
+# MOJITO_ICAL_EXTRA_FILE=/var/lib/mojito/ical-extra-urls
+```
+
 Writing to the calendar is a separate, optional step for the agent (section 5).
 
 ### 3.3 Firebase service account (Android push)
@@ -215,6 +222,7 @@ Start from [`hub/deploy/server.env.example`](../hub/deploy/server.env.example) a
 | `MOJITO_TOKENS` | The token file from section 2 |
 | `MOJITO_SEED` | The seed file from section 3.4 |
 | `MOJITO_ICAL_URL` | The calendar feed from section 3.2 (`https://…` or `file://…`) |
+| `MOJITO_ICAL_EXTRA_FILE` | The subscribed-calendar link file from section 3.2 (may be empty) |
 | `MOJITO_FCM_CREDENTIALS` | The service-account file from section 3.3 |
 | `MOJITO_ATTACHMENTS_DIR` | Directory for images attached to chat, notes and feedback. It must already exist and be writable by the hub. |
 | `MOJITO_VAPID_KEY_FILE` | The key from section 3.1 |
@@ -332,7 +340,7 @@ The worker runs on your computer and uses your own Claude Code login. It turns n
    ```
 
    This grant stays on your computer: never copy it to the server. `gmail.readonly` is a restricted scope, so an unverified app shows a warning. Email bodies are never sent to the hub; the daily mail card carries sender, subject and one line per message.
-4. **Feeds.** New subscriptions start with the paper feed (arXiv plus Hugging Face daily papers, picked with your taste notes, the cards you asked about, and optionally your Zotero library) and the daily mail digest. Turn off what you don't use in **Feed → Subscriptions**, otherwise **System** will show it failing.
+4. **Feeds.** New instances start with three subscriptions. The daily AI brief: papers from arXiv and Hugging Face daily papers, picked with your taste notes, the cards you asked about and optionally your Zotero library, plus web news (Google News search, no account needed). The lab watch: news about a list of AI labs every 8 hours; edit the list by telling chat ("also watch Mistral"). And the daily mail digest. Turn off what you don't use in **Feed → Subscriptions**, otherwise **System** will show it failing.
 5. **Orca (optional).** Project snapshots and the maintainer watchdog use the `orca` CLI. Without Orca, **System** shows project sync as failing; everything else works.
 
 Before restarting the worker, check that no job is mid-flight: `GET /jobs?status=running` with an app token should return an empty list. An interrupted job goes back to the queue after 30 minutes.

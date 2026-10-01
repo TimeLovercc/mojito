@@ -407,7 +407,10 @@ def apply_taste_notes(hub: Hub, notes: list[str]) -> None:
         hub.post_taste(text.strip())
 
 
-# ---------------------------------------------------------------- subscriptions (papers / mail)
+# ---------------------------------------------------------------- subscriptions (brief / watch / mail, api.md 信息流改成报告)
+
+# The config keys each subscription kind takes; the chat always sends the full new config.
+SUBSCRIPTION_CONFIG_KEYS = {"brief": set(), "watch": {"labs", "every_hours"}, "mail": set()}
 
 SUBSCRIPTION_UPDATES_SCHEMA = {
     "type": "array",
@@ -422,8 +425,11 @@ SUBSCRIPTION_UPDATES_SCHEMA = {
                     "enabled": {"type": "boolean"},
                     "config": {
                         "type": "object",
-                        "description": "full new config; papers / mail take none: {}",
-                        "properties": {},
+                        "description": "full new config; watch: {labs: [...], every_hours: N}, brief / mail: {}",
+                        "properties": {
+                            "labs": {"type": "array", "items": {"type": "string"}},
+                            "every_hours": {"type": "integer", "minimum": 1},
+                        },
                         "additionalProperties": False,
                     },
                 },
@@ -436,6 +442,16 @@ SUBSCRIPTION_UPDATES_SCHEMA = {
 }
 
 
+def _validate_subscription_config(kind: str, config: dict, where: str) -> None:
+    if set(config) != SUBSCRIPTION_CONFIG_KEYS[kind]:
+        raise ValidationError(f"{where}: {kind} config keys must be {sorted(SUBSCRIPTION_CONFIG_KEYS[kind])}, got {config}")
+    if kind == "watch":
+        if not config["labs"] or any(not lab.strip() for lab in config["labs"]):
+            raise ValidationError(f"{where}: watch labs must be a non-empty list of non-empty strings, got {config}")
+        if isinstance(config["every_hours"], bool) or not isinstance(config["every_hours"], int) or config["every_hours"] < 1:
+            raise ValidationError(f"{where}: watch every_hours must be an integer >= 1, got {config['every_hours']!r}")
+
+
 def validate_subscription_updates(updates: list[dict], subs_by_id: dict[str, dict]) -> None:
     for i, u in enumerate(updates):
         where = _where("subscription_updates", i)
@@ -446,8 +462,8 @@ def validate_subscription_updates(updates: list[dict], subs_by_id: dict[str, dic
             raise ValidationError(f"{where}: changes nothing")
         if "at" in changes and not re.match(HHMM, changes["at"]):
             raise ValidationError(f"{where}: at={changes['at']!r} is not HH:MM")
-        if "config" in changes and changes["config"]:
-            raise ValidationError(f"{where}: {subs_by_id[u['id']]['kind']} takes no config, got {changes['config']}")
+        if "config" in changes:
+            _validate_subscription_config(subs_by_id[u["id"]]["kind"], changes["config"], where)
 
 
 def apply_subscription_updates(hub: Hub, updates: list[dict], subs_by_id: dict[str, dict]) -> None:

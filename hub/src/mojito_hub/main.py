@@ -34,11 +34,12 @@ from .models import (
     FeedbackMessage, FeedbackMessageIn, FeedbackMessageList, FocusItem, Metrics, MetricsDay, MetricsTotals,
     SourceHealthIn, Pulse, PulseCounts, Subscription, SubscriptionEnabledIn, SubscriptionList, SubscriptionPutIn,
     SubscriptionResultIn, CalendarDeleteIn, SettingsPutIn, VapidPublicKey, WebPushEndpointIn, WebPushSubscriptionIn,
+    SUBSCRIPTION_CONFIG,
 )
 
 FOCUS_STATUSES = ("active", "waiting_you", "scheduled")
-# Jobs a chat can start right away (api.md 对话能做的事): mac, no record, deduplicated.
-RUN_NOW_KINDS = ("refresh", "sync_projects", "draft_review", "feed_papers", "feed_mail")
+# Jobs a chat can start right away (api.md 对话能做的事, 信息流改成报告): mac, no record, deduplicated.
+RUN_NOW_KINDS = ("refresh", "sync_projects", "draft_review", "feed_brief", "feed_watch", "feed_mail")
 CHAT_TITLE_CHARS = 40
 
 
@@ -171,10 +172,10 @@ def build_today(at: datetime) -> Today:
     later = [i for i in open_dated if i.next_at >= tomorrow_start]
     read = last_read_row()
     if read is None:
-        alert_rows = db.all_("SELECT * FROM records WHERE tier = 'interrupt' ORDER BY at DESC, seq DESC")
+        alert_rows = db.all_("SELECT * FROM records WHERE tier = 'interrupt' AND smoke = 0 ORDER BY at DESC, seq DESC")
     else:
         alert_rows = db.all_(
-            "SELECT * FROM records WHERE tier = 'interrupt' AND (at > ? OR (at = ? AND seq > ?))"
+            "SELECT * FROM records WHERE tier = 'interrupt' AND smoke = 0 AND (at > ? OR (at = ? AND seq > ?))"
             " ORDER BY at DESC, seq DESC",
             read["at"], read["at"], read["seq"],
         )
@@ -238,14 +239,16 @@ async def items(category: Category | None = None, status: ItemStatus | None = No
 @app.get("/items/{item_id}", response_model=ItemDetail, dependencies=[Depends(auth.app_read)])
 async def item_get(item_id: str):
     item = db.item_of(get_or_404("items", item_id), db.now())
-    rows = db.all_("SELECT * FROM records WHERE item_id = ? AND hidden_at IS NULL ORDER BY at DESC, seq DESC", item_id)
+    rows = db.all_("SELECT * FROM records WHERE item_id = ? AND hidden_at IS NULL AND smoke = 0"
+                   " ORDER BY at DESC, seq DESC", item_id)
     return ItemDetail(item=item, records=[db.record_of(r) for r in rows])
 
 
 @app.get("/records", response_model=RecordList, dependencies=[Depends(auth.app_read)])
 async def records(limit: int = Query(gt=0, le=500), before: str | None = None, kind: RecordKind | None = None,
-                  author: Author | None = None, project_id: str | None = None, include_hidden: bool = False):
-    where, args = ["1 = 1" if include_hidden else "hidden_at IS NULL"], []
+                  author: Author | None = None, project_id: str | None = None, include_hidden: bool = False,
+                  include_smoke: bool = False):
+    where, args = ["1 = 1" if include_hidden else "hidden_at IS NULL", "1 = 1" if include_smoke else "smoke = 0"], []
     if before is not None:
         b = get_or_404("records", before)
         where.append("(at < ? OR (at = ? AND seq < ?))")
@@ -292,10 +295,12 @@ async def record_create(body: RecordIn):
             at=at, author="me", source="app", kind="note", tier="log", item_id=body.item_id,
             project_id=body.project_id, title=body.title if body.body != "" else labels.t("image"), body=body.body,
             evidence=None, needs_processing=body.needs_processing, undo=None, card_id=None, category=None,
+            smoke=body.smoke,
         )
         conn.executemany("UPDATE attachments SET record_id = ? WHERE id = ?",
                          [(rec.id, aid) for aid in body.attachment_ids])
-        if body.needs_processing:
+        # A smoke note is checked and written as usual but never processed (api.md 冒烟标记).
+        if body.needs_processing and not body.smoke:
             db.insert_job(kind="process_note", runner="mac", record_id=rec.id, payload=None, at=at)
     return db.record_of(get_or_404("records", rec.id))
 
@@ -337,7 +342,7 @@ async def item_decision(item_id: str, body: DecisionIn):
             at=at, author="me", source="app", kind="decision", tier="log", item_id=item_id,
             project_id=None,
             title=labels.titled(labels.t(f"decision_{body.action}"), row["title"]), body=detail,
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
         if body.action in ("done", "close", "reopen"):
             write_item_change_record(item_id, row, at, author="me", source="app")
@@ -359,7 +364,7 @@ def write_item_change_record(item_id: str, old, at, *, author: str, source: str)
         at=at, author=author, source=source, kind="log", tier="log", item_id=item_id, project_id=None,
         title=labels.titled(new["title"], labels.t("changes_sep").join(labels.item_change(f, old[f], new[f]) for f in changed)),
         body="", evidence=None, needs_processing=False,
-        undo={"type": "item", "item_id": item_id, "before": {f: old[f] for f in changed}}, card_id=None, category=None,
+        undo={"type": "item", "item_id": item_id, "before": {f: old[f] for f in changed}}, card_id=None, category=None, smoke=False,
     )
     conn.execute("INSERT INTO undo_marks (record_id, change_seq) VALUES (?, ?)", (rec.id, db.last_item_change_seq()))
     return rec
@@ -468,6 +473,8 @@ async def worker_finish(job_id: str, body: FinishIn, r: str = Depends(auth.runne
         raise HTTPException(422, "error is required for failed and only allowed there")
     at = db.now()
     rec = None
+    # The failure record of a job for a smoke record (a smoke chat's reply) is smoke too.
+    smoke = row["record_id"] is not None and bool(db.one("SELECT smoke FROM records WHERE id = ?", row["record_id"])["smoke"])
     with conn:
         conn.execute("UPDATE jobs SET status = ?, finished_at = ?, error = ? WHERE id = ?",
                      (body.status, db.ts(at), body.error, job_id))
@@ -477,14 +484,14 @@ async def worker_finish(job_id: str, body: FinishIn, r: str = Depends(auth.runne
                 project_id=None,
                 title=labels.t("job_failed", job=labels.name("job", row["kind"]), error=body.error),
                 body=labels.t("job_failed_body", job=labels.name("job", row["kind"]), error=body.error),
-                evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+                evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=smoke,
             )
         elif row["kind"] == "refresh":
             rec = db.insert_record(
                 at=at, author="system", source="hub", kind="log", tier="digest", item_id=None,
                 project_id=None,
                 title=labels.t("refreshed"), body=labels.t("refreshed_body"),
-                evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+                evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
             )
         elif row["kind"] == "undo":
             conn.execute("UPDATE records SET undone_at = ? WHERE id = ?", (db.ts(at), row["record_id"]))
@@ -525,7 +532,7 @@ async def item_put(item_id: str, body: ItemIn, r: str = Depends(auth.item_writer
                     at=at, author="system", source="worker", kind="log", tier="log", item_id=item_id,
                     project_id=None, title=labels.t("note_to_item", x=body.title), body=labels.t("from_note", x=note["title"]),
                     evidence=None, needs_processing=False, undo={"type": "item_create", "item_id": item_id},
-                    card_id=None, category=None,
+                    card_id=None, category=None, smoke=False,
                 )
         if old is not None:
             write_item_change_record(item_id, old, at, author="system", source=auth.SOURCE_OF[r])
@@ -611,7 +618,7 @@ async def event_create(body: EventIn, src: str = Depends(auth.source), r: str = 
             at=db.now(), author="system", source=src, kind=body.kind, tier=body.tier,
             item_id=body.item_id, project_id=project_id,
             title=body.title, body=body.body, evidence=body.evidence,
-            needs_processing=False, undo=body.undo, card_id=None, category=body.category,
+            needs_processing=False, undo=body.undo, card_id=None, category=body.category, smoke=body.smoke,
         )
     push(rec)
     return rec
@@ -664,6 +671,7 @@ async def chat_send(body: ChatIn):
             at=at, author="me", source="app", kind="chat", tier="log", item_id=body.item_id,
             project_id=body.project_id,
             title=title, body=body.body, evidence=None, needs_processing=False, undo=None, card_id=body.card_id, category=None,
+            smoke=body.smoke,
         )
         conn.executemany("UPDATE attachments SET record_id = ? WHERE id = ?",
                          [(rec.id, aid) for aid in body.attachment_ids])
@@ -751,8 +759,8 @@ async def attachment_get(attachment_id: str):
 
 @app.get("/chat", response_model=ChatList, dependencies=[Depends(auth.app_read)])
 async def chat_list(limit: int = Query(gt=0, le=500), before: str | None = None,
-                    item_id: str | None = None, project_id: str | None = None):
-    where, args = ["kind = 'chat'"], []
+                    item_id: str | None = None, project_id: str | None = None, include_smoke: bool = False):
+    where, args = ["kind = 'chat'", "1 = 1" if include_smoke else "smoke = 0"], []
     if before is not None:
         b = get_or_404("records", before)
         where.append("(at < ? OR (at = ? AND seq < ?))")
@@ -858,7 +866,7 @@ def undo_item_create(record, undo: dict) -> Job:
         db.insert_record(
             at=at, author="me", source="app", kind="log", tier="log", item_id=item_id, project_id=None,
             title=labels.t("undone", x=record["title"]), body=labels.t("item_create_undone"),
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
         return finish_hub_undo(record["id"], at)
 
@@ -889,7 +897,7 @@ def undo_item(record, undo: dict) -> Job:
             body=labels.t("restored", x=labels.t("parts_sep").join(
                 labels.t("field_value", field=labels.name("item_field", f), value=labels.item_value(f, v))
                 for f, v in values.items())),
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
         return finish_hub_undo(record["id"], at)
 
@@ -901,7 +909,7 @@ async def calendar_refresh():
     try:
         await ical.refresh()
     except (OSError, ValueError) as e:
-        raise HTTPException(502, f"calendar fetch failed: {e}") from e
+        raise HTTPException(502, f"calendar fetch failed: {ical.describe(e)}") from e
     start = db.local_day_bounds(db.local_today(db.now()))[0]
     return EventList(events=db.events_between(start, "9999"))
 
@@ -948,7 +956,7 @@ async def draft_resolve(draft_id: str, body: DraftResolveIn):
                                 row["subject"] if row["subject"] is not None else row["to"]),
             body=labels.t("draft_resolved", to=row["to"], channel=labels.name("draft_channel", row["channel"]),
                           status=labels.name("draft_status", body.status)),
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
     return db.draft_of(get_or_404("drafts", draft_id))
 
@@ -1004,8 +1012,8 @@ async def project_get(project_id: str):
     at = db.now()
     project = db.project_of(get_or_404("projects", project_id), at)
     items = [db.item_of(r, at) for r in db.all_("SELECT * FROM items WHERE project_id = ? ORDER BY id", project_id)]
-    records = db.all_("SELECT * FROM records WHERE project_id = ? AND hidden_at IS NULL ORDER BY at DESC, seq DESC LIMIT 50",
-                      project_id)
+    records = db.all_("SELECT * FROM records WHERE project_id = ? AND hidden_at IS NULL AND smoke = 0"
+                      " ORDER BY at DESC, seq DESC LIMIT 50", project_id)
     return ProjectDetail(project=project, items=by_next_at(items), snapshot=db.snapshot_of(project_id),
                          records=[db.record_of(r) for r in records])
 
@@ -1073,7 +1081,7 @@ async def project_decision(project_id: str, body: ProjectDecisionIn):
         db.insert_record(
             at=at, author="me", source="app", kind="decision", tier="log", item_id=None,
             project_id=project_id, title=labels.titled(labels.t(title), row["title"]),
-            body=labels.entity_change("project", "status", row["status"], new_status), evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            body=labels.entity_change("project", "status", row["status"], new_status), evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
     return db.project_of(get_or_404("projects", project_id), at)
 
@@ -1137,14 +1145,14 @@ async def auth_status_put(name: AuthName, body: AuthStatusIn, r: str = Depends(a
                 at=at, author="system", source="hub", kind="alert", tier="interrupt", item_id=None,
                 project_id=None, title=labels.t("auth_lost", x=labels.name("auth", name)),
                 body=labels.t("auth_lost_body", x=labels.name("auth", name), detail=body.detail),
-                evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+                evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
             )
         elif not was_ok and body.ok:
             rec = db.insert_record(
                 at=at, author="system", source="hub", kind="log", tier="digest", item_id=None,
                 project_id=None, title=labels.t("auth_back", x=labels.name("auth", name)),
                 body=labels.t("auth_back_body", x=labels.name("auth", name)),
-                evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+                evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
             )
     if rec is not None:
         push(rec)
@@ -1160,6 +1168,7 @@ async def auth_status_list():
 
 @app.post("/cards", response_model=Card)
 async def card_create(body: CardIn, r: str = Depends(auth.card_writers)):
+    """A kind=alert card (lab watch) also gets a pushed news record pointing at it."""
     if body.project_id is not None:
         require_ref("projects", body.project_id)
     if db.one("SELECT 1 FROM cards WHERE origin = ? AND dedupe_key = ?", body.origin, body.dedupe_key):
@@ -1172,14 +1181,24 @@ async def card_create(body: CardIn, r: str = Depends(auth.card_writers)):
                 or db.one("SELECT 1 FROM cards WHERE image_attachment_id = ?", body.image_attachment_id)):
             raise HTTPException(422, f"attachment {body.image_attachment_id} is already used")
     cid = db.new_id("c")
+    at = db.now()
+    rec = None
     with conn:
         conn.execute(
-            'INSERT INTO cards (id, at, source, origin, kind, project_id, title, summary, link, dedupe_key,'
-            " status, item_id, image_attachment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', NULL, ?)",
-            (cid, db.ts(db.now()), auth.SOURCE_OF[r] if r in auth.SOURCE_OF else r.removeprefix("source:"),
-             body.origin, body.kind, body.project_id, body.title, body.summary, body.link, body.dedupe_key,
+            'INSERT INTO cards (id, at, source, origin, kind, project_id, title, summary, body, link, dedupe_key,'
+            " status, item_id, image_attachment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', NULL, ?)",
+            (cid, db.ts(at), auth.SOURCE_OF[r] if r in auth.SOURCE_OF else r.removeprefix("source:"),
+             body.origin, body.kind, body.project_id, body.title, body.summary, body.body, body.link, body.dedupe_key,
              body.image_attachment_id),
         )
+        if body.kind == "alert":
+            rec = db.insert_record(
+                at=at, author="system", source="hub", kind="log", tier="digest", item_id=None,
+                project_id=body.project_id, title=labels.t("news", x=body.title), body=body.summary,
+                evidence=body.link, needs_processing=False, undo=None, card_id=cid, category="news", smoke=False,
+            )
+    if rec is not None:
+        push(rec)
     return db.card_of(get_or_404("cards", cid))
 
 
@@ -1236,7 +1255,7 @@ async def card_to_item(card_id: str):
         rec = db.insert_record(
             at=at, author="me", source="app", kind="note", tier="log", item_id=None,
             project_id=card["project_id"], title=labels.t("to_item", x=card["title"])[:CHAT_TITLE_CHARS], body=body,
-            evidence=card["link"], needs_processing=True, undo=None, card_id=card_id, category=None,
+            evidence=card["link"], needs_processing=True, undo=None, card_id=card_id, category=None, smoke=False,
         )
         return db.insert_job(kind="process_note", runner="mac", record_id=rec.id, payload=None, at=at)
 
@@ -1259,7 +1278,7 @@ async def feedback_create(body: FeedbackIn, r: str = Depends(auth.app_or_agent))
             at=at, author="me", source=auth.actor(r)[1], kind="feedback",
             tier="log", item_id=None, project_id=None,
             title=body.body[:CHAT_TITLE_CHARS] if body.body != "" else labels.t("image"), body=body.body,
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
         conn.execute("UPDATE records SET feedback_id = ? WHERE id = ?", (fid, rec.id))
         conn.executemany("UPDATE attachments SET record_id = ? WHERE id = ?",
@@ -1303,7 +1322,7 @@ async def feedback_put(feedback_id: str, body: FeedbackPutIn):
             rec = db.insert_record(
                 at=at, author="system", source="maintainer", kind="feedback", tier="digest", item_id=None,
                 project_id=None, title=labels.titled(labels.t(FEEDBACK_DONE_TITLE[body.status]), what), body=body.summary,
-                evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+                evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
             )
     if rec is not None:
         push(rec)
@@ -1324,7 +1343,7 @@ async def feedback_decision(feedback_id: str, body: FeedbackDecisionIn):
             at=at, author="me", source="app", kind="decision", tier="log", item_id=None, project_id=None,
             title=labels.t(f"feedback_{body.action}", x=what),
             body=labels.t(f"feedback_{body.action}_body"),
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
     return db.feedback_of(get_or_404("feedback", feedback_id))
 
@@ -1445,7 +1464,7 @@ async def feedback_message_add(feedback_id: str, body: FeedbackMessageIn, r: str
                 at=at, author="system", source="maintainer", kind="chat", tier="digest", item_id=None,
                 project_id=None, title=body.body[:CHAT_TITLE_CHARS] if body.body != "" else labels.t("image"),
                 body=f"{labels.t('feedback_message_prefix', x=about)}\n{body.body}", evidence=None, needs_processing=False,
-                undo=None, card_id=None, category=None,
+                undo=None, card_id=None, category=None, smoke=False,
             )
             conn.execute("UPDATE records SET feedback_id = ? WHERE id = ?", (feedback_id, rec.id))
     if rec is not None:
@@ -1490,12 +1509,12 @@ async def metrics(from_: date = Query(alias="from"), to: date = Query()):
         opens = db.one("SELECT COUNT(*) AS n FROM usage WHERE kind = 'view' AND name = 'app_open' AND at >= ? AND at < ?",
                        start, end)["n"]
         asked = db.all_("SELECT at FROM records WHERE kind = 'chat' AND author = 'system' AND title IN (?, ?)"
-                        " AND at >= ? AND at < ? ORDER BY at", *EVENING_QUESTIONS, start, end)
+                        " AND smoke = 0 AND at >= ? AND at < ? ORDER BY at", *EVENING_QUESTIONS, start, end)
         replied = 0
         if asked:
             until = db.ts(datetime.combine(day + timedelta(days=1), REPLY_UNTIL, db.DAY_TZ))
             replied = int(db.one("SELECT 1 FROM records WHERE author = 'me' AND kind IN ('chat', 'note')"
-                                 " AND at > ? AND at < ? LIMIT 1", asked[0]["at"], until) is not None)
+                                 " AND smoke = 0 AND at > ? AND at < ? LIMIT 1", asked[0]["at"], until) is not None)
         days.append(MetricsDay(date=day, opens=opens, evening_asked=int(bool(asked)), evening_replied=replied))
         day += timedelta(days=1)
     return Metrics(days=days, totals=MetricsTotals(opens=sum(d.opens for d in days),
@@ -1539,7 +1558,7 @@ async def pulse(limit: int = Query(ge=1, le=100), after: str | None = None):
         raise HTTPException(422, "after must be a cursor returned by /pulse")
     rows = db.all_(
         f"SELECT * FROM records WHERE seq > ? AND tier IN ({', '.join('?' * len(PUSHED_TIERS))})"
-        " AND hidden_at IS NULL ORDER BY seq LIMIT ?",
+        " AND hidden_at IS NULL AND smoke = 0 ORDER BY seq LIMIT ?",
         int(after), *PUSHED_TIERS, limit + 1,
     )
     page = rows[:limit]
@@ -1552,11 +1571,14 @@ async def pulse(limit: int = Query(ge=1, le=100), after: str | None = None):
 
 @app.post("/calendar/{uid}/delete", response_model=Job, dependencies=[Depends(auth.app_write)])
 async def calendar_delete(uid: str, body: CalendarDeleteIn):
-    """One occurrence of any calendar event (uid + start); the agent deletes it via the Google
-    API and writes an undoable record."""
+    """One occurrence of a main-calendar event (uid + start); the agent deletes it via the Google
+    API and writes an undoable record. Subscribed calendars are read-only (api.md 订阅日历)."""
     start = db.ts(body.start)
-    if db.one("SELECT 1 FROM calendar_events WHERE uid = ? AND start = ?", uid, start) is None:
+    event = db.one("SELECT read_only FROM calendar_events WHERE uid = ? AND start = ?", uid, start)
+    if event is None:
         raise HTTPException(404, f"calendar event {uid} at {start} not found")
+    if event["read_only"]:
+        raise HTTPException(409, "这是订阅来的日历，只能在原日历里改")
     with conn:
         return db.insert_job(kind="calendar_delete", runner="server", record_id=None,
                              payload={"uid": uid, "start": start}, at=db.now())
@@ -1580,11 +1602,16 @@ async def subscription_enabled(sub_id: str, body: SubscriptionEnabledIn, r: str 
 
 @app.put("/subscriptions/{sub_id}", response_model=Subscription)
 async def subscription_put(sub_id: str, body: SubscriptionPutIn, r: str = Depends(auth.runners)):
+    """config must have the shape of the subscription's kind (the watchdog schedules from it)."""
     old = get_or_404("subscriptions", sub_id)
+    try:
+        config = SUBSCRIPTION_CONFIG[old["kind"]].model_validate(body.config)
+    except ValidationError as e:
+        raise HTTPException(422, f"config of a {old['kind']} subscription: {e.errors(include_input=False)}") from e
     at = db.now()
     with conn:
         conn.execute("UPDATE subscriptions SET at = ?, config = ? WHERE id = ?",
-                     (body.at, json.dumps(body.config, ensure_ascii=False), sub_id))
+                     (body.at, json.dumps(config.model_dump(), ensure_ascii=False), sub_id))
         changes.record("subscription", sub_id, old, at, author="system", source=auth.SOURCE_OF[r])
     return db.subscription_of(get_or_404("subscriptions", sub_id))
 

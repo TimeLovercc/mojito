@@ -40,11 +40,11 @@ def _transition(old: str | None, new: str, title_key: str, name: str, detail: st
         return db.insert_record(
             at=at, author="system", source="hub", kind="alert", tier="digest", item_id=None, project_id=None,
             title=labels.t(title_key, state=labels.t(f"health_{new}"), name=name), body=detail if detail is not None else "",
-            evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
     if not was_ok and new == "ok":
         db.insert_record(
             at=at, author="system", source="hub", kind="log", tier="log", item_id=None, project_id=None,
-            title=labels.t(title_key, state=labels.t("health_recovered"), name=name), body="", evidence=None, needs_processing=False, undo=None, card_id=None, category=None,
+            title=labels.t(title_key, state=labels.t("health_recovered"), name=name), body="", evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=False,
         )
     return None

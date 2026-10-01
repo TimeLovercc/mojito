@@ -60,7 +60,7 @@
 - 约定只在 main 改；要改约定的反馈一律先问用户。
 - 请求体新增必填字段：app 先空中更新、hub 后部署。hub 忽略未知字段。
 - 上线前，改到的模块都要过类型检查和构建（例如 mobile 的 `npm run typecheck`）。不写测试文件，闸门就是类型检查和构建。
-- 服务器：`hub/deploy/deploy.sh main "<用户能看懂的说明>"`（会备份、等所有任务空闲、自动推送）。一般让 infra 会话执行。
+- 服务器：`hub/deploy/deploy.sh main "<用户能看懂的说明>"`（会备份、等所有任务空闲；部署后用真实令牌跑冒烟检查 `hub/deploy/smoke.py`，全过才推送，任何一步失败 exit 1）。一般让 infra 会话执行。
 - 网页版：`hub/deploy/deploy-web.sh <ref> "<说明>"`（本机构建、切换版本、自动推送）。
 - app：mobile 会话用 `npm run update -- --message ... --notes ...`（指纹不变才行，会自动推送）；原生改动 `npm run build:apk`（会自动推送）。
 - 本机 worker 合并后要 `launchctl kickstart -k gui/$(id -u)/<LABEL_PREFIX>.worker`（先确认 `GET /jobs?status=running&runner=mac` 为空）。

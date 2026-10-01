@@ -44,8 +44,10 @@ HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 OUTPUT_KEYS = ("new_items", "item_updates", "goal_updates", "plan_updates", "plan_changes", "project_updates",
                "settings_update", "card_actions", "note_links", "taste_notes", "subscription_updates", "run_jobs")
 # Jobs chat may start right away (api.md 对话能做的事); all run on the Mac.
-RUNNABLE_JOBS = ("refresh", "sync_projects", "draft_review", "feed_papers", "feed_mail")
-SUBSCRIPTION_FIELDS = ("at", "enabled")
+RUNNABLE_JOBS = ("refresh", "sync_projects", "draft_review", "feed_brief", "feed_watch", "feed_mail")
+SUBSCRIPTION_FIELDS = ("at", "enabled", "config")
+# The one list chat may edit in each subscription's config (api.md 信息流改成报告); brief and mail have no config.
+CONFIG_LIST = {"watch": "labs"}
 
 
 def _changes_list(id_field: str, properties: dict) -> dict:
@@ -150,6 +152,12 @@ SCHEMAS = {
     "subscription_updates": _changes_list("id", {
         "at": {"type": "string"},
         "enabled": {"type": "boolean"},
+        "config": {
+            "type": "object",
+            "properties": {"labs": {"type": "array", "items": {"type": "string"}}},
+            "required": ["labs"],
+            "additionalProperties": False,
+        },
     }),
 }
 
@@ -172,11 +180,14 @@ reply 里说清改了什么，并说可以在动态里撤销。只放用户要�
 - card_actions [{card_id, status}]：信息流卡片 收藏 saved / 不感兴趣 dismissed / 恢复 new。
 - note_links [{record_id, item_id, project_id}]：把用户的某条笔记挂到事项 / 项目（两个都写最终值，不挂就 null）。
 - taste_notes：用户说出的论文 / 信息偏好（"多推开源工具"、"少推综述"），每条一句话，写进口味档案；没有就空数组。
-- subscription_updates [{id, changes}]：订阅（每日论文 / 每日邮件）。at（HH:MM，用户时区，每天几点跑）、
-  enabled（开关）。"邮件改到 8 点"→ at="08:00"。
+- subscription_updates [{id, changes}]：订阅（每日简报 / 实验室动态 / 每日邮件）。at（HH:MM，用户时区；简报、邮件是每天几点跑，
+  实验室动态是从几点起每隔几小时查一次）、enabled（开关）、config：
+  只有实验室动态有 {labs: [...]}（盯的实验室名单，给改完后的完整列表，别名用 / 连起来如"DeepMind/Gemini"）；简报和邮件没有 config。
+  "也盯一下 Mistral"→ labs 里加"Mistral"（原有的保留）；"邮件改到 8 点"→ at="08:00"。
 - run_jobs：用户要"现在跑 / 刷新一下 / 同步项目 / 现在复盘"时，列出要立刻开始的任务（每种一次）：
-  refresh（刷新事项的下一步）、sync_projects（同步项目）、draft_review（起草两周复盘）、feed_papers（每日论文）、feed_mail（每日邮件）。
-  reply 里说"已开始，跑完进信息流 / 会推送"（论文、邮件跑完进信息流；刷新、同步、复盘跑完会推送）。没要求就空数组。
+  refresh（刷新事项的下一步）、sync_projects（同步项目）、draft_review（起草两周复盘）、feed_brief（每日 AI 简报）、
+  feed_watch（查实验室新动态）、feed_mail（每日邮件）。
+  reply 里说"已开始，跑完进信息流 / 会推送"（简报、实验室动态、邮件跑完进信息流；刷新、同步、复盘跑完会推送）。没要求就空数组。
 - 今日重点里的事项：对话里看出有进展或卡点时，顺手用 item_updates 把 next_step 改成"今天能做的一小步"（必要时调 next_at）。
 - 对外发送（邮件、消息）仍然只起草 Draft。
 - 不许声称 app 有它其实没有的功能；不确定时说"你可以在事项详情点完成 / 关闭"。"""
@@ -345,6 +356,16 @@ def validate(answer: dict, ctx: EditContext, hub: Hub) -> None:
             raise ValidationError(f"{where}: at={ch['at']!r} is not HH:MM")
         if "enabled" in ch and not isinstance(ch["enabled"], bool):
             raise ValidationError(f"{where}: enabled must be a bool")
+        if "config" in ch:
+            kind = ctx.subscriptions[u["id"]]["kind"]
+            if kind not in CONFIG_LIST:
+                raise ValidationError(f"{where}: the {kind} subscription has no config")
+            field = CONFIG_LIST[kind]
+            require_fields(ch["config"], (field,), where)
+            if any(not k.strip() for k in ch["config"][field]):
+                raise ValidationError(f"{where}: empty entry in {field} {ch['config'][field]}")
+            if field == "labs" and not ch["config"]["labs"]:
+                raise ValidationError(f"{where}: labs must not be empty")
 
 
 def _check_plan_delta(delta: dict, plan: dict, item_ids: set[str], goal_ids: set[str], where: str) -> None:
@@ -418,12 +439,18 @@ def apply(hub: Hub, answer: dict, ctx: EditContext) -> None:
 
     for u in answer["subscription_updates"]:
         sub, ch = ctx.subscriptions[u["id"]], u["changes"]
-        if "at" in ch and ch["at"] != sub["at"]:
-            hub.put_subscription(sub["id"], ch["at"], sub["config"])
+        if "at" in ch or "config" in ch:
+            config = sub["config"]
+            if "config" in ch:
+                field = CONFIG_LIST[sub["kind"]]
+                config = {**sub["config"], field: list(dict.fromkeys(k.strip() for k in ch["config"][field]))}
+            at = ch["at"] if "at" in ch else sub["at"]
+            if at != sub["at"] or config != sub["config"]:
+                hub.put_subscription(sub["id"], at, config)
         if "enabled" in ch and ch["enabled"] != sub["enabled"]:
             hub.set_subscription_enabled(sub["id"], ch["enabled"])
 
-    # Last, so a run sees this message's other edits (e.g. a changed subscription).
+    # Last, so a run sees this message's other edits (e.g. new labs).
     for kind in answer["run_jobs"]:
         hub.create_job(kind, "mac", None)
 

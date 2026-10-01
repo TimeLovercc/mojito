@@ -262,7 +262,7 @@ agent 的回复用 `POST /events` 写：`kind=chat`，`source` 取令牌（`serv
 
 - hub 按设置里的时间（配置时区）每天各入队一次 `morning_brief`、`evening_prompt`（`runner=server`）。只在到点后 10 分钟内入队，每天每种一次，停机错过的不补发。**是否发、发什么由 agent 判断**，hub 只负责按时入队。
 - 早上简报：agent 写 `kind=chat`、`tier=digest` 的记录（今日重点 + 夜间要事 + 待确认数 + 今天日程）。
-- 晚上提问：agent 判断当天是否已有 `author=me` 的记录、是否连续 3 天未回；要问就写 `kind=chat`、`tier=digest`、标题"今天推进了什么？"。用户在对话里回复即可，那条回复本身就是当天的笔记。
+- 晚上提问：agent 只判断两件事：今天是否已经问过（问过就不再问），是否连续 3 天未回（是就改为问一句要不要继续）；要问就写 `kind=chat`、`tier=digest`、标题"今天推进了什么？"。用户在对话里回复即可，那条回复本身就是当天的笔记。白天记过东西也照样问：对话里的消息也是 `author=me` 的记录，按"当天已有记录就不问"判断，晚上提问几乎从不发出。
 - 新增 tier `quiet`：推送但不响不震。推送的 tier：`interrupt`、`digest`、`quiet`；`log` 不推。
 
 | 方法 | 路径 | 令牌 | 作用 |
@@ -275,7 +275,7 @@ agent 的回复用 `POST /events` 写：`kind=chat`，`source` 取令牌（`serv
 ## 日历（只读）
 
 - hub 每 15 分钟拉取私密 iCal 链接（环境变量 `MOJITO_ICAL_URL`，必填，链接当令牌保管），展开重复事件，存未来 14 天和过去 1 天的事件。拉取成功即为数据源 `google-calendar` 心跳（`expected_interval_s=3600`）。
-- Event：`{uid, start, end, all_day, title, location}`，`start`/`end` 为 datetime（全天事件为配置时区当天 00:00）。
+- Event：`{uid, start, end, all_day, title, location}`，`start`/`end` 为 datetime（全天事件为配置时区当天 00:00）。（后文"订阅日历"加 `read_only`。）
 
 | 方法 | 路径 | 令牌 | 作用 |
 |---|---|---|---|
@@ -882,7 +882,7 @@ hub 在以下写操作时像事项一样**自动写"从 X 改成 Y"记录并带�
 - 对话里要求删除同样走 `calendar_actions` 的 `delete`，不限带标记的事件（改和建仍只动 Mojito 建的）。
 
 ## 订阅
-**Subscription** `{id, name, kind: "papers" | "mail", at: "HH:MM", enabled: bool, config: object, last_run_at, last_result: str | null, health: "ok"|"warn"|"error"|null}`
+**Subscription** `{id, name, kind: "papers" | "mail", at: "HH:MM", enabled: bool, config: object, last_run_at, last_result: str | null, health: "ok"|"warn"|"error"|null}`（后文"信息流改成报告"把 `kind` 改为 `brief | watch | mail`）
 
 | 方法 | 路径 | 令牌 | 作用 |
 |---|---|---|---|
@@ -901,7 +901,7 @@ hub 在以下写操作时像事项一样**自动写"从 X 改成 Y"记录并带�
 ## 帖子类卡片（给插件用）
 - Card.kind 新增 `post`：`title` 帖子标题，`summary` "作者 · 赞 N —— 为什么推给你"，`link` 帖子网址，`dedupe_key` 帖子 id，`origin` 由插件自定（如 `<平台>:<关键词>`）。
 - 封面：插件下载封面，按对话图片规则压缩（长边 ≤800px）后 `POST /attachments`（**放开 worker**），卡片新字段 `image_attachment_id: str | null`（`POST /cards` 请求体加该字段，可选，不给即 null）。
-- 公开版不自带发帖子卡片的插件；订阅 `kind` 目前只有 `papers`、`mail`。
+- 公开版不自带发帖子卡片的插件；内置订阅见后文"信息流改成报告"。
 
 ---
 
@@ -1215,8 +1215,110 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 
 ### 补充（回答 hub 的问题）
 1. 晚间提问的固定标题：中文"今天推进了什么？"，英文 "What did you move forward today?"；`/metrics.evening_asked` 两种都认。
-2. 订阅名称按 `kind` 由 hub 按语言输出（papers → 论文 / Papers，mail → 每日邮件 / Daily mail），不用库里存的名字显示。
+2. 订阅名称按 `kind` 由 hub 按语言输出（papers → 论文 / Papers，mail → 每日邮件 / Daily mail；后文"信息流改成报告"换成 brief / watch / mail），不用库里存的名字显示。
 3. 界面英文用词以 agent 的词表为准（Your call、Focus、Overdue、Gone quiet、Plan、Projects、Feed、Notes、Chat；In progress / Waiting on you / Scheduled / Ongoing / Done / Closed；Me / Auto / Auto, then me；计划 Draft / In progress / Ended），mobile、hub、agent、worker 一致。
+
+---
+
+# 信息流改成报告（design.md 8.10）
+
+论文不再一篇一张卡；信息流里多两种报告卡：每天一张"每日 AI 简报"，关注的实验室有实质消息时一张"新动态"。
+
+## Card
+- `kind` 新增 `brief`（每日 AI 简报）、`alert`（新动态）。
+- 新字段 `body: str | null`：Markdown 全文，≤ 12000 字；`POST /cards` 请求体加 `body`（可选，不给即 null）。`summary` 仍 ≤ 800 字，报告卡写 3 行要点（卡片上只显示这 3 行，点开看 `body`）。
+- `POST /cards` 收到 `kind=alert` 时，hub 写一条记录并推送：`kind=log`、`tier=digest`、`category=news`、`title="新动态：<卡片标题>"`（英文 "News: <title>"）、`body` = 卡片 `summary`、`evidence` = 卡片 `link`、`card_id` = 该卡片。点通知打开这张卡片。
+- 通知设置：`Settings.notify` 新增 `news`（迁移时补 true）；Record.category 新增 `news`。
+- 推送带卡片：`push_data(record)`（FCM data 与 Web Push data）在 `record.card_id` 不为 null 时带 `card_id`（规则同 `item_id`）；Web Push 的 `/app/open` 查询参数也带 `card_id`。app 点通知：有 `item_id` 去事项；否则有 `card_id` 去 `/cards/<id>`；其余照旧。Mac 点通知同样打开卡片。
+
+## 订阅
+- `Subscription.kind` 改为 `brief | watch | mail`。`config` 按 kind 校验，多出或缺少的键 → 422：`brief` `{}`；`watch` `{labs: [str], every_hours: int}`（1–24）；`mail` `{}`。
+- 初始（新库）：`brief` 07:00、`mail` 07:30、`watch` 08:00，全开；`watch` 的 config 是 `{"labs": ["OpenAI", "Anthropic", "DeepMind/Gemini", "DeepSeek", "Qwen", "Kimi"], "every_hours": 8}`。实验室名里可以用 `/` 写别名（如 `DeepMind/Gemini`），搜索时按"任一别名"查。
+- 迁移（已有库）：`papers` → `brief`（保留 at、enabled，config 改为 `{}`，清掉上次结果）；新建 `watch`（同上）；`mail` 不变；之前针对 `papers` 的改动记录不再能撤销。
+- hub 按 `at`（配置时区）每天入队 `feed_brief`、`feed_mail`；`watch` 从 `at` 起每 `config.every_hours` 小时入队一次 `feed_watch`，每天从 `at` 重新开始（runner 都是 mac，同 kind 已在 queued / running 就不重复入队）。`feed_papers` 不再入队。`POST /worker/jobs` 和对话 `run_jobs` 允许的 kind 换成 `refresh`、`sync_projects`、`draft_review`、`feed_brief`、`feed_watch`、`feed_mail`。
+- 订阅名称按语言由 hub 输出：brief → 每日简报 / Daily brief，watch → 实验室动态 / Lab watch，mail → 每日邮件 / Daily mail。
+- 对话 `subscription_updates`：`at`、`enabled` 照旧；`config` 只有 `watch` 有，给改完后的完整 `labs`（以及 `every_hours`），其余键原样保留。
+
+## feed_brief（worker）
+- 素材，全部由脚本取，Claude（`claude -p`，不给工具）只按素材写，不编造：
+  - 论文：沿用原 `feed_papers` 的扫描与两轮筛选（候选去掉已出现过的：旧论文卡和历次简报里的 arXiv id），选 5–10 篇；
+  - 网页新闻：Google News RSS 搜索，中英文两版、过去 24 小时；几条通用的 AI 查询，加上 `watch.labs` 逐家一条。
+- 输出一张卡：`kind=brief`、`origin=brief`、`title="今日 AI 简报 · M/D"`（英文 "Daily AI brief · M/D"）、`summary` 3 行要点、`dedupe_key` = 配置时区的日期（当天已发过就跳过）。`body` 按顺序分节：新模型发布、重要论文、开源项目、行业新闻、趋势解读、实验室覆盖；没有内容的节写"今天没有"。
+- 写法：每条一行（一句话 + 链接）；论文每篇"做了什么"一句 +"和你有关"一句；趋势解读 ≤ 3 句；实验室覆盖按名单顺序每家一条，上面已写过的写"见上"。引用的每条链接必须来自素材，同一链接不许引两次（同一件事只写一次）；正文去掉链接地址后 ≤ 4000 字，超了报错。
+- 链接文字写具体出处：素材里的媒体或网站名，没有名字时用域名（去掉 `www.`）；论文以标题为链接文字。引用的 Google News 跳转链接由脚本解析成原文地址，解析不了保留原链接。
+- 订阅 result 报一句（"简报写好：论文 N 篇、新闻 M 条"）；任一素材源失败 → 跳过它、health=warn 并写是哪个源，简报照写，正文末尾注明没取到的来源。
+- 数据源 `feed-papers`：worker 每次写完简报为它心跳（`expected_interval_s=93600`）并报健康：论文抓取失败 → error，抓到但筛完 0 篇 → warn，其余 ok（detail 写篇数或失败原因）。
+
+## feed_watch（worker）
+- 查上次成功运行以来（首次：过去 `every_hours` 小时）`labs` 逐家的网页新闻。
+- `claude -p` 只留实质事件：新发布、开源（权重、代码）、重要技术报告或论文、争议或安全事件，也包括关于这些的传闻、泄露、曝光；股价、融资、泛泛评测、旧闻不算。没有就不发卡，result 写"没有新动态"。
+- 每个事件一张卡：`kind=alert`、`origin="watch:<实验室>"`、`title` 前加【传闻】或【确认】（英文 "[Rumor] " / "[Confirmed] "）、`summary` 3 行（第一行写消息来源和可信度）、`body` = 细节一段 + "相关链接"（每条写"出处：文章标题"，标题过长截断）、`link` = 第一条链接。
+- 去重：事件键 `<实验室>:<事件简称>`，确认的加 `:confirmed`，作为 `dedupe_key`；worker 把已报的键和上次成功时间记在本机 `~/.mojito-worker/watch.json`。同一事件按传闻报一次、确认后再报一次；确认过的不再按传闻报。
+- 读 X 的插件：hub 的授权状态接受名字 `x`（显示为 X），留给自己加的读 X 的插件报登录状态；公开版不自带。
+
+## 对话
+- 对话上下文加上最新一期简报的全文；最近卡片里的报告卡带 3 行要点；"问问这个"的卡片带 `body` 全文。
+- 多行文字（对话回复、草稿正文、早上简报、本周总结）让 Claude 按行给字符串数组，脚本用换行拼接（模型常把换行多转义成字面的 `\n`）。
+
+---
+
+# 部署冒烟检查（design.md 0.4 e）
+
+起因：服务"正常运行"时核心路径也可能每次都失败（比如每条一行笔记都 422、每条对话回复都 403），而且要等用户自己发现。所以每次部署完，用真实令牌把核心循环走一遍，任何一步不是 2xx（或没走到）就让部署失败。
+
+## 冒烟标记（hub）
+- 请求体新增可选字段 `smoke: bool`（不给即 false）：`POST /records`、`POST /chat`（app）；`POST /events`（agent / worker）。
+- Record 新增只读字段 `smoke: bool`。hub 自己因冒烟记录或冒烟任务写的记录（如任务失败）也标 `smoke=true`。
+- 冒烟记录：
+  - **永不推送**（FCM、Web Push 都不发），不进 `/pulse`、`/today.alerts`；
+  - `GET /records`、`GET /chat` 默认不返回，带可选参数 `include_smoke=true` 才返回；
+  - 不算进 `/metrics` 和 `/usage/summary`；
+  - `POST /records` 带 `smoke=true` 时照常校验、照常写入，但**不入队 `process_note`**；
+  - `POST /chat` 带 `smoke=true` 时照常入队 `chat_reply`，任务照常出现在 `/jobs`。
+- 记录只追加：冒烟记录不删除，靠 `smoke` 标记隔离。
+
+## 服务器 agent
+- `chat_reply` 读到的用户消息 `smoke=true` 时：取上下文、调 `claude -p` 都照常走（要测的就是这条真实路径），但**只写回复，不执行任何动作**（不改事项、日历、计划、订阅、设置，不写反馈、口味，不转给本机，不起草）；回复用 `POST /events` 带 `smoke=true`。
+
+## 冒烟步骤（`hub/deploy/smoke.py`，`deploy.sh` 在服务起来之后在服务器上执行）
+对 `http://127.0.0.1:8787`，用 `tokens.json` 里的真实 app 令牌依次：
+1. **一行笔记**：`POST /records {title, body: 一行文字, item_id: null, project_id: null, needs_processing: true, attachment_ids: [], smoke: true}` → 2xx，返回的 Record `smoke=true`。
+2. **对话 + agent 回复**：`POST /chat {body: "部署检查：请只回复"收到"", item_id: null, project_id: null, card_id: null, attachment_ids: [], smoke: true}` → 2xx；轮询 `GET /jobs/{job.id}` 直到 `done`（`failed` 或 180 秒没完成 → 失败）；再 `GET /chat?limit=10&include_smoke=true`，必须有一条服务器 agent 写的、`smoke=true`、晚于这条消息的回复。
+3. **今天页**：`GET /today` → 2xx。
+4. **信息流**：`GET /cards?limit=20` → 2xx。
+5. **没有漏出去**：`GET /records?limit=50`、`GET /chat?limit=20`（不带 `include_smoke`）里不含第 1、2 步的记录；第 1 步笔记没有产生 `process_note` 任务。
+
+- 任何一步失败：打印步骤名、HTTP 状态码和响应里的 `detail`（不打印令牌），`deploy.sh` 以 exit 1 结束，**不发**"服务器已更新"推送。全部通过才推送，输出末尾逐步列出通过的步骤。
+
+---
+
+# 订阅日历（design.md 9.3）
+
+只是"通过网址订阅"的日历（比如工作或学校发布的 Outlook 日历）不在主日历的私密地址里，Google 对它的刷新也要 12–24 小时。hub 直接从源头读它们，只读。
+
+## hub
+- 新环境变量 `MOJITO_ICAL_EXTRA_FILE`（必填）：一个文本文件的路径，每行一个 ICS 链接（`https://` 或 `webcal://`，`webcal` 按 `https` 取；空行忽略；文件可以为空 = 没有订阅日历）。启动时读一遍，格式不对就启动失败；之后每次拉取都重新读，改链接不用重启。链接当令牌保管：文件属主是 hub 的服务用户、权限 600，日志和报错里只写 host 或行号，不写完整链接。
+- 每 15 分钟拉取时，主日历（`MOJITO_ICAL_URL`）和文件里每个链接都拉，展开重复事件，窗口规则不变。
+- Event 新增只读字段 `read_only: bool`：主日历的事件 `false`，订阅日历的事件 `true`。
+- 去重：同一 `uid` + 同一 `start` 在多处出现时只留一条，优先主日历那条。
+- 健康：主日历拉取失败照旧 `google-calendar` error；主日历成功但某个订阅链接失败 → `google-calendar` health=warn，detail 写"订阅日历读取失败：<host>"，其余日历照常更新；全部成功 → ok。
+- `POST /calendar/{uid}/delete` 对 `read_only=true` 的事件 → 409（"这是订阅来的日历，只能在原日历里改"）。
+
+## agent
+- 取日历时带上 `read_only`。对 `read_only=true` 的事件不输出任何 `calendar_actions`（脚本也拦：命中只读事件的动作直接丢弃），回复里说明这是订阅的日历、Mojito 改不了，请在原日历里改。早上简报照常列出这些日程。
+
+## app
+- 今天页日程：`read_only=true` 的事件展开后不显示"删除"，改为一行小字"订阅的日历，请在原日历里改"（英文 "Subscribed calendar — edit it in the original app"）。
+
+## 部署
+- `install-secrets.sh`：本机 `<SECRETS_DIR>/ical-extra-urls` → 服务器 `<数据目录>/ical-extra-urls`（600），env 写 `MOJITO_ICAL_EXTRA_FILE`。源文件不存在就报错（不订阅也要建一个空文件）。
+- 上线顺序：先装文件和 env → hub → agent → app 空中更新（app 在字段缺失时报错，所以 hub 必须先上）。
+
+---
+
+# Mac app 打开外部链接（design.md 8.4）
+
+- 网页版里 `Linking.openURL` 就是 `window.open`，Mac app 的 WebView 会直接丢掉。Mac 外壳注入的脚本接管 `window.open` 和指向外站的 `<a>` 点击，交给 Tauri 命令 `open_external`，用系统默认浏览器（或对应 app）打开；只放行 `http`、`https`、`orca`，其他协议拒绝并记日志。主窗口和菜单栏面板都生效。
 
 ---
 
@@ -1234,6 +1336,7 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 | `MOJITO_TIMEZONE` | 配置时区，IANA 名 |
 | `MOJITO_ATTACHMENTS_DIR` | 图片附件目录 |
 | `MOJITO_ICAL_URL` | 日历私密 iCal 链接（当令牌保管） |
+| `MOJITO_ICAL_EXTRA_FILE` | 订阅日历链接文件（每行一个 ICS 链接，可以为空，见"订阅日历"） |
 | `MOJITO_FCM_CREDENTIALS` | Firebase 服务账号 JSON 路径 |
 | `MOJITO_VAPID_KEY_FILE` | VAPID 私钥 PEM 路径 |
 | `MOJITO_VAPID_SUBJECT` | `mailto:…` 或 `https://…` |

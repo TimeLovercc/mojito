@@ -21,7 +21,8 @@ TEXT = {
     "off": ("关", "off"),
     "notify_all_on": ("全部开", "all on"),
     "notify_off": ("关掉 {x}", "off: {x}"),
-    "keywords": ("关键词 {x}", "keywords {x}"),
+    "watch_config": ("实验室 {labs}，每 {n} 小时", "labs {labs}, every {n} h"),
+    "news": ("新动态：{x}", "News: {x}"),
     "field_value": ("{field} {value}", "{field} {value}"),
     "image": ("[图片]", "[Image]"),
     # change / undo records
@@ -105,27 +106,30 @@ NAMES = {
     "job": ({"refresh": "刷新", "process_note": "整理笔记", "draft_review": "起草复盘", "weekly_summary": "每周总结",
              "sync_projects": "同步项目", "feed_arxiv": "arXiv 日报", "feed_papers": "每日论文", "feed_weekly": "本周论文",
              "feed_mail": "每日邮件", "calendar_delete": "删除日程", "chat_reply": "回复对话",
-             "undo": "撤销", "morning_brief": "早上简报", "evening_prompt": "晚间提问", "draft_plan": "起草计划"},
+             "undo": "撤销", "morning_brief": "早上简报", "evening_prompt": "晚间提问", "draft_plan": "起草计划",
+             "feed_brief": "每日简报", "feed_watch": "实验室动态"},
             {"refresh": "Refresh", "process_note": "Note processing", "draft_review": "Review draft",
              "weekly_summary": "Weekly summary", "sync_projects": "Project sync", "feed_arxiv": "arXiv digest",
              "feed_papers": "Daily papers", "feed_weekly": "Weekly papers", "feed_mail": "Daily mail",
              "calendar_delete": "Calendar delete", "chat_reply": "Chat reply",
              "undo": "Undo", "morning_brief": "Morning brief", "evening_prompt": "Evening question",
-             "draft_plan": "Plan draft"}),
+             "draft_plan": "Plan draft", "feed_brief": "Daily brief", "feed_watch": "Lab watch"}),
     "auth": ({"google-calendar-write": "日历写入", "gmail-read": "Gmail 读取", "claude-server": "Claude（服务器）",
-              "claude-mac": "Claude（Mac）"},
+              "claude-mac": "Claude（Mac）", "x": "X"},
              {"google-calendar-write": "Calendar write", "gmail-read": "Gmail read", "claude-server": "Claude (server)",
-              "claude-mac": "Claude (Mac)"}),
-    "notify": ({"brief": "早晚简报", "chat": "对话", "alert": "告警", "feedback": "反馈", "release": "更新", "jobs": "任务"},
+              "claude-mac": "Claude (Mac)", "x": "X"}),
+    "notify": ({"brief": "早晚简报", "chat": "对话", "alert": "告警", "feedback": "反馈", "release": "更新", "jobs": "任务",
+                "news": "新动态"},
                {"brief": "Briefs", "chat": "Chat", "alert": "Alerts", "feedback": "Feedback", "release": "Updates",
-                "jobs": "Jobs"}),
-    "category": ({"brief": "简报", "chat": "对话", "alert": "告警", "feedback": "反馈", "release": "更新", "jobs": "任务"},
+                "jobs": "Jobs", "news": "News"}),
+    "category": ({"brief": "简报", "chat": "对话", "alert": "告警", "feedback": "反馈", "release": "更新", "jobs": "任务",
+                  "news": "新动态"},
                  {"brief": "Brief", "chat": "Chat", "alert": "Alert", "feedback": "Feedback", "release": "Update",
-                  "jobs": "Job"}),
+                  "jobs": "Job", "news": "News"}),
     "language": ({"zh": "中文", "en": "English"}, {"zh": "中文", "en": "English"}),
     # subscription names are shown by kind, not from the stored name (api.md 补充)
-    "subscription": ({"papers": "论文", "mail": "每日邮件"},
-                     {"papers": "Papers", "mail": "Daily mail"}),
+    "subscription": ({"brief": "每日简报", "watch": "实验室动态", "mail": "每日邮件"},
+                     {"brief": "Daily brief", "watch": "Lab watch", "mail": "Daily mail"}),
     "field_goal": ({"title": "标题", "status": "状态"}, {"title": "Title", "status": "Status"}),
     "field_plan": ({"start": "开始", "end": "结束", "goal_ids": "目标", "item_ids": "事项"},
                    {"start": "Start", "end": "End", "goal_ids": "Goals", "item_ids": "Items"}),
@@ -230,8 +234,8 @@ def entity_value(entity: str, field: str, value) -> str:
         off = [name("notify", k) for k, on in value.items() if not on]
         return t("notify_all_on") if not off else t("notify_off", x=joined(off))
     if field == "config":
-        if "keywords" in value:
-            return t("keywords", x=joined(value["keywords"]) if value["keywords"] else t("empty"))
+        if "labs" in value:
+            return t("watch_config", labs=joined(value["labs"]) if value["labs"] else t("empty"), n=value["every_hours"])
         return json.dumps(value, ensure_ascii=False)
     return str(value)
 

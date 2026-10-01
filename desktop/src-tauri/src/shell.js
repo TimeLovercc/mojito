@@ -56,6 +56,52 @@
     })
   }
 
+  // 外部链接：mobile 用 Linking.openURL，在 react-native-web 上就是 window.open(url, '_blank', 'noopener')，
+  // WKWebView 会直接丢掉。改交给 Rust 的 open_external，用系统默认浏览器打开（只放行 http / https / orca）。
+  // 点到指向外站的 <a> 也一样处理，不让 WebView 自己跳走。主窗口和菜单栏面板都注入这段。
+  const openExternal = (url) => {
+    const href = new URL(url, location.href).href
+    invoke('open_external', { url: href }).catch((reason) => log(`open_external ${href} failed ${reason}`))
+  }
+  window.open = (url) => {
+    openExternal(String(url))
+    return null
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target instanceof Element ? e.target.closest('a[href]') : null
+    if (a === null) return
+    const url = new URL(a.getAttribute('href'), location.href)
+    if (url.origin === location.origin) return
+    e.preventDefault()
+    openExternal(url.href)
+  }, true)
+
+  // 菜单栏面板高度随内容（docs/desktop-v2.md §8）：mobile 把面板全部内容包在 nativeID="menubar-content"（网页上是 id）里、按内容自然高度；
+  // 这里量它的高度，变了就让 Rust 把面板窗口设成这么高（最高 560，超出由页面滚动）并按托盘图标重新定位。
+  // 元素还没渲染出来、或重新挂载换了一个，都由 MutationObserver 找到当前那个再观察。
+  if (location.pathname === '/menubar') {
+    // 窗口是 Popover 毛玻璃、圆角 12；页面叠的底色（popoverTint）铺满矩形会把四角盖成直角，所以把页面也裁成 12 圆角
+    const corner = document.createElement('style')
+    corner.textContent = 'body { clip-path: inset(0 round 12px); }'
+    document.documentElement.appendChild(corner)
+    let observed = null
+    let sent = 0
+    const sizer = new ResizeObserver(([entry]) => {
+      const height = Math.ceil(entry.target.getBoundingClientRect().height)
+      if (height === 0 || height === sent) return
+      sent = height
+      invoke('set_size', { height }).catch((reason) => log(`set_size ${height} failed ${reason}`))
+    })
+    const attach = () => {
+      const el = document.getElementById('menubar-content')
+      if (el === observed) return
+      if (observed !== null) sizer.unobserve(observed)
+      observed = el
+      if (el !== null) sizer.observe(el)
+    }
+    new MutationObserver(attach).observe(document, { childList: true, subtree: true })
+  }
+
   // 网页报错写进日志文件（~/Library/Logs/com.example.mojito/webview.log），白屏时能查到原因
   const log = (msg) => invoke('log_web', { msg: `${location.pathname} ${msg}` })
   window.addEventListener('error', (e) => log(`error ${e.message} @${e.filename}:${e.lineno}:${e.colno}`))

@@ -39,7 +39,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/android-icon-monochrome.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#e9c27a",
           "defaultChannel": "digest"
         }

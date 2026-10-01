@@ -35,6 +35,29 @@ fn log_web(app: tauri::AppHandle, msg: String) -> Result<(), String> {
     weblog::write(&app, &msg)
 }
 
+// 菜单栏面板高度随内容（docs/desktop-v2.md §8），shell.js 在面板里量 #menubar-content 后调
+#[tauri::command]
+fn set_size(app: tauri::AppHandle, height: f64) -> Result<(), String> {
+    tray::set_height(&app.get_webview_window(tray::PANEL).unwrap(), height).map_err(|e| format!("设面板高度：{e}"))
+}
+
+// 外部链接（shell.js 接管 window.open 和外链 <a> 后调）：交给 macOS 的 open，用系统默认浏览器或对应 app 打开。
+// WKWebView 自己会把 window.open 直接丢掉。只放行 app 用到的协议：http / https（简报、卡片原文），
+// orca（系统页"去 Orca"，Orca.app 注册的 orca://）；其他拒绝并记日志
+#[tauri::command]
+fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    let scheme = reqwest::Url::parse(&url).map_err(|e| format!("链接 {url}：{e}"))?.scheme().to_string();
+    if !matches!(scheme.as_str(), "http" | "https" | "orca") {
+        weblog::write(&app, &format!("open_external refused {url}"))?;
+        return Err(format!("不打开 {scheme}: 链接（只放行 http、https、orca）"));
+    }
+    let status = std::process::Command::new("/usr/bin/open").arg(&url).status().map_err(|e| format!("open {url}：{e}"))?;
+    if !status.success() {
+        return Err(format!("open {url} 失败：{status}"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn set_theme(app: tauri::AppHandle, scheme: String) -> Result<(), String> {
     theme::set(&app, &scheme)
@@ -137,7 +160,7 @@ pub fn run() {
             weblog::write(webview.app_handle(), &format!("{} web content process terminated, reloading", webview.label())).unwrap();
             webview.reload().unwrap();
         })
-        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, fetch::hub_fetch])
+        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, set_size, open_external, fetch::hub_fetch])
         .setup(|app| {
             build_main(app)?;
             tray::build(app)?;

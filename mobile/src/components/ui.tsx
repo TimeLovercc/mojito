@@ -50,6 +50,7 @@ const toneStyle = {
   a: { backgroundColor: colors.warnSoft, color: colors.warn },
   r: { backgroundColor: colors.badSoft, color: colors.bad },
   n: { backgroundColor: colors.raised, color: colors.tx2 },
+  b: { backgroundColor: colors.brandSoft, color: colors.brand },
 } as const
 
 export function Tag({ label, tone }: { label: string; tone: Tone }) {

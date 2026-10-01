@@ -44,12 +44,17 @@ export function RecordLine({ record, linkItem, showDate }: { record: HubRecord; 
       </View>
     </View>
   )
-  if (!linkItem || itemId === null) return body
+  // 挂着卡片的记录（"新动态：…"，design.md 8.10）点开看那张报告
+  const cardId = record.card_id
+  const target =
+    linkItem && itemId !== null
+      ? () => router.push({ pathname: '/items/[id]', params: { id: itemId } })
+      : cardId !== null
+        ? () => router.push({ pathname: '/cards/[id]', params: { id: cardId } })
+        : null
+  if (target === null) return body
   return (
-    <Pressable
-      onPress={() => router.push({ pathname: '/items/[id]', params: { id: itemId } })}
-      style={({ pressed }) => pressed && { opacity: 0.7 }}
-    >
+    <Pressable onPress={target} style={({ pressed }) => pressed && { opacity: 0.7 }}>
       {body}
     </Pressable>
   )

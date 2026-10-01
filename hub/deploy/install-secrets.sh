@@ -4,6 +4,9 @@
 #   claude-oauth-token        -> agent.env  CLAUDE_CODE_OAUTH_TOKEN
 #   ical-url                  -> env        MOJITO_ICAL_URL
 #                                 no calendar: file:///var/lib/mojito/empty.ics (setup-server.sh creates it)
+#   ical-extra-urls           -> /var/lib/mojito/ical-extra-urls    (env MOJITO_ICAL_EXTRA_FILE)
+#                                one https:// or webcal:// ICS link per line, shown read-only (e.g. a work or
+#                                school Outlook calendar); empty file = no subscribed calendars
 #   google-oauth-calendar.json -> /var/lib/mojito/google-oauth.json (agent.env MOJITO_GOOGLE_OAUTH)
 #                                 must hold exactly calendar.events; optional: without it the agent runs
 #                                 without calendar writes (System shows the grant as not connected)
@@ -44,10 +47,9 @@ print(key, \"->\", dest)
 ' $dest $key && sudo chmod 600 $dest && sudo chown root:root $dest"
 }
 
-# put_file <local-file> <remote-path>: mojito-owned, mode 600; must be valid JSON.
+# put_file <local-file> <remote-path>: mojito-owned, mode 600.
 put_file() {
   local src="$1" dest="$2"
-  python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$src"
   ssh "$HOST" "sudo sh -c 'umask 077 && cat > $dest && chown mojito:mojito $dest && chmod 600 $dest' && echo '$(basename "$src") -> $dest'" < "$src"
 }
 
@@ -68,8 +70,20 @@ else
 fi
 echo /var/lib/mojito/google-oauth.json | set_env /var/lib/mojito/agent.env MOJITO_GOOGLE_OAUTH
 
+python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$SECRETS/fcm-service-account.json"
 put_file "$SECRETS/fcm-service-account.json" /var/lib/mojito/fcm.json
 echo /var/lib/mojito/fcm.json | set_env /var/lib/mojito/env MOJITO_FCM_CREDENTIALS
+
+# Subscribed ICS links are secrets too: errors name the line number, never the link.
+test -f "$SECRETS/ical-extra-urls"
+python3 -c '
+import sys
+for n, line in enumerate(open(sys.argv[1]).read().splitlines(), 1):
+    line = line.strip()
+    assert not line or (line.startswith(("https://", "webcal://")) and " " not in line), f"ical-extra-urls line {n}: must be one https:// or webcal:// link"
+' "$SECRETS/ical-extra-urls"
+put_file "$SECRETS/ical-extra-urls" /var/lib/mojito/ical-extra-urls
+echo /var/lib/mojito/ical-extra-urls | set_env /var/lib/mojito/env MOJITO_ICAL_EXTRA_FILE
 
 EMAIL="$MOJITO_CONTACT_EMAIL"
 [[ "$EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+$ ]] || { echo "MOJITO_CONTACT_EMAIL is not an email address: '$EMAIL'" >&2; exit 1; }

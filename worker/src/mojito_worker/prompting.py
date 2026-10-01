@@ -3,6 +3,17 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from mojito_worker.config import TIMEZONE
+from mojito_worker.validate import ValidationError
+
+# Multi-line text Claude writes (chat reply, draft body, weekly summary) comes back as a list of lines that the
+# script joins: inside one JSON string every line break is an escape the model writes itself, and it sometimes
+# over-escapes it, so the user got a literal "\n" (agent e0f1225: 3 of 13 multi-line server replies).
+LINES_SCHEMA = {
+    "type": "array",
+    "items": {"type": "string"},
+    "description": "one element per line (Markdown allowed); an empty string is a blank line; no line breaks inside an element",
+}
+LINES_RULE = "按行给：字符串数组，每个元素是一行（可带 Markdown），空字符串表示空行；元素里不要换行，也不要写 \\n。"
 
 
 def now_context() -> str:
@@ -37,6 +48,16 @@ def short_time(iso: str) -> str:
 
 def short_date(d: date) -> str:
     return f"{d.month}/{d.day}"
+
+
+def joined_lines(obj: dict, field: str, where: str) -> str:
+    lines = obj[field]
+    if not isinstance(lines, list) or not all(isinstance(line, str) for line in lines):
+        raise ValidationError(f"{where}: {field} must be a list of strings, got {lines!r}")
+    text = "\n".join(lines).strip()
+    if not text:
+        raise ValidationError(f"{where}: {field} is empty, got {lines!r}")
+    return text
 
 
 def dump(obj) -> str:

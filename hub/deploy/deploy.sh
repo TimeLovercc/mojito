@@ -7,8 +7,10 @@
 # source:cards token in $MOJITO_SECRETS_DIR/cards.env.
 # Pushes <ref> to <server>:/srv/mojito.git, backs up hub.db, resets /opt/mojito to
 # the ref, syncs both venvs, installs both systemd units, waits for the agent to
-# be idle, restarts mojito-hub and mojito-agent, and checks that the hub answers
-# and the agent stays up.
+# be idle, restarts mojito-hub and mojito-agent, checks that the hub answers and
+# the agent stays up, then runs hub/deploy/smoke.py on the server (docs/api.md,
+# 部署冒烟检查): the core loop with a real app token. The push is sent only when
+# every smoke step passes.
 set -euo pipefail
 
 REF="$1"
@@ -18,6 +20,8 @@ HOST="${MOJITO_SSH_HOST:?set MOJITO_SSH_HOST (ssh alias of your server)}"
 SHA=$(git rev-parse --verify "$REF^{commit}")
 CARDS_ENV="${MOJITO_SECRETS_DIR:?set MOJITO_SECRETS_DIR (folder holding cards.env)}/cards.env"
 test -r "$CARDS_ENV"
+SMOKE_LOG=$(mktemp)
+trap 'rm -f "$SMOKE_LOG"' EXIT
 
 git push --force "$HOST:/srv/mojito.git" "$SHA:refs/heads/deploy"
 
@@ -103,6 +107,9 @@ fi
 echo "mojito-agent up at $SHA ($(systemctl show mojito-agent -p MemoryCurrent))"
 REMOTE
 
+# Smoke check (exits 1 on the first failing step, so no push below).
+ssh "$HOST" 'sudo python3 /opt/mojito/hub/deploy/smoke.py "$(sudo grep "^MOJITO_TOKENS=" /var/lib/mojito/env | cut -d= -f2-)"' | tee "$SMOKE_LOG"
+
 # Tell the user. Title uses the note's first line; the body is the remaining lines
 # (or the first line again when the note is a single line).
 ( set -a; . "$CARDS_ENV"; set +a
@@ -118,3 +125,4 @@ with urllib.request.urlopen(req, timeout=20) as resp:
     print("pushed:", json.load(resp)["title"])
 PY_EVENT
 )
+sed -n '/^smoke passed:/,$p' "$SMOKE_LOG"

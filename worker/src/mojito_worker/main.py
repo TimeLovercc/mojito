@@ -6,12 +6,13 @@ import httpx
 from mojito_worker.auth import AuthReporter
 from mojito_worker.chat import chat_reply
 from mojito_worker.config import HEARTBEAT_INTERVAL_S, POLL_INTERVAL_S, load_config
-from mojito_worker.feed import feed_papers, feed_weekly
+from mojito_worker.feed import feed_weekly
 from mojito_worker.hub import Hub
 from mojito_worker.i18n import language
 from mojito_worker.jobs import process_note, refresh
 from mojito_worker.mail_feed import feed_mail
 from mojito_worker.projects import sync_projects
+from mojito_worker.reports import feed_brief, feed_watch
 from mojito_worker.review import draft_review
 from mojito_worker.watchdog import MaintainerWatchdog
 from mojito_worker.weekly import weekly_summary
@@ -25,7 +26,8 @@ HANDLERS = {
     "draft_review": draft_review,
     "weekly_summary": weekly_summary,
     "sync_projects": sync_projects,
-    "feed_papers": feed_papers,
+    "feed_brief": feed_brief,
+    "feed_watch": feed_watch,
     "feed_weekly": feed_weekly,
     "feed_mail": feed_mail,
 }

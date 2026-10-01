@@ -18,6 +18,7 @@ DB_PATH = os.environ["MOJITO_DB"]
 TOKENS_PATH = os.environ["MOJITO_TOKENS"]
 SEED_PATH = os.environ["MOJITO_SEED"]
 ICAL_URL = os.environ["MOJITO_ICAL_URL"]
+ICAL_EXTRA_FILE = os.environ["MOJITO_ICAL_EXTRA_FILE"]
 FCM_CREDENTIALS = os.environ["MOJITO_FCM_CREDENTIALS"]
 ATTACHMENTS_DIR = os.environ["MOJITO_ATTACHMENTS_DIR"]
 VAPID_KEY_FILE = os.environ["MOJITO_VAPID_KEY_FILE"]
@@ -33,6 +34,7 @@ CONTACT_EMAIL = os.environ["MOJITO_CONTACT_EMAIL"]
 
 ROLE_PATTERN = re.compile(r"^(app|worker|agent|maintainer|source:[A-Za-z0-9_.:-]+)$")
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,}$")
+URL_DISALLOWED = re.compile(r"[\x00-\x20\x7f]")  # what http.client rejects, quoting the whole URL
 
 
 def load_tokens(path: str) -> dict[str, str]:
@@ -58,6 +60,22 @@ def _check_public_url(url: str) -> str:
     return url
 
 
+def ical_extra_urls() -> list[str]:
+    """api.md 订阅日历: one https:// or webcal:// link per line (webcal fetched as https), blank
+    lines ignored; re-read on every calendar fetch. The links are secrets: errors name the line
+    number, never its text."""
+    urls = []
+    for n, line in enumerate(Path(ICAL_EXTRA_FILE).read_text().splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        parts = urlsplit(line)
+        if parts.scheme not in ("https", "webcal") or not parts.hostname or URL_DISALLOWED.search(line):
+            raise ValueError(f"MOJITO_ICAL_EXTRA_FILE {ICAL_EXTRA_FILE} line {n}: must be one https:// or webcal:// link")
+        urls.append("https" + line[len(parts.scheme):])
+    return urls
+
+
 def _load_vapid(path: str) -> tuple[Vapid02, str]:
     # Not Vapid02.from_file: it silently generates and writes a new key when the file is missing.
     if not Path(path).is_file():
@@ -80,6 +98,7 @@ if not re.fullmatch(r"\S+", OWNER_NAME):
     raise ValueError(f"MOJITO_OWNER_NAME {OWNER_NAME!r} must be one word without spaces")
 if not re.fullmatch(r"[^@\s]+@[^@\s]+", CONTACT_EMAIL):
     raise ValueError(f"MOJITO_CONTACT_EMAIL {CONTACT_EMAIL!r} is not an email address")
+ical_extra_urls()  # fail at startup on a missing file or a bad line
 if not Path(WEB_DIR).is_dir():
     raise FileNotFoundError(f"MOJITO_WEB_DIR {WEB_DIR} is not a directory")
 VAPID, VAPID_PUBLIC_KEY = _load_vapid(VAPID_KEY_FILE)  # public key: 65-byte point, base64url, no padding

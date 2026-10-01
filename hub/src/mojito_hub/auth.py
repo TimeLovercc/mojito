@@ -61,7 +61,7 @@ def actor(r: str) -> tuple[str, str]:
 SOURCE_OF = {"worker": "worker", "agent": "server-agent"}
 # Which runner reports which authorization (api.md 授权状态).
 AUTH_REPORTER = {"google-calendar-write": "agent", "claude-server": "agent",
-                 "gmail-read": "worker", "claude-mac": "worker"}
+                 "gmail-read": "worker", "claude-mac": "worker", "x": "worker"}
 RUNNER_OF = {"worker": "mac", "agent": "server"}
 
 

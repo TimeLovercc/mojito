@@ -3,7 +3,7 @@ import { Linking, StyleSheet, Text, View, type StyleProp, type TextStyle } from 
 import { useRouter } from 'expo-router'
 import { ENUM_NAMES, FIELD_NAMES } from '../labels'
 import { when } from '../time'
-import { colors, desktop, font, overlay } from '../theme'
+import { colors, desktop, font, overlay, size } from '../theme'
 import { t } from '../i18n'
 
 // hub / worker 写的文字里会带内部值，这里统一改成人能读的：
@@ -111,7 +111,7 @@ export function Markdown({ text, style }: { text: string; style: StyleProp<TextS
     const bullet = line.match(/^\s*[-*•·]\s+(.*)$/)
     const numbered = line.match(/^\s*(\d+)[.)]\s+(.*)$/)
     const quote = line.match(/^\s*>\s?(.*)$/)
-    const heading = line.match(/^#{1,6}\s+(.*)$/)
+    const heading = line.match(/^(#{1,6})\s+(.*)$/)
     if (line.trim() === '') blocks.push(<View key={i} style={md.gap} />)
     else if (bullet !== null) blocks.push(<Item key={i} mark="•" text={bullet[1]} style={style} indent={indent} />)
     else if (numbered !== null) blocks.push(<Item key={i} mark={`${numbered[1]}.`} text={numbered[2]} style={style} indent={indent} />)
@@ -121,7 +121,16 @@ export function Markdown({ text, style }: { text: string; style: StyleProp<TextS
           <RichText text={quote[1]} style={[style, md.quoteText]} enums={false} />
         </View>,
       )
-    else if (heading !== null) blocks.push(<RichText key={i} text={heading[1]} style={[style, bold]} enums={false} />)
+    // 标题：# / ## 大一号并和上文隔开（报告按节分，design.md 8.10），### 以下只加粗
+    else if (heading !== null)
+      blocks.push(
+        <RichText
+          key={i}
+          text={heading[2]}
+          style={[style, heading[1].length <= 2 ? [md.h2, i === 0 && md.first] : [bold, md.h3, i === 0 && md.first]]}
+          enums={false}
+        />,
+      )
     else blocks.push(<RichText key={i} text={line.trimStart()} style={[style, indent]} enums={false} />)
   })
   return <View style={md.col}>{blocks}</View>
@@ -156,4 +165,7 @@ const md = StyleSheet.create({
   item: { flexDirection: 'row', gap: 6 },
   mark: { minWidth: 14 },
   itemText: { flex: 1 },
+  h2: { ...font.semibold, fontSize: size.title + 2, lineHeight: Math.round((size.title + 2) * 1.4), color: colors.tx, marginTop: 12 },
+  h3: { color: colors.tx, marginTop: 6 },
+  first: { marginTop: 0 },
 })

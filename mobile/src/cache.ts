@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 export type Cached<T> = { data: T; fetchedAt: string }
 
 // 响应结构变了（比如 /today 加了 schedule、drafts、needs_you.projects，Record 加 attachments、card_id，Plan 加 revises，needs_you 加 feedback，Record 加 feedback_id，/today 加 overdue、days_until，Source 加 health）就把版本号加一：旧缓存不再读取，启动时清掉
-const CACHE_VERSION = 12
+const CACHE_VERSION = 13
 const PREFIX = `mojito.cache.v${CACHE_VERSION}:`
 const OLD_PREFIX = /^mojito\.cache(\.v\d+)?:/
 

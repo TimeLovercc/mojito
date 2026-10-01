@@ -88,6 +88,10 @@ shrink(square, 1024).convert("RGB").save(assets / "icon.png")
 # adaptive icon: 108 dp canvas, launchers show a 66 dp safe circle (radius 0.306 of the canvas); keep a margin
 place(clear(1024), mark, in_circle(0.28, mark)).save(assets / "android-icon-foreground.png")
 place(clear(1024), mono, in_circle(0.28, mono)).save(assets / "android-icon-monochrome.png")
+# notification icon (status bar, 24 dp): Android uses only the alpha; white mark, longest side 20 of 24 dp
+white = Image.new("RGBA", mono.size, (255, 255, 255, 0))
+white.putalpha(mono.getchannel("A"))
+place(clear(1024), white, 20 / 24).save(assets / "notification-icon.png")
 place(clear(1024), mark, 0.62).save(assets / "splash-icon.png")
 shrink(place(clear(1024), mark, 0.96), 48).save(assets / "favicon.png")
 badge = place(background("circle", 512), mark, in_circle(0.42, mark))

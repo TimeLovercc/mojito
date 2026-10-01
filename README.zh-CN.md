@@ -9,7 +9,7 @@
 <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
-<p align="center"><a href="README.md">English</a> · <a href="docs/SETUP.md">部署指南（英文）</a> · <a href="docs/self-rebuild-loop.md">回路怎么工作（英文）</a> · <a href="SECURITY.md">安全说明（英文）</a></p>
+<p align="center"><a href="https://zhimeng.page/mojito/">在线试玩</a> · <a href="README.md">English</a> · <a href="docs/SETUP.md">部署指南（英文）</a> · <a href="docs/self-rebuild-loop.md">回路怎么工作（英文）</a> · <a href="SECURITY.md">安全说明（英文）</a></p>
 
 **Mojito 是一个会进化的 app：它会照你的意思改写自己。** 在对话里说你想要什么，你自己 Mac 上的 Claude Code agent 就会改代码，把更新发到你的手机、Mac 和网页版。装好时，它是一个你自己托管的每日计划 app：今天页、计划、笔记、信息流和对话。
 
@@ -17,25 +17,21 @@
   <a href="https://youtu.be/gMkHYQJ1r8Q"><img src="docs/media/mojito.gif" width="100%" alt="11 秒动图演示：大多数 app 是为千万人造的机器；Mojito 只留一层薄薄的 app，核心是你 Mac 上的 Claude Code，它能读你的邮件、日历和文件。你在对话里提，agent 重做 app，卡片上的下一步就变了。最后是 Mojito 的图标：本地的、会进化的云端个人 AI 替代品。"></a>
 </p>
 <p align="center"><sub>11 秒循环动图，界面为演示数据重现。<a href="https://youtu.be/gMkHYQJ1r8Q">看 25 秒带声音的完整视频</a>（部分画面由 AI 生成）。如果你喜欢这个方向，点个 star 能让更多人看到它。</sub></p>
-<p align="center"><a href="https://timelovercc.github.io/mojito/"><b>在线试玩</b></a>：带示例数据的完整 app，整个跑在你的浏览器里。不用注册，也没有服务器；刷新就重置。</p>
+<p align="center"><a href="https://zhimeng.page/mojito/"><b>在线试玩</b></a>：带示例数据的完整 app，整个跑在你的浏览器里。不用注册，也没有服务器；刷新就重置。</p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/hero-light.png">
-    <img src="docs/media/hero-light.png" width="100%" alt="Mojito 同时开在 Mac 和 iPhone 上。手机的对话里，你让 Mojito 把下一步放到最上面、加粗，Mojito 回复说已经把改动转给了维护会话。一条标题为 'Feedback'（反馈）的推送写着 'Fixed: Put the next step on top, in bold.'。Mac 窗口标着 'Desktop design preview'，是下一版桌面界面的设计稿，代码还没进本仓库；图里今天页每张重点卡片都以加粗的下一步开头。手机是 app 的真实截图（示例数据），对话里那一问一答是为这张图写的；推送横幅按 hub 实际发出的内容绘制。">
+    <img src="docs/media/hero-light.png" width="42%" alt="Mojito 同时开在 Mac 和 iPhone 上。手机的对话里，你让 Mojito 把下一步放到最上面、加粗，Mojito 回复说已经把改动转给了维护会话。一条标题为 'Feedback'（反馈）的推送写着 'Fixed: Put the next step on top, in bold.'。Mac 窗口标着 'Desktop design preview'，是下一版桌面界面的设计稿，代码还没进本仓库；图里今天页每张重点卡片都以加粗的下一步开头。手机是 app 的真实截图（示例数据），对话里那一问一答是为这张图写的；推送横幅按 hub 实际发出的内容绘制。">
   </picture>
-</p>
-<p align="center"><sub>在对话里提，推送告诉你上线了，app 就变了。左边的 Mac 窗口是桌面版设计稿（Desktop design preview），也就是下一版桌面界面，代码还没进本仓库。右边手机是演示副本的真实截图，示例数据；对话里那一问一答是为这组图写的，推送横幅按 hub 实际发出的内容绘制，"下一步在上、加粗"是手工加的改动。</sub></p>
-
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-preview-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/desktop-preview-light.png">
-    <img src="docs/media/desktop-preview-light.png" width="100%" alt="设计稿：整个 Mac 桌面，后面是今天窗口，前面是对话窗口，菜单栏面板展开着。">
+    <img src="docs/media/desktop-preview-light.png" width="56%" alt="设计稿：整个 Mac 桌面，后面是今天窗口，前面是对话窗口，菜单栏面板展开着。">
   </picture>
 </p>
-<p align="center"><sub>桌面版设计稿（Desktop design preview）：重设计进行中，代码还没进本仓库。示例数据。</sub></p>
+<p align="center"><sub>左：在对话里提，推送告诉你上线了，app 就变了。右：下一版设计里的整个 Mac 桌面，有今天页、对话和菜单栏面板。两张图里的 Mac 画面都是桌面版设计稿（Desktop design preview），也就是下一版桌面界面，代码还没进本仓库。手机是演示副本的真实截图，示例数据；对话里那一问一答是为这组图写的，推送横幅按 hub 实际发出的内容绘制，"下一步在上、加粗"是手工加的改动。</sub></p>
 
 > **实验性 / alpha。** Mojito 是围着一个人的日常长出来的单用户 app，代码大多由 Claude Code 会话按 `CLAUDE.md`、`docs/design.md` 和 `docs/api.md` 里的规则写成。会有毛刺，会有不兼容的改动，部署步骤也默认你会自己管服务器。
 
@@ -98,27 +94,20 @@ Mojito 按三条原则来做：
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-today-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/desktop-today-light.png">
-    <img src="docs/media/desktop-today-light.png" width="100%" alt="Mojito 下一版桌面界面的设计稿，标着 'Desktop design preview'：今天窗口，衬线大字写着 'Good morning'。左栏是重点卡片，每张写着事项和蓝色的下一步，下面是逾期和等你拍板；右栏是今天的日程、夜里和被忘了。">
+    <img src="docs/media/desktop-today-light.png" width="49%" alt="Mojito 下一版桌面界面的设计稿，标着 'Desktop design preview'：今天窗口，衬线大字写着 'Good morning'。左栏是重点卡片，每张写着事项和蓝色的下一步，下面是逾期和等你拍板；右栏是今天的日程、夜里和被忘了。">
   </picture>
-</p>
-<p align="center"><sub>桌面版设计稿（Desktop design preview）：下一版桌面界面里的今天页，代码还没进本仓库。示例数据。</sub></p>
-
-<details>
-<summary>更多桌面版设计稿：对话、信息流、菜单栏面板</summary>
-<br>
-<p align="center"><img src="docs/media/desktop-chat-dark.png" width="100%" alt="设计稿，深色：整页的对话。Mojito 的回复不套气泡，你的消息是灰色气泡。里面有一条加进日历的日程、晨报、今天的安排，还有你说的 'Put the next step on top, in bold.'（把下一步放到最上面，加粗），Mojito 把它转给了维护会话。"></p>
-<p align="center"><sub>对话。最下面那条请求，和首图里是同一段演示对话。</sub></p>
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-feed-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/desktop-feed-light.png">
-    <img src="docs/media/desktop-feed-light.png" width="100%" alt="设计稿：信息流。左边是卡片列表（论文、一个会话发来的崩溃报告、每日邮件摘要），中间有一条'上次读到这里'的分隔线；右边的阅读区打开了选中的论文，有 Original（原文）和 Ask（问问）两个按钮。">
+    <img src="docs/media/desktop-feed-light.png" width="49%" alt="设计稿：信息流。左边是卡片列表（论文、一个会话发来的崩溃报告、每日邮件摘要），中间有一条'上次读到这里'的分隔线；右边的阅读区打开了选中的论文，有 Original（原文）和 Ask（问问）两个按钮。">
   </picture>
 </p>
-<p align="center"><sub>信息流：左边是列表，右边阅读选中的卡片。</sub></p>
-<p align="center"><img src="docs/media/desktop-menubar-light.png" width="440" alt="设计稿：Mac 屏幕右上角。菜单栏上显示下一件事 'Find a used pr… · 09:00'；它的面板展开着，里面是这件事和它的下一步、接下来的两件事，以及两件等你拍板的事。"></p>
-<p align="center"><sub>菜单栏面板。</sub></p>
-</details>
+<p align="center"><sub>桌面版设计稿（Desktop design preview），代码还没进本仓库，示例数据。左：下一版桌面界面里的今天页。右：信息流，左边是列表，右边阅读选中的卡片。</sub></p>
+<p align="center">
+  <img src="docs/media/desktop-chat-dark.png" width="52%" alt="设计稿，深色：整页的对话。Mojito 的回复不套气泡，你的消息是灰色气泡。里面有一条加进日历的日程、晨报、今天的安排，还有你说的 'Put the next step on top, in bold.'（把下一步放到最上面，加粗），Mojito 把它转给了维护会话。">
+  <img src="docs/media/desktop-menubar-light.png" width="46%" alt="设计稿：Mac 屏幕右上角。菜单栏上显示下一件事 'Find a used pr… · 09:00'；它的面板展开着，里面是这件事和它的下一步、接下来的两件事，以及两件等你拍板的事。">
+</p>
+<p align="center"><sub>左：对话，最下面那条请求和首图里是同一段演示对话。右：菜单栏面板。</sub></p>
 
 ## 它是什么
 
@@ -127,7 +116,7 @@ Mojito 按三条原则来做：
 - **今天**页：列出该推进的几件事，每件都写着下一小步；
 - **两周计划**：Claude 起草，你来批准；
 - **笔记**：由 Claude 整理成事项、归到项目；
-- **信息流**：按你的口味挑的论文和邮件；
+- **信息流**：整理好的报告：每日 AI 简报、实验室新动态即时报，还有值得看的邮件；
 - **对话**：里面的 agent 能改上面任何一样，每次改动都能撤销。
 
 这只是起点。真正值得带走的，是 app 外面那个回路。哪里用着不顺手，就在对话里说（"字太小了""把明天第一件事放到小组件上"）。你自己电脑上的 Claude Code 会话会接过去，判断怎么改，在你的私有副本里改代码，确认能构建，再发布到网页版、手机、Mac 或服务器，最后告诉你改了什么。界面和文案（包括提示词措辞）的小修小改直接上线；更大的改动，要等你在 app 里点**同意**。这个判断目前由维护会话按文档规则做出，**代码里还没有强制**（见[安全与隐私](#安全与隐私)）。
@@ -193,7 +182,7 @@ sequenceDiagram
 - **计划**：近期目标和两周计划。一期结束时，Claude 起草复盘和下一期计划；上一期没复盘，新一期就不开始。
 - **笔记**：文字或照片随手记。Claude 会把每条整理成事项、归到项目，或者回头问你是什么意思。每个结果都能撤销。
 - **对话**：问 app 里的任何事，或者一句话改事项、目标、计划、设置、订阅和日程，每次改动都能撤销。对外的消息（邮件、私信）只起草，由你自己发。需要你电脑上数据的问题（本地 git 仓库、邮件）会转给 worker，结果以推送回来。
-- **信息流**：一张张卡片，有按你的口味挑出的 arXiv 和 Hugging Face 新论文，每天一张"值得看的邮件"（Gmail 只读，可选），还有任何 Claude Code 会话用 `mojito-card` 命令发来的结果。**订阅**页列出每个来源的时间、上次结果、开关和**现在跑**。
+- **信息流**：给你整理好的报告，不是原始帖子。每天一份 AI 简报：新模型、按你的口味从 arXiv 和 Hugging Face 挑的论文、开源项目、行业新闻、趋势，以及你关注的每家实验室一行，每条都链到具体出处。关注的实验室有新发布、开源或重要报告时，马上推一张"新动态"（传闻会标成传闻）。另外每天一张"值得看的邮件"（Gmail 只读，可选），还有任何 Claude Code 会话用 `mojito-card` 命令发来的结果。**订阅**页列出每个来源的时间、上次结果、开关和**现在跑**。
 - **项目**：每个项目一张卡，写着未完成的事项、最近动态和 Claude 写的一句话现状。发现项目要用可选的 Orca 集成。
 - **每日节奏**：早上一份简报，晚上问一句"今天推进了什么？"，每周一份总结，每两周一次复盘。
 - **系统**：每个数据源、任务和授权的健康状况集中在一处，还有 7 天使用情况和你的反馈讨论。
@@ -299,7 +288,7 @@ npm run web                                              # 终端 2：app 在 ht
 - **维护会话权限很大**：它能改代码、部署到你的服务器和设备上，要当成 root 看待。一个改动是直接上线还是先问你，**由维护会话判断，代码里还没有强制**。hub 接受 maintainer 令牌发来的任何反馈状态变更。
 - **computer use 用的是你的身份**：你让 agent 加上的功能，凡是通过你 Mac 上已登录的 app 和网站去做的，用的都是你的登录态。先看看它做了什么，再放心用。有些网站（比如小红书）限制自动化访问：用你的账号自动操作网站，可能违反该网站的条款，导致账号限流或被封。加之前先看清楚。
 - **只在私有仓库里跑回路**：不要在公开 fork 上开。它会把你的反馈写进提交，而你的反馈是私事。
-- **不可信的文字会进到 agent 那里**：邮件、日历邀请、论文、截图都可能夹带提示注入。agent 和 worker 调模型时不给任何工具（校验后由脚本执行），对外消息只起草，agent 的每次改动都能撤销。即便如此，接入邮箱之前请先读 [SECURITY.md](SECURITY.md)（英文）。
+- **不可信的文字会进到 agent 那里**：邮件、日历邀请、论文、新闻、截图都可能夹带提示注入。agent 和 worker 调模型时不给任何工具（校验后由脚本执行），对外消息只起草，agent 的每次改动都能撤销。即便如此，接入邮箱之前请先读 [SECURITY.md](SECURITY.md)（英文）。
 - **hub 别暴露在公网**：用 `tailscale serve` 只在 tailnet 内访问；每台设备一个 app 令牌，设备丢了就吊销它的令牌。
 
 ## 局限与路线图

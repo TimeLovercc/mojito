@@ -9,7 +9,7 @@
 <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
-<p align="center"><a href="README.zh-CN.md">中文说明</a> · <a href="docs/SETUP.md">Setup</a> · <a href="docs/self-rebuild-loop.md">How the loop works</a> · <a href="SECURITY.md">Security</a></p>
+<p align="center"><a href="https://zhimeng.page/mojito/">Live demo</a> · <a href="README.zh-CN.md">中文说明</a> · <a href="docs/SETUP.md">Setup</a> · <a href="docs/self-rebuild-loop.md">How the loop works</a> · <a href="SECURITY.md">Security</a></p>
 
 **Mojito is an evolving app — it rewrites itself for you.** Tell it in chat what you want, and a Claude Code agent on your own Mac changes the code and ships the update to your phone, Mac and web app. Out of the box it's a daily planner you host yourself: Today, plans, notes, a feed and a chat.
 
@@ -17,25 +17,21 @@
   <a href="https://youtu.be/gMkHYQJ1r8Q"><img src="docs/media/mojito.gif" width="100%" alt="An 11-second animated demo. Most apps are a machine built for millions; Mojito keeps a thin app with Claude Code on your Mac at its core, reading your mail, calendar and files. You ask in chat, the agent rebuilds the app, and a card's next step changes. It ends on the Mojito logo: the local, evolving alternative to cloud personal AI."></a>
 </p>
 <p align="center"><sub>An 11-second loop with recreated screens and demo data. <a href="https://youtu.be/gMkHYQJ1r8Q">Watch the 25-second video with sound</a> (it includes some AI-generated footage). If you like where this is going, a star helps other people find it.</sub></p>
-<p align="center"><a href="https://timelovercc.github.io/mojito/"><b>Try the live demo</b></a>: the app with sample data, running entirely in your browser. No account and no server; it resets when you reload.</p>
+<p align="center"><a href="https://zhimeng.page/mojito/"><b>Try the live demo</b></a>: the app with sample data, running entirely in your browser. No account and no server; it resets when you reload.</p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/hero-light.png">
-    <img src="docs/media/hero-light.png" width="100%" alt="Mojito on a Mac and an iPhone. In the phone's chat, you ask Mojito to put the next step on top, in bold, and Mojito replies that it passed the change to the maintainer. A push titled 'Feedback' reads 'Fixed: Put the next step on top, in bold.' The Mac window, labeled 'Desktop design preview', is a design for the next desktop interface, whose code isn't in this repo yet; in it, each card in Today's Focus list leads with its next step in bold. The phone is a real capture of the app with sample data, and the chat exchange was written for this picture; the push banner is drawn to match what the hub sends.">
+    <img src="docs/media/hero-light.png" width="42%" alt="Mojito on a Mac and an iPhone. In the phone's chat, you ask Mojito to put the next step on top, in bold, and Mojito replies that it passed the change to the maintainer. A push titled 'Feedback' reads 'Fixed: Put the next step on top, in bold.' The Mac window, labeled 'Desktop design preview', is a design for the next desktop interface, whose code isn't in this repo yet; in it, each card in Today's Focus list leads with its next step in bold. The phone is a real capture of the app with sample data, and the chat exchange was written for this picture; the push banner is drawn to match what the hub sends.">
   </picture>
-</p>
-<p align="center"><sub>Ask in chat; a push tells you it shipped; the app has changed. The Mac window is a desktop design preview: the design for the next desktop interface, whose code isn't in this repo yet. The phone is a real capture of a demo copy with sample data. The chat exchange was written for these pictures, the push banner is drawn to match what the hub sends, and the bold next step was added by hand.</sub></p>
-
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-preview-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/desktop-preview-light.png">
-    <img src="docs/media/desktop-preview-light.png" width="100%" alt="Design preview: a whole Mac desktop, with the Today window behind, the Chat window in front and the menu-bar panel open.">
+    <img src="docs/media/desktop-preview-light.png" width="56%" alt="Design preview: a whole Mac desktop, with the Today window behind, the Chat window in front and the menu-bar panel open.">
   </picture>
 </p>
-<p align="center"><sub>Desktop design preview: the redesign in progress; the code isn't in this repo yet. Sample data.</sub></p>
+<p align="center"><sub>Left: ask in chat; a push tells you it shipped; the app has changed. Right: the whole Mac desktop in the next design, with Today, Chat and the menu-bar panel. Both Mac screens are desktop design previews: the next desktop interface, whose code isn't in this repo yet. The phone is a real capture of a demo copy with sample data. The chat exchange was written for these pictures, the push banner is drawn to match what the hub sends, and the bold next step was added by hand.</sub></p>
 
 > **Experimental / alpha.** Mojito is a single-user app, built around one person's day. Most of its code was written by Claude Code sessions working under the rules in `CLAUDE.md`, `docs/design.md` and `docs/api.md`. Expect rough edges, breaking changes and setup steps that assume you're comfortable running your own server.
 
@@ -98,27 +94,20 @@ The Mac app in this repo already has the sidebar layout from the "stretched phon
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-today-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/desktop-today-light.png">
-    <img src="docs/media/desktop-today-light.png" width="100%" alt="Design preview of Mojito's next desktop interface, labeled 'Desktop design preview': the Today window, with a serif 'Good morning'. On the left, Focus cards each show a task and its next step in blue, followed by Overdue and Needs your decision. On the right, today's calendar, Overnight and Gone quiet.">
+    <img src="docs/media/desktop-today-light.png" width="49%" alt="Design preview of Mojito's next desktop interface, labeled 'Desktop design preview': the Today window, with a serif 'Good morning'. On the left, Focus cards each show a task and its next step in blue, followed by Overdue and Needs your decision. On the right, today's calendar, Overnight and Gone quiet.">
   </picture>
-</p>
-<p align="center"><sub>Desktop design preview: Today in the next desktop design. Its code isn't in this repo yet. Sample data.</sub></p>
-
-<details>
-<summary>More of the desktop design preview: Chat, Feed, the menu-bar panel</summary>
-<br>
-<p align="center"><img src="docs/media/desktop-chat-dark.png" width="100%" alt="Design preview, dark theme: Chat as a full page. Mojito's replies have no bubble; your messages sit in grey bubbles. The thread shows an event added to the calendar, the morning brief, a plan for today, and the request 'Put the next step on top, in bold.', which Mojito passed to the maintainer."></p>
-<p align="center"><sub>Chat. The request at the bottom is the same demo exchange as in the picture at the top.</sub></p>
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-feed-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/media/desktop-feed-light.png">
-    <img src="docs/media/desktop-feed-light.png" width="100%" alt="Design preview: the Feed. On the left, a list of cards (papers, a crash report from a session, the daily mail digest) with a 'You left off here' marker; on the right, the selected paper open in a reader, with Original and Ask buttons.">
+    <img src="docs/media/desktop-feed-light.png" width="49%" alt="Design preview: the Feed. On the left, a list of cards (papers, a crash report from a session, the daily mail digest) with a 'You left off here' marker; on the right, the selected paper open in a reader, with Original and Ask buttons.">
   </picture>
 </p>
-<p align="center"><sub>Feed: the list, and the selected card in a reader.</sub></p>
-<p align="center"><img src="docs/media/desktop-menubar-light.png" width="440" alt="Design preview: the top-right corner of the Mac screen. The menu bar shows the next task, 'Find a used pr… · 09:00'. Its panel is open, with that task and its next step, the next two tasks, and two items under Needs your decision."></p>
-<p align="center"><sub>The menu-bar panel.</sub></p>
-</details>
+<p align="center"><sub>Desktop design preview (its code isn't in this repo yet; sample data). Left: Today in the next desktop design. Right: the Feed, with the list and the selected card in a reader.</sub></p>
+<p align="center">
+  <img src="docs/media/desktop-chat-dark.png" width="52%" alt="Design preview, dark theme: Chat as a full page. Mojito's replies have no bubble; your messages sit in grey bubbles. The thread shows an event added to the calendar, the morning brief, a plan for today, and the request 'Put the next step on top, in bold.', which Mojito passed to the maintainer.">
+  <img src="docs/media/desktop-menubar-light.png" width="46%" alt="Design preview: the top-right corner of the Mac screen. The menu bar shows the next task, 'Find a used pr… · 09:00'. Its panel is open, with that task and its next step, the next two tasks, and two items under Needs your decision.">
+</p>
+<p align="center"><sub>Left: Chat; the request at the bottom is the same demo exchange as in the pictures at the top. Right: the menu-bar panel.</sub></p>
 
 ## What it is
 
@@ -127,7 +116,7 @@ On day one, Mojito is a daily planner you host yourself:
 - a **Today** page with the few things to move forward and the next small step for each,
 - **two-week plans** that Claude drafts and you approve,
 - **notes** that Claude files into tasks and projects,
-- a **feed** of papers and mail picked for your taste,
+- a **feed** of reports: a daily AI brief, lab news as it happens, and the mail worth reading,
 - a **chat** with an agent that can change any of it, with an Undo for every change.
 
 That's just where it starts. The part worth taking home is the loop around the app. When something bugs you, say so in chat ("the font is too small", "put tomorrow's first task on the widget"). A Claude Code session on your own computer picks it up, decides how to fix it, edits your private copy of the code, checks that it builds, ships it to your web app, phone, Mac or server, and tells you what changed. Small UI and copy fixes (prompt wording included) ship on their own. Anything bigger waits until you tap **Approve** in the app. Today that call is made by the maintainer following the rules in the docs; it is **not yet enforced in code** (see [Security](#security--privacy)).
@@ -193,7 +182,7 @@ The full description, including what the hub checks today and what it doesn't, i
 - **Plan.** Near-term goals and two-week plans. At the end of a plan, Claude drafts the review and the next plan; nothing new starts until you've reviewed the last one.
 - **Notes.** Jot text or photos. Claude turns each note into a task, files it under a project, or asks you what you meant. Every result can be undone.
 - **Chat.** Ask about anything in the app, or change tasks, goals, plans, settings, subscriptions and calendar events in one sentence, each with Undo. Outgoing messages (email, DMs) are only drafted for you to send yourself. Questions that need your computer (local git repos, email) go to the worker and come back as a push.
-- **Feed.** Cards: new arXiv and Hugging Face papers picked for your taste, a daily "mail worth reading" digest (Gmail, read-only, optional), and results that any Claude Code session posts with the `mojito-card` command. **Subscriptions** lists each source with its time, last result, an on/off switch and **Run now**.
+- **Feed.** Reports rather than raw posts. A daily AI brief: new models, papers picked for your taste from arXiv and Hugging Face, open source, industry news, trends and a line per lab you follow, every item linked to its outlet. A news alert, pushed right away, when a lab you follow ships, open-sources or publishes something that matters (rumors are marked as rumors). Also a daily "mail worth reading" digest (Gmail, read-only, optional), and results that any Claude Code session posts with the `mojito-card` command. **Subscriptions** lists each source with its time, last result, an on/off switch and **Run now**.
 - **Projects.** A card per project with open tasks, recent activity and a one-line status written by Claude. Project discovery uses the optional Orca integration.
 - **Daily rhythm.** A morning brief, an evening "What moved forward today?", a weekly summary and a two-week review.
 - **System.** The health of every source, job and authorization in one place, a 7-day usage view, and your feedback threads.
@@ -299,7 +288,7 @@ Details, the permission setup and the cost: **[docs/self-rebuild-loop.md](docs/s
 - **The maintainer is powerful.** It can change code and deploy to your server and devices, so treat it like root. Whether a change ships on its own or asks you first is **judged by the maintainer; not yet enforced in code**. The hub accepts any feedback status change from the maintainer token.
 - **Computer use runs as you.** Anything you ask the agent to add that works through apps and sites you're signed in to on your Mac acts with your logins. Review what it built before you rely on it. Some sites, RedNote among them, restrict automated access: automating a site through your account can break its terms and get the account limited or banned. Check before you add one.
 - **Run the loop only in a private repository.** Never turn it on in a public fork: it commits your feedback, and your feedback is personal.
-- **Untrusted text reaches the agents.** Emails, calendar invites, papers and screenshots can carry prompt injections. The agent's and worker's model calls get no tools (scripts carry out the validated output), outgoing messages are only drafted, and every agent change comes with Undo. Still, read [SECURITY.md](SECURITY.md) before you connect your mail.
+- **Untrusted text reaches the agents.** Emails, calendar invites, papers, news articles and screenshots can carry prompt injections. The agent's and worker's model calls get no tools (scripts carry out the validated output), outgoing messages are only drafted, and every agent change comes with Undo. Still, read [SECURITY.md](SECURITY.md) before you connect your mail.
 - **Keep the hub private.** Serve it on your tailnet (`tailscale serve`), give each device its own app token, and revoke a token when you lose the device.
 
 ## Limitations & roadmap

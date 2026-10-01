@@ -43,11 +43,12 @@ Owner = Literal["auto", "me", "auto_then_me"]
 Author = Literal["system", "me"]
 RecordKind = Literal["log", "note", "alert", "decision", "chat", "feedback"]
 Tier = Literal["interrupt", "digest", "quiet", "log"]
-RecordCategory = Literal["brief", "chat", "alert", "feedback", "release", "jobs"]
-# draft_plan is retired (replaced by draft_review) but stays readable for old rows.
+RecordCategory = Literal["brief", "chat", "alert", "feedback", "release", "jobs", "news"]
+# draft_plan and feed_arxiv/feed_papers are retired (replaced by draft_review, feed_brief) but stay readable for old rows.
 JobKind = Literal["refresh", "process_note", "draft_plan", "chat_reply", "morning_brief",
                   "evening_prompt", "undo", "draft_review", "weekly_summary", "sync_projects",
-                  "feed_arxiv", "feed_papers", "feed_weekly", "feed_mail", "calendar_delete"]  # feed_arxiv: renamed to feed_papers
+                  "feed_arxiv", "feed_papers", "feed_weekly", "feed_mail", "calendar_delete",
+                  "feed_brief", "feed_watch"]
 ProjectStatus = Literal["proposed", "active", "paused", "done", "declined"]
 
 # api.md 使用记录: the two name tables. unused in /usage/summary = names here with count 0.
@@ -63,7 +64,7 @@ USAGE_ACTIONS = (
     "feedback_decision", "note_hide", "push_enable", "push_disable",
 )
 FeedbackStatus = Literal["open", "triaged", "fixing", "awaiting_approval", "shipped", "declined"]
-AuthName = Literal["google-calendar-write", "gmail-read", "claude-server", "claude-mac"]
+AuthName = Literal["google-calendar-write", "gmail-read", "claude-server", "claude-mac", "x"]
 Runner = Literal["server", "mac"]
 DraftStatus = Literal["pending", "dismissed", "sent_by_me"]
 Clock = Annotated[str, StringConstraints(pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")]
@@ -135,6 +136,7 @@ class Record(BaseModel):
     feedback_id: str | None  # the feedback a feedback record or a maintainer chat message belongs to
     hidden_at: datetime | None  # a note the user deleted; left out of lists unless asked for
     category: RecordCategory | None  # notification category of pushed records; null for tier log
+    smoke: bool  # deploy smoke check (api.md 冒烟标记): never pushed, left out of lists and metrics
 
 
 SourceHealth = Literal["ok", "warn", "error"]
@@ -201,7 +203,7 @@ class Snapshot(Body):
     commits: Annotated[list[SnapshotCommit], Field(max_length=20)]
 
 
-CardKind = Literal["paper", "idea", "report", "other", "mail", "post"]
+CardKind = Literal["paper", "idea", "report", "other", "mail", "post", "brief", "alert"]
 CardStatus = Literal["new", "saved", "dismissed"]
 
 
@@ -229,6 +231,7 @@ class Card(BaseModel):
     project_id: str | None
     title: str
     summary: str
+    body: str | None  # Markdown full text of report cards (brief / alert)
     link: str | None
     dedupe_key: str
     status: CardStatus
@@ -266,6 +269,7 @@ class Event(BaseModel):
     all_day: bool
     title: str
     location: str | None
+    read_only: bool  # from a subscribed calendar (api.md 订阅日历): cannot be deleted here
 
 
 class Notify(Body):
@@ -276,6 +280,7 @@ class Notify(Body):
     feedback: bool
     release: bool
     jobs: bool
+    news: bool
 
 
 Language = Literal["zh", "en"]
@@ -458,6 +463,7 @@ class RecordIn(Body):
     project_id: str | None
     needs_processing: bool
     attachment_ids: Annotated[list[str], Field(max_length=4)] = []  # added in 8.6; omitted = no images
+    smoke: bool = False  # deploy smoke check; optional
 
 
 class DecisionIn(Body):
@@ -510,6 +516,7 @@ class ChatIn(Body):
     project_id: str | None
     attachment_ids: Annotated[list[str], Field(max_length=4)]
     card_id: str | None
+    smoke: bool = False  # deploy smoke check; optional
 
 
 class JobCreateIn(Body):
@@ -573,6 +580,7 @@ class CardIn(Body):
     link: Annotated[str, StringConstraints(pattern=r"^https?://")] | None
     dedupe_key: str
     image_attachment_id: str | None = None  # added for post covers; optional for earlier senders
+    body: Annotated[str, StringConstraints(max_length=12000)] | None = None  # added for report cards; optional
 
 
 class CardStatusIn(Body):
@@ -650,6 +658,7 @@ class EventIn(Body):
     evidence: str | None
     undo: dict[str, Any] | None = None  # added in v2b; optional so v2a senders keep working
     category: RecordCategory | None = None  # added in 8.6; omitted = inferred by the hub
+    smoke: bool = False  # deploy smoke check; optional
 
 
 class FeedbackContext(Body):
@@ -715,7 +724,30 @@ class Pulse(BaseModel):
     counts: PulseCounts
 
 
-SubscriptionKind = Literal["papers", "mail"]
+SubscriptionKind = Literal["brief", "watch", "mail"]
+
+
+class SubscriptionConfig(BaseModel):
+    """`config` of one subscription kind (api.md 信息流改成报告); a wrong or extra key is a 422,
+    never dropped."""
+    model_config = ConfigDict(extra="forbid")
+
+
+class BriefConfig(SubscriptionConfig):
+    pass
+
+
+class WatchConfig(SubscriptionConfig):
+    labs: list[str]
+    every_hours: Annotated[int, Field(ge=1, le=24)]  # runs start again at `at` every day
+
+
+class MailConfig(SubscriptionConfig):
+    pass
+
+
+SUBSCRIPTION_CONFIG: dict[str, type[SubscriptionConfig]] = {"brief": BriefConfig, "watch": WatchConfig,
+                                                             "mail": MailConfig}
 
 
 class Subscription(BaseModel):

@@ -2,16 +2,18 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { ExternalLink, MessageCircle } from 'lucide-react-native'
 import type { Card, Project } from '../api/types'
-import { when } from '../time'
+import { todayYmd, when, ymdOf } from '../time'
 import { useErrorToast } from '../toast'
 import { colors, font, size } from '../theme'
 import { trackAction } from '../usage'
 import { AuthImage } from './AuthImage'
 import { Markdown, plainText, RichText } from './RichText'
-import { Card as Box } from './ui'
+import { Card as Box, Tag } from './ui'
 import { t } from '../i18n'
 
 export const kindLabel: Record<Card['kind'], string> = {
+  brief: t('每日简报'),
+  alert: t('新动态'),
   paper: t('论文'),
   idea: t('想法'),
   report: t('报告'),
@@ -20,8 +22,10 @@ export const kindLabel: Record<Card['kind'], string> = {
   post: t('帖子'),
 }
 
-// origin：arxiv、hf-daily、author:<名>、session:<worktree 名>、gmail；其他来源原样显示
+// origin：brief、watch:<实验室>、arxiv、hf-daily、author:<名>、session:<worktree 名>、gmail；其他来源原样显示
 export function originLabel(origin: string): string {
+  if (origin === 'brief') return 'mojito'
+  if (origin.startsWith('watch:')) return origin.slice('watch:'.length)
   if (origin === 'arxiv') return 'arXiv'
   if (origin === 'hf-daily') return 'Hugging Face'
   if (origin.startsWith('author:')) return t('关注作者 {name}', { name: origin.slice('author:'.length) })
@@ -30,7 +34,18 @@ export function originLabel(origin: string): string {
   return origin
 }
 
-// 信息流的一张卡片：只有"原文""问问"两个动作（design.md 8.3）；full=true 时（卡片详情）摘要不截断
+// 报告卡（design.md 8.10）：列表里摘要只显示 3 行要点，点开看 body 全文
+export const isReport = (card: Card) => card.kind === 'brief' || card.kind === 'alert'
+
+// 当天的每日简报排在最上面，其余照时间倒序
+export function pinTodayBrief(cards: Card[]): Card[] {
+  const today = todayYmd()
+  const brief = cards.find((c) => c.kind === 'brief' && ymdOf(new Date(c.at)) === today)
+  if (brief === undefined) return cards
+  return [brief, ...cards.filter((c) => c.id !== brief.id)]
+}
+
+// 信息流的一张卡片：只有"原文""问问"两个动作（design.md 8.3）；full=true 时（卡片详情）摘要不截断，报告显示 body 全文
 export function CardView({ card, project, full }: { card: Card; project: Project | null; full: boolean }) {
   const router = useRouter()
   const showError = useErrorToast()
@@ -43,22 +58,27 @@ export function CardView({ card, project, full }: { card: Card; project: Project
 
   return (
     <Box style={styles.card} onPress={full ? undefined : () => router.push({ pathname: '/cards/[id]', params: { id: card.id } })}>
-      <Text style={styles.meta}>
-        {kindLabel[card.kind]} · {originLabel(card.origin)} · {when(card.at)}
-      </Text>
+      <View style={styles.metaRow}>
+        {card.kind === 'alert' ? <Tag label={t('新动态')} tone="b" /> : null}
+        <Text style={styles.meta}>
+          {card.kind === 'alert' ? originLabel(card.origin) : `${kindLabel[card.kind]} · ${originLabel(card.origin)}`} · {when(card.at)}
+        </Text>
+      </View>
       {card.image_attachment_id === null ? (
         <>
-          <Text style={styles.title}>{card.title}</Text>
-          {/* 每日邮件一封一行，行数就是封数，列表里也不截断 */}
-          {/* 详情按 Markdown 显示；列表里是去掉标记的纯文本（design.md 8.7） */}
-          {full ? (
+          <Text style={[styles.title, full && isReport(card) && styles.titleBig]}>{card.title}</Text>
+          {/* 每日邮件一封一行，行数就是封数，列表里也不截断；报告只显示 3 行要点 */}
+          {/* 详情按 Markdown 显示（报告显示 body 全文）；列表里是去掉标记的纯文本（design.md 8.7） */}
+          {full && card.body !== null ? (
+            <Markdown text={card.body} style={styles.body} />
+          ) : full ? (
             <Markdown text={card.summary} style={styles.summary} />
           ) : (
             <RichText
               text={plainText(card.summary)}
               style={styles.summary}
               enums={false}
-              numberOfLines={card.kind === 'mail' ? undefined : 5}
+              numberOfLines={card.kind === 'mail' ? undefined : isReport(card) ? 3 : 5}
             />
           )}
         </>
@@ -100,8 +120,12 @@ function Tool({ icon: Icon, label, onPress }: { icon: typeof ExternalLink; label
 
 const styles = StyleSheet.create({
   card: { paddingVertical: 12, paddingHorizontal: 13, gap: 6 },
-  meta: { ...font.regular, fontSize: size.small, color: colors.tx2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  meta: { ...font.regular, fontSize: size.small, color: colors.tx2, flexShrink: 1 },
   title: { ...font.semibold, fontSize: size.title, color: colors.tx },
+  titleBig: { fontSize: size.page, lineHeight: Math.round(size.page * 1.3) },
+  // 报告全文：正文字号、主文字色，行距放宽（design.md 8.10）
+  body: { ...font.regular, fontSize: size.body, lineHeight: Math.round(size.body * 1.6), color: colors.tx, userSelect: 'text' },
   summary: { ...font.regular, fontSize: size.secondary, color: colors.tx2 },
   post: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   postText: { flex: 1, gap: 6 },

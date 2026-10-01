@@ -10,9 +10,11 @@
 hub/deploy/deploy.sh main "<用户能感知的变化，没有就写：无可见变化>"
 ```
 
-说明必填，缺了就报错、不部署。部署成功后，它会用 `$MOJITO_SECRETS_DIR/cards.env` 里的令牌往 app 推一条通知：标题是"服务器已更新：<说明第一行>"，正文是其余各行（只有一行时，正文就用这一行）。说明要写给用户看：用中文，不写内部 id。
+说明必填，缺了就报错、不部署。部署成功（包括冒烟检查全部通过）后，它会用 `$MOJITO_SECRETS_DIR/cards.env` 里的令牌往 app 推一条通知：标题是"服务器已更新：<说明第一行>"，正文是其余各行（只有一行时，正文就用这一行）。说明要写给用户看：用中文，不写内部 id。
 
 它会把这个 ref 推到 `<服务器>:/srv/mojito.git`（分支 `deploy`），先把 `hub.db` 在线备份到 `/var/lib/mojito/backups/hub-<时间>-<旧提交>.db`，再把 `/opt/mojito` 重置到该提交，给 hub 和 agent 各做一次 `uv sync --frozen`，安装 `mojito-hub.service` 和 `agent/deploy/mojito-agent.service`，然后重启两个服务。最后确认无令牌访问 `/today` 返回 401，并且 agent 15 秒内没有重启过。可以传任何已提交的 ref 或 SHA。
+
+然后在服务器上跑冒烟检查 `hub/deploy/smoke.py`（约定见 `docs/api.md` 末节"部署冒烟检查"）：用 `tokens.json` 里的真实 app 令牌对 `http://127.0.0.1:8787` 依次走一行笔记 → 对话并等服务器 agent 回复（最多 180 秒）→ `GET /today` → `GET /cards` → 确认冒烟记录不出现在默认列表里、冒烟笔记没有产生 `process_note` 任务。请求都带 `smoke=true`，这些记录不推送、不整理、不计入统计。任何一步失败就打印步骤名、状态码和 `detail`（不打印令牌），以 exit 1 结束，不发"服务器已更新"推送；全部通过才推送，输出末尾逐步列出通过的步骤。只查 systemd 不够：服务一直显示"正常运行"时，核心路径也可能每次都失败（比如每条一行笔记都 422、每条对话回复都 403），而且要等用户自己发现。
 
 重启会打断正在跑的任务：被打断的任务停在 `running`，看门狗 30 分钟后才会放回队列，用户的对话就要等这么久。hub 重启的那几秒里，服务器上的 agent 和 Mac worker 调 hub 都会失败，所以 `deploy.sh` 会先等到任何 runner 上都没有 `running` 任务（最多等 2 分钟），然后停掉 agent，重启 hub，再启动 agent。等超时的话照样重启，并在输出里给出 WARNING；这时要去看 `GET /jobs?status=running`。
 
@@ -47,6 +49,7 @@ curl -s -H "Authorization: Bearer $APP_TOKEN" "$MOJITO_HUB_URL/jobs?status=runni
 | `/var/lib/mojito/tokens.json` | 令牌，mojito 600 |
 | `/var/lib/mojito/agent.env` | mojito-agent 的 EnvironmentFile（hub 地址、agent 令牌、claude 路径、OAuth 令牌、`UV_*`），root 600 |
 | `/var/lib/mojito/google-oauth.json` | Google 日历授权（你自己的桌面 OAuth 客户端，只有 calendar.events），agent 用，mojito 600。Gmail 授权永不上服务器 |
+| `/var/lib/mojito/ical-extra-urls` | 订阅日历 ICS 链接（每行一个，可为空），hub 每次拉日历都重读，mojito 600；源文件 `$MOJITO_SECRETS_DIR/ical-extra-urls` |
 | `/var/lib/mojito/fcm.json` | Firebase 服务账号，hub 用，mojito 600 |
 | `/var/lib/mojito/.local/bin/claude` | Claude Code（原生安装，mojito 用户） |
 | `/var/lib/mojito/hub.db` | SQLite |

@@ -17,6 +17,7 @@ export const AUTH_LABEL: Record<string, string> = {
   'gmail-read': t('Gmail（只读）'),
   'claude-server': t('Claude（服务器）'),
   'claude-mac': t('Claude（Mac）'),
+  x: 'X',
 }
 
 export type Problem = { text: string; bad: boolean }

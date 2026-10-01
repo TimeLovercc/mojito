@@ -143,9 +143,6 @@ class Hub:
     def auth_status(self) -> list[dict]:
         return self._request("GET", "/auth-status").json()["auth"]
 
-    def list_jobs(self, *, status: str) -> list[dict]:
-        return self._request("GET", "/jobs", params={"status": status}).json()["jobs"]
-
     def list_goals(self) -> list[dict]:
         return self._request("GET", "/goals").json()["goals"]
 
@@ -207,10 +204,11 @@ class Hub:
         return self._request("PUT", f"/items/{item_id}", json=fields).json()
 
     def post_event(self, *, kind: str, tier: str, item_id: str | None, project_id: str | None, title: str, body: str,
-                   evidence: str | None, undo: dict | None, category: str | None) -> dict:
+                   evidence: str | None, undo: dict | None, category: str | None, smoke: bool) -> dict:
         # repo_path is only for sources that know a repo but not a project (Orca Stop hook); the agent always sends null.
+        # smoke marks the reply to a deploy smoke-check message (api.md 部署冒烟检查): never pushed, hidden by default.
         payload = {"kind": kind, "tier": tier, "item_id": item_id, "project_id": project_id, "repo_path": None,
-                   "title": title, "body": body, "evidence": evidence, "undo": undo}
+                   "title": title, "body": body, "evidence": evidence, "undo": undo, "smoke": smoke}
         # category is optional in the contract: absent means the hub infers it (chat / jobs / ...); only briefs set it.
         if category is not None:
             payload["category"] = category

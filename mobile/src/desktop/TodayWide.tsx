@@ -380,7 +380,7 @@ function FeedbackAsk({ fb }: { fb: Feedback }) {
 }
 
 // 日程一行（44，有地点 56）：96 首列 mono 时间段（全天写"全天"并置顶）；标题 15 最多两行；地点 12 tx3；
-// 已结束整行 tx3；点开原地展开"删除"（design.md 8.5）
+// 已结束整行 tx3；点开原地展开"删除"（design.md 8.5），只读的订阅日程展开是一行说明
 function EventRowD({ event: e }: { event: CalEvent }) {
   const [open, setOpen] = useState(false)
   const { deleting, remove } = useDeleteEvent(e)
@@ -396,7 +396,9 @@ function EventRowD({ event: e }: { event: CalEvent }) {
         {e.location === null || e.location === '' ? null : <Text style={styles.evLoc}>{e.location}</Text>}
         {open ? (
           <View style={styles.evActs}>
-            {deleting ? (
+            {e.read_only ? (
+              <Text style={styles.evLoc}>{t('订阅的日历，请在原日历里改')}</Text>
+            ) : deleting ? (
               <Text style={styles.evLoc}>{t('删除中…')}</Text>
             ) : (
               <BtnD label={t('删除')} kind="ghost" size="sm" disabled={false} onPress={remove} />

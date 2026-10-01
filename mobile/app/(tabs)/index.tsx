@@ -198,8 +198,8 @@ function TodayPhone() {
   )
 }
 
-// 日程一行，点开原地展开"删除"（design.md 8.5：任何日程都能删，服务器 agent 真的从 Google 日历删掉，
-// 时间线留一条可撤销的记录）。删除任务跑完后重取今天页，这一行就消失了
+// 日程一行，点开原地展开"删除"（design.md 8.5：主日历的日程都能删，服务器 agent 真的从 Google 日历删掉，
+// 时间线留一条可撤销的记录）。删除任务跑完后重取今天页，这一行就消失了。订阅来的只读日程展开是一行说明，不能删
 function EventRow({ event: e }: { event: CalEvent }) {
   const [open, setOpen] = useState(false)
   const { deleting, remove } = useDeleteEvent(e)
@@ -217,7 +217,9 @@ function EventRow({ event: e }: { event: CalEvent }) {
       {open ? (
         <View style={styles.evActs}>
           <Text style={styles.evSub}>{e.all_day ? t('全天') : `${clock(e.start)} – ${clock(e.end)}`}</Text>
-          {deleting ? (
+          {e.read_only ? (
+            <Text style={styles.evSub}>{t('订阅的日历，请在原日历里改')}</Text>
+          ) : deleting ? (
             <Text style={styles.evSub}>{t('删除中…')}</Text>
           ) : (
             <Pressable accessibilityLabel={t('删除日程')} hitSlop={6} onPress={remove}>

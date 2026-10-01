@@ -162,6 +162,21 @@
       "evidence": null,
       "needs_processing": false,
       "feedback_id": null
+    },
+    {
+      "id": "r-demo-news",
+      "at": "2026-09-28T08:05:00+00:00",
+      "author": "system",
+      "source": "hub",
+      "kind": "log",
+      "tier": "digest",
+      "item_id": null,
+      "title": "News: [Confirmed] Apple publishes FastVLM, a vision-language model that runs on phones",
+      "body": "Official paper and code are public (Apple research)\nA new vision encoder answers much faster on high-resolution images\nWorth trying: one-line captions for crumb photos",
+      "evidence": "https://arxiv.org/abs/2412.13303",
+      "needs_processing": false,
+      "card_id": "c-demo-6",
+      "category": "news"
     }
   ],
   "plans": [
@@ -422,6 +437,7 @@
       "project_id": "p-loaflog",
       "title": "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications",
       "summary": "Lightweight convolutional networks for phones: depthwise separable convolutions cut the compute a lot for a small loss in accuracy.\nWhy it may interest you: Loaflog wants to score crumb photos on the phone itself; this is the usual starting point.\nRelated project: Loaflog",
+      "body": null,
       "link": "https://arxiv.org/abs/1704.04861",
       "dedupe_key": "1704.04861",
       "status": "saved",
@@ -437,6 +453,7 @@
       "project_id": "p-loaflog",
       "title": "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks",
       "summary": "Scales network depth, width and input resolution together, getting better accuracy with fewer parameters.\nWhy it may interest you: If MobileNet is not accurate enough, this is the next family to try.\nRelated project: Loaflog",
+      "body": null,
       "link": "https://arxiv.org/abs/1905.11946",
       "dedupe_key": "1905.11946",
       "status": "new",
@@ -452,6 +469,7 @@
       "project_id": null,
       "title": "Segment Anything",
       "summary": "A general model that segments any object in an image from a prompt, released with a large segmentation dataset.\nWhy it may interest you: It could cut the loaf's cross-section out of the background before scoring.",
+      "body": null,
       "link": "https://arxiv.org/abs/2304.02643",
       "dedupe_key": "2304.02643",
       "status": "new",
@@ -460,6 +478,22 @@
     },
     {
       "id": "c-demo-4",
+      "at": "2026-09-28T07:00:00+00:00",
+      "source": "worker",
+      "origin": "brief",
+      "kind": "brief",
+      "project_id": null,
+      "title": "Daily AI brief · 9/28",
+      "summary": "MobileNetV4: a new general backbone for phones\nSAM 2 brings promptable segmentation to video, handy for picking crumb shots\nLabs: 2 of 3 had news",
+      "body": "## New models\n\n- MobileNetV4: a general backbone for phones, fast and accurate across many phone chips. [arXiv](https://arxiv.org/abs/2404.10518)\n\n## Papers\n\n- [SAM 2: Segment Anything in Images and Videos](https://arxiv.org/abs/2408.00714): extends promptable segmentation to video and follows one object across frames. For you: Loaflog could pick the clearest crumb shot from a short turn-around video.\n\n## Open source\n\n- ExecuTorch: PyTorch's on-device runtime; a trained model deploys straight to iOS and Android. [GitHub](https://github.com/pytorch/executorch)\n\n## Industry news\n\nNothing today\n\n## Trends\n\nOn-device vision is moving to a small backbone plus promptable segmentation: cut out the part that matters, then judge it. Steadier than classifying the whole photo, and lighter on the battery.\n\n## Labs\n\n- **Google**: MobileNetV4 (see above)\n- **Meta**: SAM 2 (see above)\n- **Apple**: no new release today",
+      "link": null,
+      "dedupe_key": "brief-2026-09-28",
+      "status": "new",
+      "item_id": null,
+      "image_attachment_id": null
+    },
+    {
+      "id": "c-demo-5",
       "at": "2026-09-28T07:31:00+00:00",
       "source": "worker",
       "origin": "gmail",
@@ -467,6 +501,7 @@
       "project_id": null,
       "title": "Today's mail: 3 worth reading",
       "summary": "Casey (beta tester) · Photo upload crashes on an older phone — crash log attached; related to “Fix the photo-upload crash”\nRiley · Icon options, round two — pick one of three directions at today's 16:00 icon review\nMusic school · Lesson time change — from now on 18:30 (your next guitar lesson is the day after tomorrow)",
+      "body": null,
       "link": null,
       "dedupe_key": "2026-09-28",
       "status": "new",
@@ -474,7 +509,23 @@
       "image_attachment_id": null
     },
     {
-      "id": "c-demo-5",
+      "id": "c-demo-6",
+      "at": "2026-09-28T08:05:00+00:00",
+      "source": "worker",
+      "origin": "watch:Apple",
+      "kind": "alert",
+      "project_id": null,
+      "title": "[Confirmed] Apple publishes FastVLM, a vision-language model that runs on phones",
+      "summary": "Official paper and code are public (Apple research)\nA new vision encoder answers much faster on high-resolution images\nWorth trying: one-line captions for crumb photos",
+      "body": "Apple's research team published the FastVLM paper and code. Its hybrid vision encoder, FastViTHD, turns high-resolution images into fewer visual tokens, so the first word comes much sooner, which suits running on a phone. For Loaflog, it could write a one-line caption for each crumb photo next to the score.\n\n## Links\n\n- [arXiv: FastVLM: Efficient Vision Encoding for Vision…](https://arxiv.org/abs/2412.13303)\n- [github.com: ml-fastvlm](https://github.com/apple-aiml-research/ml-fastvlm)",
+      "link": "https://arxiv.org/abs/2412.13303",
+      "dedupe_key": "Apple:FastVLM release:confirmed",
+      "status": "new",
+      "item_id": null,
+      "image_attachment_id": null
+    },
+    {
+      "id": "c-demo-7",
       "at": "2026-09-28T08:10:00+00:00",
       "source": "cards",
       "origin": "session:crash-fix",
@@ -482,6 +533,7 @@
       "project_id": "p-loaflog",
       "title": "Crash repro: 3 of 5 cases fixed",
       "summary": "Of the 5 repro cases (10+ photos on older phones), 3 are fixed by compressing thumbnails while picking. The other 2 involve the photo-permission prompt; continuing tomorrow.",
+      "body": null,
       "link": null,
       "dedupe_key": "crash-fix-1",
       "status": "new",
@@ -533,14 +585,32 @@
   ],
   "subscriptions": [
     {
-      "id": "papers",
-      "name": "Daily papers",
-      "kind": "papers",
+      "id": "brief",
+      "name": "Daily brief",
+      "kind": "brief",
       "at": "07:00",
       "enabled": true,
       "config": {},
-      "last_run_at": "2026-09-28T07:04:00+00:00",
-      "last_result": "Posted 3 cards",
+      "last_run_at": "2026-09-28T07:00:00+00:00",
+      "last_result": "Brief written: 1 paper, 1 news item",
+      "health": "ok"
+    },
+    {
+      "id": "watch",
+      "name": "Lab watch",
+      "kind": "watch",
+      "at": "08:00",
+      "enabled": true,
+      "config": {
+        "labs": [
+          "Google",
+          "Meta",
+          "Apple"
+        ],
+        "every_hours": 8
+      },
+      "last_run_at": "2026-09-28T08:05:00+00:00",
+      "last_result": "1 lab update: [Confirmed] Apple publishes FastVLM, a vision-language model that runs on phones",
       "health": "ok"
     },
     {
@@ -562,7 +632,8 @@
       "end": "2026-09-28T11:30:00+00:00",
       "all_day": false,
       "title": "Coworking",
-      "location": "Library, 2nd floor"
+      "location": "Library, 2nd floor",
+      "read_only": false
     },
     {
       "uid": "demo-lunch",
@@ -570,7 +641,8 @@
       "end": "2026-09-28T13:15:00+00:00",
       "all_day": false,
       "title": "Lunch with Jordan",
-      "location": null
+      "location": null,
+      "read_only": false
     },
     {
       "uid": "demo-icons",
@@ -578,7 +650,8 @@
       "end": "2026-09-28T16:30:00+00:00",
       "all_day": false,
       "title": "Icon review with Riley (video)",
-      "location": null
+      "location": null,
+      "read_only": false
     },
     {
       "uid": "demo-freeze",
@@ -586,7 +659,8 @@
       "end": "2026-09-30T00:00:00+00:00",
       "all_day": true,
       "title": "Beta build freeze",
-      "location": null
+      "location": null,
+      "read_only": false
     },
     {
       "uid": "demo-coffee",
@@ -594,7 +668,8 @@
       "end": "2026-09-29T10:30:00+00:00",
       "all_day": false,
       "title": "Coffee with Jordan",
-      "location": null
+      "location": null,
+      "read_only": false
     },
     {
       "uid": "demo-lesson",
@@ -602,7 +677,8 @@
       "end": "2026-09-30T19:30:00+00:00",
       "all_day": false,
       "title": "Guitar lesson",
-      "location": "Music school, room 3"
+      "location": "Music school, room 3",
+      "read_only": false
     },
     {
       "uid": "demo-casey",
@@ -610,7 +686,8 @@
       "end": "2026-10-01T11:45:00+00:00",
       "all_day": false,
       "title": "Call with Casey: beta feedback",
-      "location": null
+      "location": null,
+      "read_only": false
     },
     {
       "uid": "demo-signup",
@@ -618,7 +695,8 @@
       "end": "2026-10-03T18:30:00+00:00",
       "all_day": false,
       "title": "Open mic sign-up closes",
-      "location": "Corner café"
+      "location": "Corner café",
+      "read_only": false
     }
   ],
   "simulated_review": {

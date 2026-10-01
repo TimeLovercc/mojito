@@ -1,10 +1,10 @@
-"""Subscriptions (api.md 订阅): the hub enqueues feed_papers / feed_mail at each
+"""Subscriptions (api.md 订阅, 信息流改成报告): the hub enqueues feed_brief / feed_watch / feed_mail by each
 subscription's `at`; after every run the worker reports `POST /subscriptions/{id}/result`."""
 from collections.abc import Callable
 
 from mojito_worker.hub import Hub
 
-KINDS = ("papers", "mail")
+KINDS = ("brief", "watch", "mail")
 RESULT_CHARS = 300
 
 
