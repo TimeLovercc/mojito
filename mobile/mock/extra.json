@@ -427,6 +427,70 @@
       "summary_at": "2026-09-27T23:00:00+00:00"
     }
   },
+  "project_overviews": {
+    "p-loaflog": {
+      "source": "project",
+      "one_liner": "A sourdough bake log: snap every rise and bake, and remember which recipe works",
+      "status": "The new onboarding only needs its walkthrough video; the photo-upload crash soak is at 31/40 runs. Next: **pricing**.",
+      "kill": {
+        "state": "running",
+        "setting": "40 beta testers for two weeks; if under 30% still log in week two, hold 1.0 and rework the logging flow",
+        "progress": "Day 9: 31 of 40 still logging this week (78%)"
+      },
+      "paper": null,
+      "abstract": "Rise times, temperatures and photos of every bake in one place, with a comparison of which recipe holds up; works offline, no account needed.",
+      "novelty": "Similar apps are recipe collections that keep results, not the process; see the [competitor notes](https://example.com/loaflog-competitors).",
+      "significance": "The beta's most common comment: “now I know why the last one collapsed.” Next: pricing, then a public 1.0.",
+      "objections": [
+        "Too much logging for beginners to last two weeks? Answered: 78% still log on day 9, and onboarding drops to three screens.",
+        "Why not just a notes app? Partly answered: notes can't compare recipes, but there is no data on it yet."
+      ],
+      "score": 3.5,
+      "decision": "Keep going; decide on 1.0 after the two-week beta.",
+      "checked_at": "2026-09-27T22:45:00+00:00",
+      "status_file": "~/code/loaflog/STATUS.md",
+      "status_changed": true,
+      "evidence": "~/code/loaflog/overview.json"
+    },
+    "p-app": {
+      "source": "claude",
+      "one_liner": "Mojito: session progress, notes and the two-week plan, all on the phone",
+      "status": "The last 3 feedback items all shipped; the Today page could be leaner.",
+      "kill": null,
+      "paper": null,
+      "abstract": null,
+      "novelty": null,
+      "significance": null,
+      "objections": null,
+      "score": null,
+      "decision": null,
+      "checked_at": "2026-09-27T23:00:00+00:00",
+      "status_file": null,
+      "status_changed": false,
+      "evidence": "inferred"
+    },
+    "p-guitar": {
+      "source": "me",
+      "one_liner": "Play three songs at the open mic",
+      "status": "Song two's chorus works; song three isn't picked yet.",
+      "kill": {
+        "state": "not_started",
+        "setting": "A week before the open mic, play all three for friends; more than two stalls and an easier song goes in",
+        "progress": ""
+      },
+      "paper": null,
+      "abstract": null,
+      "novelty": null,
+      "significance": null,
+      "objections": null,
+      "score": null,
+      "decision": null,
+      "checked_at": "2026-09-25T21:30:00+00:00",
+      "status_file": null,
+      "status_changed": false,
+      "evidence": null
+    }
+  },
   "cards": [
     {
       "id": "c-demo-1",

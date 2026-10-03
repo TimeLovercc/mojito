@@ -19,6 +19,7 @@ import { useChatSubject, useWide } from '../../src/wide'
 import { hoverRow } from '../../src/web-data'
 import { FeedWide } from '../../src/desktop/FeedWide'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 const PAGE = 20
 

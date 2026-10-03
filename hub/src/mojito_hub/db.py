@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from . import config, labels
 from .models import (
-    Attachment, Card, Draft, Event, Feedback, FeedbackMessage, Goal, Item, ItemIn, Job, Plan, Project, ProjectCreateIn, Record, Review,
+    Attachment, Card, Draft, Event, Feedback, FeedbackMessage, Goal, Item, ItemIn, Job, OVERVIEW_REVIEW_FIELDS, Plan, Project, ProjectCreateIn, ProjectOverview, Record, Review,
     SeedSettings, Settings, Snapshot, Source, Subscription, TasteNote,
 )
 
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
 CREATE INDEX IF NOT EXISTS calendar_start ON calendar_events (start);
 CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, area TEXT NOT NULL, status TEXT NOT NULL,
-    repo_path TEXT, goal_id TEXT, summary TEXT, summary_evidence TEXT, summary_at TEXT);
+    repo_path TEXT, goal_id TEXT, summary TEXT, summary_evidence TEXT, summary_at TEXT, overview TEXT);
 CREATE TABLE IF NOT EXISTS project_snapshots (project_id TEXT PRIMARY KEY, snapshot TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS usage (
     seq INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL,
@@ -177,7 +177,7 @@ def migrate() -> None:
                        ("attachments", "message_id"), ("sources", "health"), ("sources", "health_detail"),
                        ("sources", "health_at"), ("records", "hidden_at"), ("jobs", "payload"),
                        ("cards", "image_attachment_id"), ("records", "category"), ("settings", "notify"),
-                       ("settings", "language"), ("cards", "body")):
+                       ("settings", "language"), ("cards", "body"), ("projects", "overview")):
         cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if col not in cols:
             with conn:
@@ -193,6 +193,20 @@ def migrate() -> None:
             conn.execute("ALTER TABLE calendar_events ADD COLUMN read_only INTEGER")
             conn.execute("ALTER TABLE calendar_events ADD COLUMN feed TEXT")
             conn.execute("UPDATE calendar_events SET read_only = 0, feed = ?", (config.token_ref(config.ICAL_URL),))
+    # api.md 项目概况 补充 (16:50): overviews stored before the review-card fields, in projects
+    # and in the `before` of overview undos, get them as null.
+    with conn:
+        for r in conn.execute("SELECT id, overview FROM projects WHERE overview IS NOT NULL").fetchall():
+            ov = json.loads(r["overview"])
+            if "score" not in ov:
+                conn.execute("UPDATE projects SET overview = ? WHERE id = ?",
+                             (ProjectOverview.model_validate(ov | dict.fromkeys(OVERVIEW_REVIEW_FIELDS)).model_dump_json(),
+                              r["id"]))
+        for r in conn.execute("SELECT id, undo FROM records WHERE undo LIKE '%\"project_overview\"%'").fetchall():
+            undo = json.loads(r["undo"])
+            if undo["type"] == "project_overview" and undo["before"] is not None and "score" not in undo["before"]:
+                undo["before"] |= dict.fromkeys(OVERVIEW_REVIEW_FIELDS)
+                conn.execute("UPDATE records SET undo = ? WHERE id = ?", (json.dumps(undo), r["id"]))
     if one("SELECT 1 FROM subscriptions LIMIT 1") is None:
         with conn:
             # api.md 删日程、订阅… as changed by 信息流改成报告: the three initial subscriptions.
@@ -471,6 +485,7 @@ def project_of(row: sqlite3.Row, at: datetime) -> Project:
         last_activity_at=last,
         stale=row["status"] == "active" and (last is None or last < at - STALE_AFTER),
         open_items=open_items,
+        overview=None if row["overview"] is None else ProjectOverview.model_validate_json(row["overview"]),
     )
 
 
@@ -493,7 +508,7 @@ def project_for_repo_path(path: str) -> str | None:
 def insert_project(p: ProjectCreateIn, status: str) -> None:
     conn.execute(
         "INSERT INTO projects (id, title, area, status, repo_path, goal_id, summary,"
-        " summary_evidence, summary_at) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL)",
+        " summary_evidence, summary_at, overview) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)",
         (p.id, p.title, p.area, status, p.repo_path, p.goal_id),
     )
 

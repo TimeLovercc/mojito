@@ -34,3 +34,8 @@ export function reportError(err: Error) {
   if (err instanceof HubError) trackAction('client_error', { path: err.path.split('?')[0], status: String(err.status) })
   else trackAction('client_error', { path: 'local', status: PICKER_BROKEN.test(err.message) ? 'picker_unregistered' : 'other' })
 }
+
+// 页面渲染出错（PageError 错误边界接住的）：path 是出错页面的路由
+export function reportRenderError(page: string) {
+  trackAction('client_error', { path: page, status: 'render' })
+}

@@ -13,6 +13,7 @@ import { t } from '../src/i18n'
 import { useHub } from '../src/use-hub'
 import { useViewTracking } from '../src/usage'
 import { useWide, type Subject } from '../src/wide'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 type Params = { card_id?: string; kind?: Subject['kind']; id?: string; title?: string }
 

@@ -195,7 +195,7 @@ def chat_reply(hub: Hub, job: dict, lang: str) -> None:
         today=dump(today),
         items=dump([{k: i[k] for k in ITEM_BRIEF_FIELDS} for i in items.values() if i["status"] not in ("done", "closed")]),
         goals=dump([{k: g[k] for k in ("id", "title", "status")} for g in goals]),
-        projects=dump([{k: p[k] for k in ("id", "title", "area", "status", "goal_id")} for p in projects]),
+        projects=dump([{k: p[k] for k in ("id", "title", "area", "status", "goal_id", "overview")} for p in projects]),
         plans=dump(list(plans.values())),
         settings=dump(hub.get_settings()),
         subscriptions=dump([{k: s[k] for k in ("id", "name", "kind", "at", "enabled", "config", "last_result")} for s in subs]),

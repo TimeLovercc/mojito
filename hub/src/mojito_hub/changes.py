@@ -13,7 +13,7 @@ from datetime import datetime
 from fastapi import HTTPException
 
 from . import db, labels
-from .models import Record
+from .models import OVERVIEW_REVIEW_FIELDS, ProjectOverview, Record
 
 # entity → (table, fields that are recorded and restorable, undo key of the id)
 ENTITIES = {
@@ -131,6 +131,87 @@ def undo(rec: sqlite3.Row, spec: dict, at: datetime) -> None:
         body=labels.t("restored", x=labels.t("parts_sep").join(
             labels.t("field_value", field=labels.entity_field(entity, f), value=restored_text(entity, f, v))
             for f, v in before.items())),
+        evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=bool(rec["smoke"]),
+    )
+
+
+# ---- project overview (api.md 项目概况): written whole; only user edits (source=me) are
+# change records, and their undo restores the whole previous overview ----
+
+OVERVIEW_OBJECTS = (("kill", ("state", "setting", "progress")),
+                    ("paper", ("title", "format", "pending", "review", "advice", "note", "pdf_path",
+                               "review_path", "dir_path")))
+
+
+def overview_parts(stored: str | None) -> dict:
+    """The fields a person reads, flat (one_liner, status, kill.state, …, paper.dir_path, then
+    the review card; objections compare as a whole list); a missing overview, kill or paper
+    reads as all None."""
+    ov = None if stored is None else json.loads(stored)
+    parts = {f: None if ov is None else ov[f] for f in ("one_liner", "status")}
+    for obj, keys in OVERVIEW_OBJECTS:
+        for k in keys:
+            parts[f"{obj}.{k}"] = None if ov is None or ov[obj] is None else ov[obj][k]
+    for f in OVERVIEW_REVIEW_FIELDS:
+        parts[f] = None if ov is None else ov[f]
+    return parts
+
+
+def _changed_parts(old: str | None, new: str | None) -> list[tuple[str, object, object]]:
+    before, after = overview_parts(old), overview_parts(new)
+    return [(k, before[k], after[k]) for k in before if before[k] != after[k]]
+
+
+def _store_overview(project_id: str, stored: str | None, at: datetime) -> sqlite3.Row:
+    """Write the column; a write that changes it (metadata included) is logged so an undo
+    sees it. Returns the row before the write."""
+    old = row("project", project_id)
+    db.conn.execute("UPDATE projects SET overview = ? WHERE id = ?", (stored, project_id))
+    if old["overview"] != stored:
+        db.conn.execute("INSERT INTO entity_changes (entity, entity_id, field, at) VALUES ('project', ?, 'overview', ?)",
+                        (project_id, db.ts(at)))
+    return old
+
+
+def set_overview(project_id: str, overview: ProjectOverview, at: datetime, *, author: str, source: str) -> None:
+    """Inside a transaction. project/claude writes are stored silently; a user edit
+    (source=me) that changes what a person reads writes "<项目>：<字段> 从 X 改成 Y" with an undo."""
+    old = _store_overview(project_id, overview.model_dump_json(), at)
+    if overview.source != "me":
+        return
+    new = row("project", project_id)
+    changed = _changed_parts(old["overview"], new["overview"])
+    if not changed:
+        return
+    rec = db.insert_record(
+        at=at, author=author, source=source, kind="log", tier="log", item_id=None, project_id=project_id,
+        title=labels.titled(_heading("project", new), labels.t("changes_sep").join(
+            labels.t("change", field=labels.name("field_overview", k), old=labels.overview_value(k, o),
+                     new=labels.overview_value(k, n)) for k, o, n in changed)),
+        body="", evidence=None, needs_processing=False,
+        undo={"type": "project_overview", "project_id": project_id,
+              "before": None if old["overview"] is None else json.loads(old["overview"])},
+        card_id=None, category=None, smoke=False,
+    )
+    db.conn.execute("INSERT INTO undo_marks (record_id, change_seq) VALUES (?, ?)", (rec.id, _last_seq()))
+
+
+def undo_overview(rec: sqlite3.Row, spec: dict, at: datetime) -> None:
+    """Restore the whole `before` (inside a transaction); 409 when the overview was written
+    again after the change record."""
+    project_id = spec["project_id"]
+    mark = db.one("SELECT change_seq FROM undo_marks WHERE record_id = ?", rec["id"])["change_seq"]
+    if db.one("SELECT 1 FROM entity_changes WHERE entity = 'project' AND entity_id = ? AND field = 'overview'"
+              " AND seq > ?", project_id, mark):
+        raise HTTPException(409, labels.t("changed_later", x=labels.t("overview")))
+    before = None if spec["before"] is None else ProjectOverview.model_validate(spec["before"]).model_dump_json()
+    old = _store_overview(project_id, before, at)
+    db.insert_record(
+        at=at, author="me", source="app", kind="log", tier="log", item_id=None, project_id=project_id,
+        title=labels.t("undone", x=rec["title"]),
+        body=labels.t("restored", x=labels.t("parts_sep").join(
+            labels.t("field_value", field=labels.name("field_overview", k), value=labels.overview_value(k, v))
+            for k, _, v in _changed_parts(old["overview"], before))),
         evidence=None, needs_processing=False, undo=None, card_id=None, category=None, smoke=bool(rec["smoke"]),
     )
 

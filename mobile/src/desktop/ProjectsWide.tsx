@@ -6,10 +6,9 @@ import { actions } from '../api/client'
 import type { Item, Project, ProjectDetail, ProjectsList, Snapshot } from '../api/types'
 import { projectActions, useAct } from '../components/Decision'
 import { RecordLine } from '../components/RecordLine'
-import { RichText } from '../components/RichText'
 import { StaleBanner } from '../components/Screen'
 import { t } from '../i18n'
-import { category, itemStatus, projectStatus } from '../labels'
+import { category, itemStatus, killState, projectStatus } from '../labels'
 import { ago, daysBetween, todayYmd, when, ymdOf } from '../time'
 import { colors, font, overlay, size } from '../theme'
 import { trackAction, useScreenIds, useViewTracking } from '../usage'
@@ -19,12 +18,13 @@ import { useChatSubject } from '../wide'
 import { Menu } from './Menu'
 import { TopBarD, useScrolled } from './TopBar'
 import { dt } from './tokens'
-import { Pill, Section } from './ui'
+import { OverviewD, ScoreBadgeD } from './ProjectOverviewD'
+import { Pill, pillOf, Section } from './ui'
 
 // 电脑项目页（docs/desktop-v2.md 逐页方案 3）：顶栏"项目 · N 个"，选中项目后右侧"⋯"放暂停 / 完成 / 恢复；
-// 左边 260 列表按研究 / 生活分组（每行 36，只有名称），底部"全部事项 ›"；右边详情最宽 720：
-// 12 tx3"研究 · 进行中"、名称 24/600、没动静时中性事实胶囊、现状（Claude 总结 · 时间）、事项行、会话、最近记录（默认折叠）。
-// 空块整块隐藏；不显示仓库路径、"依据"和写死的"7 天没动静"
+// 左边 260 列表按研究 / 生活分组（每行 36，名称 + 右边生死实验小胶囊），底部"全部事项 ›"；右边详情最宽 720：
+// 12 tx3"研究 · 进行中"、名称 24/600（右侧分数徽章）、没动静时中性事实胶囊、概况各块（design.md 8.11，每个项目都显示，取代原来的现状）、
+// 事项行、会话、最近记录（默认折叠）。其余空块整块隐藏；不显示仓库路径、"依据"和写死的"7 天没动静"
 export function ProjectsWide() {
   const research = useHub<ProjectsList>('/projects?area=research')
   const life = useHub<ProjectsList>('/projects?area=life')
@@ -48,6 +48,9 @@ export function ProjectsWide() {
             <Text style={[styles.piText, selected !== undefined && p.id === selected.id && styles.piTextOn]} numberOfLines={1}>
               {p.title}
             </Text>
+            {p.overview === null || p.overview.kill === null ? null : (
+              <Pill label={killState[p.overview.kill.state].label} tone={pillOf[killState[p.overview.kill.state].tone]} />
+            )}
           </Pressable>
         ))}
       </>
@@ -136,19 +139,17 @@ function Body({ detail: { project: p, items, snapshot, records } }: { detail: Pr
         <Text style={styles.kicker}>
           {category[p.area].label} · {projectStatus[p.status].label}
         </Text>
-        <Text style={styles.name}>{p.title}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{p.title}</Text>
+          <ScoreBadgeD overview={p.overview} />
+        </View>
         {p.stale ? (
           <View style={styles.pillRow}>
             <Pill label={quiet} tone="neutral" />
           </View>
         ) : null}
       </View>
-      {p.summary === null ? null : (
-        <View style={styles.summary}>
-          <RichText text={p.summary} style={styles.summaryText} enums={false} />
-          {p.summary_at === null ? null : <Text style={styles.meta}>{t('Claude 总结 · {ago}', { ago: ago(p.summary_at) })}</Text>}
-        </View>
-      )}
+      <OverviewD overview={p.overview} />
       <Section title={t('事项')} right={null} empty={items.length === 0}>
         {items.map((i) => (
           <ItemLine key={i.id} item={i} />
@@ -230,10 +231,9 @@ const styles = StyleSheet.create({
   column: { width: '100%', maxWidth: dt.width.read, alignSelf: 'center', gap: dt.space.section },
   head: { gap: 4 },
   kicker: { ...font.regular, fontSize: size.small, color: colors.tx3 },
-  name: { ...font.semibold, fontSize: size.page, lineHeight: dt.line.page, color: colors.tx },
+  nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  name: { ...font.semibold, flexShrink: 1, fontSize: size.page, lineHeight: dt.line.page, color: colors.tx },
   pillRow: { flexDirection: 'row', marginTop: 4 },
-  summary: { gap: 6 },
-  summaryText: { ...font.regular, fontSize: size.body, lineHeight: dt.line.para, color: colors.tx, userSelect: 'text' },
   meta: { ...font.regular, fontSize: size.small, color: colors.tx3 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: dt.height.row2, paddingVertical: dt.space.rowV, paddingHorizontal: dt.space.rowH },
   itemText: { flex: 1, minWidth: 0 },

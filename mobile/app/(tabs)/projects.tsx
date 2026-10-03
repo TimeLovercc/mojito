@@ -6,7 +6,8 @@ import type { GoalsList, ItemCategory, ItemsList, ProjectsList } from '../../src
 import { ItemRow } from '../../src/components/ItemRow'
 import { ProjectRow } from '../../src/components/ProjectCard'
 import { Screen, StaleBanner } from '../../src/components/Screen'
-import { Btn, Card, Empty, Rows, Section, Seg } from '../../src/components/ui'
+import { Btn, Card, Empty, Rows, Section, Seg, Tag } from '../../src/components/ui'
+import { killState } from '../../src/labels'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { useWide } from '../../src/wide'
@@ -17,6 +18,7 @@ import type { Project } from '../../src/api/types'
 import { ProjectPane } from '../projects/[id]'
 import { hoverRow } from '../../src/web-data'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 const OPEN = new Set(['active', 'waiting_you', 'scheduled'])
 
@@ -105,6 +107,7 @@ function WideProjects() {
             <Text style={[styles.piText, p.id === selected && font.medium]} numberOfLines={1}>
               {p.title}
             </Text>
+            {p.overview === null || p.overview.kill === null ? null : <Tag {...killState[p.overview.kill.state]} />}
             <View style={[styles.dot, { backgroundColor: p.stale ? colors.warn : p.status === 'active' ? colors.ok : colors.tx3 }]} />
           </Pressable>
         ))

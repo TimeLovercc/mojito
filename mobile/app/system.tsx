@@ -58,6 +58,7 @@ import {
   versionLines,
 } from '../src/system-shared'
 import { SystemWide } from '../src/desktop/SystemWide'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 // 回答"这些信息靠得住吗"（design.md 8.3）：顶部一行"一切正常 / 有 N 个问题"，点开看细节；
 // 下面是 7 天指标和常用动作，设置、反馈、全部动态、版本收进"更多"

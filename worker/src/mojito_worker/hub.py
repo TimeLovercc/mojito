@@ -120,6 +120,9 @@ class Hub:
     def put_snapshot(self, project_id: str, snapshot: dict) -> dict:
         return self._request("PUT", f"/projects/{project_id}/snapshot", json=snapshot).json()
 
+    def put_project_overview(self, project_id: str, overview: dict) -> dict:
+        return self._request("PUT", f"/projects/{project_id}/overview", json=overview).json()
+
     def put_project_summary(self, project_id: str, summary: str, evidence: str) -> dict:
         return self._request("PUT", f"/projects/{project_id}/summary",
                              json={"summary": summary, "summary_evidence": evidence}).json()

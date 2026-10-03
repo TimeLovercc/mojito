@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { routeOf } from '../src/push-route'
 import { trackView } from '../src/usage'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 // 点网页推送打开的页面（docs/api.md "/app/open"）：按 routeOf 跳过去，记一次 push_open。
 // 任何人都能构造这个链接，所以这里不改任何状态

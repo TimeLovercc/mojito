@@ -17,6 +17,7 @@ import { useScreenIds, useViewTracking } from '../../src/usage'
 import { useChatSubject, useWide } from '../../src/wide'
 import { ItemToolsD } from '../../src/desktop/ItemTools'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 const toneColor = { g: colors.ok, a: colors.warn, r: colors.bad, n: colors.tx2, b: colors.brand } as const
 

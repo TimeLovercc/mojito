@@ -8,6 +8,7 @@ import { colors, font, size } from '../../src/theme'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 反馈问题（系统页进入）：写下哪里不对、可附截图；自动带上刚才所在的页面、事项/项目和当前 JS 包版本。
 // 维护会话会分诊、修复；需要你确认才上线的进"等你拍板"。

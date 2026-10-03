@@ -8,6 +8,7 @@ import { prefetch } from '../../src/use-hub'
 import { useWide } from '../../src/wide'
 import { useKeyboardOpen } from '../../src/viewport'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 四个页签和右上角对话、系统打开时要取的路径；和各页面里 useHub 的路径一致
 const TAB_PATHS = [

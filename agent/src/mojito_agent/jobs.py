@@ -110,6 +110,9 @@ REPORT_CARD_KINDS = ("brief", "alert")
 # Card fields the chat sees when the user asks about one card ("问问这个").
 ASKED_CARD_FIELDS = ("id", "at", "kind", "origin", "project_id", "title", "summary", "body", "link", "status", "item_id")
 CHAT_NOTES = 10
+# Overview sources the chat must not edit (api.md 项目概况) → the reply note saying where to change it, and its marker.
+# project = the project's own session keeps overview.json.
+LOCKED_OVERVIEW_SOURCES = {"project": ("project_note", "project_marker")}
 MAINTAINER_SOURCE = "maintainer"
 MAINTAINER_MESSAGES = 3
 
@@ -205,7 +208,9 @@ CHAT_PROMPT = """你是 mojito 的服务器轻量 agent，在手机 app 的对�
 - item_updates：改已有事项 {{item_id, changes}}，changes 只放要改的字段（next_step / next_at / status / owner / title / project_id）。做完了 → status=done；删掉 / 不要了 / 取消 → closed（事项不会被真的删除，关闭就是删掉）；重新打开 → active。done_definition 永远不能改。
 - goal_updates：改目标 {{goal_id, changes: {{title?, status?}}}}（status: active / done / dropped），changes 只放要改的字段；新建目标时给一个新的 goal_id（小写英文短横线，如 learn-spanish），changes 里 title 和 status 都要给。
 - plan_updates：改两周计划 {{plan_id, add_item_ids, remove_item_ids, goal_ids（新的目标列表，不换给 null）, start, end（YYYY-MM-DD，不改给 null）}}，plan_id 必须是"当前两周计划"或"草稿计划"里的。只在用户明确要调整计划时给；关掉或完成某个事项本身不用动计划。
-- project_updates：改项目 {{project_id, changes: {{title?, area?, status?, repo_path?, goal_id?}}}}（area: research / life；status: active / paused / done / declined），changes 只放要改的字段；新建项目时给一个新的 project_id（小写英文短横线），changes 里 title、area、goal_id（可 null）都要给。
+- project_updates：改项目 {{project_id, changes: {{title?, area?, status?, repo_path?, goal_id?, overview?}}}}（area: research / life；status: active / paused / done / declined），changes 只放要改的字段；新建项目时给一个新的 project_id（小写英文短横线），changes 里 title、area、goal_id（可 null）都要给。
+  - overview：用户要改项目概况（一句话、状态、生死实验、论文、分数、摘要、查新、意义与下一步、审稿质疑、决定）时给 {{one_liner?, status?, kill?, paper?, score?, abstract?, novelty?, significance?, objections?, decision?}}，只放要改的键。score 是 0–5 的数（如 3.0）；novelty 可带 Markdown 链接；objections 是审稿质疑的完整新列表（每条一项，加一条要带上原来的）。kill = {{state（running 在跑 / queued 排队中 / not_started 未开始 / passed 通过 / failed 没过 / done 已完成）, setting, progress}}，paper = {{title, format, pending, review, advice, note, pdf_path, review_path, dir_path}}：这两个给完整对象（没改的子字段照抄当前 overview 里的值），没有生死实验 / 论文给 null。
+  - overview.source=project 的项目，卡片由它自己的会话维护，不要给 overview，reply 说"这个项目的卡片由它自己的会话维护，请在那个会话里改"。
 - settings_update：改设置 {{changes: {{morning_at?, evening_at?（HH:MM 用户时区）, evening_enabled?}}}}，只放要改的字段；不改给 null。用户说不要晚间提问 → evening_enabled=false，要恢复 → true。当前设置：{settings}
 - card_actions：信息流卡片 {{card_id, status}}：收藏 → saved，不感兴趣 → dismissed，放回未读 → new。card_id 来自下面的卡片。
 - note_links：把用户的笔记挂到事项或项目 {{record_id, item_id, project_id}}（都可 null，null 表示不挂），record_id 来自下面"最近的笔记"。
@@ -260,7 +265,7 @@ new_items 字段要求：
 - 夜里（alerts）= 还没读的告警。今天的日程（schedule）来自 Google 日历。
 {today}
 
-项目（进行中和暂停的，可用于 project_updates）：
+项目（进行中和暂停的，可用于 project_updates；overview 是项目概况：一句话 one_liner、状态 status、生死实验 kill、论文 paper、分数 score（0–5）、摘要 abstract、查新 novelty、意义与下一步 significance、审稿质疑 objections、决定 decision，source=project 是项目自己的会话维护的 / claude 是整理的 / me 是用户改的，null = 还没有）：
 {all_projects}
 
 草稿计划（可用于 plan_updates）：
@@ -494,6 +499,19 @@ def _card_brief(card: dict, project_titles: dict[str, str]) -> dict:
     }
 
 
+def _drop_overview_changes(updates: list[dict], project_ids: set[str]) -> tuple[list[dict], list[dict]]:
+    """Strip overview changes on these projects; an update left with no changes is dropped. → (kept, dropped overviews)."""
+    kept, dropped = [], []
+    for u in updates:
+        if u["project_id"] in project_ids and "overview" in u["changes"]:
+            dropped.append({"project_id": u["project_id"], "overview": u["changes"]["overview"]})
+            u = {"project_id": u["project_id"], "changes": {f: v for f, v in u["changes"].items() if f != "overview"}}
+            if not u["changes"]:
+                continue
+        kept.append(u)
+    return kept, dropped
+
+
 def chat_reply(hub: Hub, config: Config, job: dict) -> None:
     record_id = job["record_id"]
     message = hub.get_record(record_id)
@@ -554,7 +572,8 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         projects=_dump([{k: p[k] for k in ("id", "title", "area", "summary", "stale", "open_items")} for p in projects]),
         project=project,
         today=_dump(today_data),
-        all_projects=_dump([{k: p[k] for k in ("id", "title", "area", "status", "repo_path", "goal_id")} for p in all_projects.values()]),
+        all_projects=_dump([{k: p[k] for k in ("id", "title", "area", "status", "repo_path", "goal_id", "overview")}
+                            for p in all_projects.values()]),
         draft_plans=_dump([{k: p[k] for k in ("id", "start", "end", "goal_ids", "item_ids", "revises")}
                            for p in today_data["needs_you"]["plans"]]),
         notes=_dump([{"record_id": n["id"], "at": n["at"], "title": n["title"], "body": n["body"][:200],
@@ -604,6 +623,16 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         result["calendar_actions"] = [a for a in result["calendar_actions"] if a["event_id"] not in read_only_uids]
         if not mentions(language, "read_only_marker", reply):
             reply = f"{reply}\n{t(language, 'read_only_note')}"
+    # Overviews kept outside mojito (api.md 项目概况): drop chat edits to them and say where to change them.
+    locked = {p["id"]: p["overview"]["source"] for p in all_projects.values()
+              if p["overview"] is not None and p["overview"]["source"] in LOCKED_OVERVIEW_SOURCES}
+    result["project_updates"], dropped = _drop_overview_changes(result["project_updates"], set(locked))
+    if dropped:
+        log.info("chat %s dropped overview changes on projects kept elsewhere: %s", record_id, json.dumps(dropped, ensure_ascii=False))
+        for source in sorted({locked[d["project_id"]] for d in dropped}):
+            note, marker = LOCKED_OVERVIEW_SOURCES[source]
+            if not mentions(language, marker, reply):
+                reply = f"{reply}\n{t(language, note)}"
     if cal is None:
         # Calendar is down: never execute (or validate) calendar actions; make sure the reply says so.
         if result["calendar_actions"] and not mentions(language, "calendar_down_marker", reply):

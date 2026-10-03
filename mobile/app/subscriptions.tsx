@@ -13,6 +13,7 @@ import { useErrorToast, useToast } from '../src/toast'
 import { colors, desktop, font, size } from '../src/theme'
 import { useHub } from '../src/use-hub'
 import { t } from '../src/i18n'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 const healthColor = { ok: colors.ok, warn: colors.warn, error: colors.bad } as const
 

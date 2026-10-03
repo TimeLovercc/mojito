@@ -12,6 +12,7 @@ import { colors, font, size } from '../../src/theme'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 一条反馈的完整讨论：我和维护会话来回说，底部可以回复（POST /feedback/{id}/messages）
 export default function FeedbackThreadScreen() {

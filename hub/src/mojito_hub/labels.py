@@ -29,6 +29,7 @@ TEXT = {
     "heading_goal": ("目标 {x}", "Goal {x}"),
     "heading_plan": ("计划 {start}–{end}", "Plan {start}–{end}"),
     "heading_project": ("项目 {x}", "Project {x}"),
+    "overview": ("项目概况", "Project overview"),
     "heading_settings": ("设置", "Settings"),
     "heading_subscription": ("订阅 {x}", "Subscription {x}"),
     "heading_note": ("笔记「{x}」", "Note “{x}”"),
@@ -142,6 +143,26 @@ NAMES = {
     "field_note": ({"item_id": "事项", "project_id": "项目"}, {"item_id": "Item", "project_id": "Project"}),
     "field_subscription": ({"at": "时间", "enabled": "开关", "config": "设置"},
                            {"at": "Time", "enabled": "On/off", "config": "Settings"}),
+    # project overview, flattened (changes.overview_parts)
+    "field_overview": ({"one_liner": "一句话", "status": "状态", "kill.state": "生死实验状态",
+                        "kill.setting": "生死实验设置", "kill.progress": "生死实验进展", "paper.title": "论文标题",
+                        "paper.format": "论文格式", "paper.pending": "论文 pending 数", "paper.review": "论文评审",
+                        "paper.advice": "论文建议", "paper.note": "论文备注", "paper.pdf_path": "论文 PDF",
+                        "paper.review_path": "论文评审文件", "paper.dir_path": "论文文件夹", "abstract": "摘要",
+                        "novelty": "查新", "significance": "意义与下一步", "objections": "审稿质疑", "score": "分数",
+                        "decision": "决定"},
+                       {"one_liner": "One line", "status": "Status", "kill.state": "Kill test state",
+                        "kill.setting": "Kill test setting", "kill.progress": "Kill test progress",
+                        "paper.title": "Paper title", "paper.format": "Paper format", "paper.pending": "Paper pending",
+                        "paper.review": "Paper review", "paper.advice": "Paper advice", "paper.note": "Paper note",
+                        "paper.pdf_path": "Paper PDF", "paper.review_path": "Paper review file",
+                        "paper.dir_path": "Paper folder", "abstract": "Abstract", "novelty": "Novelty",
+                        "significance": "Significance & next", "objections": "Objections", "score": "Score",
+                        "decision": "Decision"}),
+    "kill_state": ({"running": "在跑", "queued": "排队中", "not_started": "未开始", "passed": "通过", "failed": "没过",
+                    "done": "已完成"},
+                   {"running": "Running", "queued": "Queued", "not_started": "Not started", "passed": "Passed",
+                    "failed": "Failed", "done": "Done"}),
 }
 
 
@@ -237,6 +258,17 @@ def entity_value(entity: str, field: str, value) -> str:
         if "labs" in value:
             return t("watch_config", labs=joined(value["labs"]) if value["labs"] else t("empty"), n=value["every_hours"])
         return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def overview_value(key: str, value) -> str:
+    """A flattened overview field's value (changes.overview_parts) → text for the user."""
+    if value is None:
+        return t("empty")
+    if key == "kill.state":
+        return name("kill_state", value)
+    if key == "objections":
+        return joined(value) if value else t("empty")
     return str(value)
 
 

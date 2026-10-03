@@ -60,6 +60,8 @@ EN = {
         "The repo {repo} newly added in Orca has no project yet; drafted one for you to confirm.",
     "更新了 {n} 个项目快照": "Updated {n} project snapshots",
     "，新发现 {n} 个仓库": ", found {n} new repos",
+    "，{n} 个项目概况来自项目的 overview.json": ", {n} project overviews from the projects' overview.json",
+    "项目概况文件有问题：{problems}（{detail}）": "Problem in project overview files: {problems} ({detail})",
     # review
     "{summary}\n\n这两周用了哪些、没用哪些：{usage}": "{summary}\n\nWhat got used these two weeks and what didn't: {usage}",
     "{pattern}（依据：{evidence}）": "{pattern} (evidence: {evidence})",

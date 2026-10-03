@@ -6,6 +6,7 @@ import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { useChatSubject } from '../../src/wide'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 卡片详情：摘要全文和全部动作（GET /cards/{id}，不论状态）
 export default function CardScreen() {

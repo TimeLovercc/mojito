@@ -520,6 +520,59 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
         "summary_evidence": {"p-loaflog": sha7(loaflog_commits[0][0]), "p-app": "inferred", "p-guitar": "inferred",
                              "p-closet": "inferred"},
         "summary_at": c.at(-1, "23:00"),
+        # project cards (api.md 项目概况), one per source: Loaflog's own session keeps ~/code/loaflog/overview.json,
+        # Claude wrote the app's on refresh, Sam set the guitar one in chat; the closet project has none yet
+        "overviews": {
+            "p-loaflog": overview_of(
+                "project", c.iso(-1, "22:45"),
+                one_liner=t("烘焙记录 app：拍下每次发面和出炉，记住哪种配方最稳",
+                            "A sourdough bake log: snap every rise and bake, and remember which recipe works"),
+                status=t("新引导只差录走查视频；上传照片闪退的夜间测试跑到 31/40 轮。下一步：**定价**。",
+                         "The new onboarding only needs its walkthrough video; the photo-upload crash soak is at "
+                         "31/40 runs. Next: **pricing**."),
+                kill={"state": "running",
+                      "setting": t("40 位内测用户用满两周；第二周还在记录的不到 30%，就先不上 1.0，回头改记录流程",
+                                   "40 beta testers for two weeks; if under 30% still log in week two, hold 1.0 and "
+                                   "rework the logging flow"),
+                      "progress": t("第 9 天：40 人里 31 人这周还在记（78%）", "Day 9: 31 of 40 still logging this week (78%)")},
+                score=3.5,
+                abstract=t("把每次烘焙的发面时间、温度和照片记在一处，自动比出哪种配方最稳；离线能用，不注册也能记。",
+                           "Rise times, temperatures and photos of every bake in one place, with a comparison of "
+                           "which recipe holds up; works offline, no account needed."),
+                novelty=t("同类 app 多是食谱合集，只记结果不记过程，见[竞品对比](https://example.com/loaflog-competitors)。",
+                          "Similar apps are recipe collections that keep results, not the process; see the "
+                          "[competitor notes](https://example.com/loaflog-competitors)."),
+                significance=t("内测里最常听到的是“终于知道上次为什么塌了”。下一步：定价，然后公开 1.0。",
+                               "The beta's most common comment: “now I know why the last one collapsed.” Next: "
+                               "pricing, then a public 1.0."),
+                objections=[t("记录太麻烦，新手坚持不了两周？——能回答：第 9 天还有 78% 在记，引导砍到 3 屏后会更好。",
+                              "Too much logging for beginners to last two weeks? Answered: 78% still log on day 9, "
+                              "and onboarding drops to three screens."),
+                            t("和用笔记 app 记有什么区别？——部分回答：自动比配方是笔记做不到的，但还没有数据。",
+                              "Why not just a notes app? Partly answered: notes can't compare recipes, but there is "
+                              "no data on it yet.")],
+                decision=t("继续；内测满两周再定要不要上 1.0。", "Keep going; decide on 1.0 after the two-week beta."),
+                status_file="~/code/loaflog/STATUS.md", status_changed=True, evidence="~/code/loaflog/overview.json"),
+            "p-app": overview_of(
+                "claude", c.iso(-1, "23:00"),
+                one_liner=t(f"{app}：会话进展、笔记和两周计划都在手机上看得到",
+                            f"{app}: session progress, notes and the two-week plan, all on the phone"),
+                status=t("最近 3 条反馈都已修好上线；今天页还想再精简。",
+                         "The last 3 feedback items all shipped; the Today page could be leaner."),
+                kill=None, score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
+                status_file=None, status_changed=False, evidence="inferred"),
+            "p-guitar": overview_of(
+                "me", c.iso(-3, "21:30"),
+                one_liner=t("在开放麦上弹完三首歌", "Play three songs at the open mic"),
+                status=t("第二首的副歌能弹下来了；第三首还没选。", "Song two's chorus works; song three isn't picked yet."),
+                kill={"state": "not_started",
+                      "setting": t("开放麦前一周给朋友完整弹一遍三首；卡壳超过两次就换一首简单的",
+                                   "A week before the open mic, play all three for friends; more than two stalls and "
+                                   "an easier song goes in"),
+                      "progress": ""},
+                score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
+                status_file=None, status_changed=False, evidence=None),
+        },
         "snapshots": {
             "p-app": {"taken_at": c.iso(-1, "23:00"), "worktrees": [
                 {"name": "main", "branch": "main", "path": f"~/code/{slug}", "status": "in-review",
@@ -545,6 +598,16 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
                   -2: ["07:31", "09:12", "12:44", "16:30", "20:40", "21:41", "22:10"], -1: ["07:31", "12:15", "15:02", "20:31", "21:52"],
                   0: ["07:32", "12:40"]},
     }
+
+
+def overview_of(source: str, checked_at: str, *, one_liner: str, status: str, kill: dict | None, score: float | None,
+                abstract: str | None, novelty: str | None, significance: str | None, objections: list[str] | None,
+                decision: str | None, status_file: str | None, status_changed: bool, evidence: str | None) -> dict:
+    """A whole project overview as the hub stores it (PUT /projects/{id}/overview); Sam's projects have no paper."""
+    return {"source": source, "one_liner": one_liner, "status": status, "kill": kill, "paper": None,
+            "abstract": abstract, "novelty": novelty, "significance": significance, "objections": objections,
+            "score": score, "decision": decision, "checked_at": checked_at, "status_file": status_file,
+            "status_changed": status_changed, "evidence": evidence}
 
 
 def ask_feedback(t: Lang) -> dict:
@@ -675,6 +738,7 @@ def mock_extra_of(c: Clock, t: Lang, app: str, seed: dict) -> dict:
         "project_summaries": {pid: {"summary": s, "summary_evidence": x["summary_evidence"][pid],
                                     "summary_at": x["summary_at"].isoformat(timespec="seconds")}
                               for pid, s in x["summaries"].items()},
+        "project_overviews": x["overviews"],
         "cards": cards,
         "feedback": [{"id": "f-demo-1", "at": c.iso(-1, "19:30"),
                       "body": t("信息流卡片太长了，能不能默认只显示三行？", "Feed cards are too long. Can they show three lines by default?"),
@@ -880,6 +944,12 @@ def cmd_load(a) -> None:
     for pid, snap in x["snapshots"].items():
         hub.call("worker", "PUT", f"/projects/{pid}/snapshot", snap)
     new.tag(x["summary_at"])
+
+    # project cards: the worker copies overview.json / writes Claude's; Sam's own edit came through chat (agent) and
+    # leaves a change record with an undo
+    for pid, overview in x["overviews"].items():
+        hub.call("agent" if overview["source"] == "me" else "worker", "PUT", f"/projects/{pid}/overview", overview)
+        new.tag(datetime.fromisoformat(overview["checked_at"]))
 
     events = [{"at": c.iso(n, hm), "kind": "view", "name": "app_open", "detail": None} for n, hms in x["opens"].items() for hm in hms]
     hub.call("app", "POST", "/usage", {"events": events})

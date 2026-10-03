@@ -24,6 +24,7 @@ import { trackAction, useViewTracking } from '../../src/usage'
 import { useHub } from '../../src/use-hub'
 import { hoverRow } from '../../src/web-data'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 const PAGE = 30
 

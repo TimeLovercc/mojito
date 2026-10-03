@@ -168,6 +168,9 @@ class Hub:
     def put_project(self, project_id: str, fields: dict) -> dict:
         return self._request("PUT", f"/projects/{project_id}", json=fields).json()
 
+    def put_project_overview(self, project_id: str, overview: dict) -> dict:
+        return self._request("PUT", f"/projects/{project_id}/overview", json=overview).json()
+
     def post_project(self, *, project_id: str, title: str, area: str, repo_path: str | None, goal_id: str | None) -> dict:
         payload = {"id": project_id, "title": title, "area": area, "repo_path": repo_path, "goal_id": goal_id}
         return self._request("POST", "/projects", json=payload).json()

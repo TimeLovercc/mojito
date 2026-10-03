@@ -20,7 +20,7 @@ from .models import (
     Attachment, ChatIn, ChatList, ChatOut, DecisionIn, DeviceIn, Draft, DraftIn, DraftList, DraftResolveIn,
     DraftStatus, EventIn, EventList, FinishIn, GoalList, HeartbeatIn, Item, ItemDetail, ItemIn,
     ItemList, ItemStatus, Category, Job, JobCreateIn, JobIn, JobList, JobStatus, NeedsYou, Plan,
-    PlanDetail, PlanIn, PlanList, Project, ProjectCreateIn, ProjectDecisionIn, ProjectDetail,
+    PlanDetail, PlanIn, PlanList, Project, ProjectCreateIn, ProjectDecisionIn, ProjectDetail, ProjectOverview,
     ProjectList, ProjectPutIn, ProjectStatus, ProjectSummaryIn, ReadIn, Record, RecordIn,
     RecordList, Review, ReviewFinishIn, Snapshot, Card, CardIn, CardList, CardReadIn, CardStatus,
     CardStatusIn, ItemBefore, USAGE_ACTIONS, USAGE_VIEWS, AuthName,
@@ -833,6 +833,11 @@ async def record_undo(record_id: str):
         return undo_item(row, undo)
     if undo["type"] == "item_create":
         return undo_item_create(row, undo)
+    if undo["type"] == "project_overview":
+        at = db.now()
+        with conn:
+            changes.undo_overview(row, undo, at)
+            return finish_hub_undo(row["id"], at)
     if undo["type"] in changes.ENTITIES:
         at = db.now()
         with conn:
@@ -1036,6 +1041,16 @@ async def project_put(project_id: str, body: ProjectPutIn, r: str = Depends(auth
             conn.execute("UPDATE projects SET title = ?, area = ?, status = ?, repo_path = ?, goal_id = ? WHERE id = ?",
                          (body.title, body.area, body.status, body.repo_path, body.goal_id, project_id))
             changes.record("project", project_id, old, at, author="system", source=auth.SOURCE_OF[r])
+    return db.project_of(get_or_404("projects", project_id), at)
+
+
+@app.put("/projects/{project_id}/overview", response_model=Project)
+async def project_overview(project_id: str, body: ProjectOverview, r: str = Depends(auth.runners)):
+    """api.md 项目概况: full overwrite by the worker (each project's overview.json on sync, refresh) or the agent (chat)."""
+    get_or_404("projects", project_id)
+    at = db.now()
+    with conn:
+        changes.set_overview(project_id, body, at, author="system", source=auth.SOURCE_OF[r])
     return db.project_of(get_or_404("projects", project_id), at)
 
 

@@ -186,6 +186,42 @@ export type Project = {
   last_activity_at: string | null
   stale: boolean
   open_items: number
+  // 项目概况（api.md"项目概况"、design.md 8.11）；从没写过为 null
+  overview: ProjectOverview | null
+}
+
+export type KillState = 'running' | 'queued' | 'not_started' | 'passed' | 'failed' | 'done'
+
+// source：project 从项目会话自己维护的 overview.json 抄来；claude 刷新时 Claude 写；me 用户在对话里改。
+// checked_at：project 为 overview.json 的 updated_at，其余为写入时间；
+// status_file / status_changed 只对 project 有意义；*_path 是 Mac 上的绝对路径
+export type ProjectOverview = {
+  source: 'project' | 'claude' | 'me'
+  one_liner: string | null
+  status: string | null
+  kill: { state: KillState; setting: string; progress: string } | null
+  paper: {
+    title: string | null
+    format: string | null
+    pending: number | null
+    review: string | null
+    advice: string | null
+    note: string | null
+    pdf_path: string | null
+    review_path: string | null
+    dir_path: string | null
+  } | null
+  // 评审卡片（api.md"项目概况"补充 16:50）：score 0–5；novelty 等可含 Markdown 链接；objections 每条一项
+  score: number | null
+  abstract: string | null
+  novelty: string | null
+  significance: string | null
+  objections: string[] | null
+  decision: string | null
+  checked_at: string
+  status_file: string | null
+  status_changed: boolean
+  evidence: string | null
 }
 
 // worker 从 Orca 只读采集的快照，每个项目只存最新一份

@@ -18,6 +18,7 @@ import { useDeleteEvent } from '../../src/components/useDeleteEvent'
 import { TodayWide } from '../../src/desktop/TodayWide'
 import { hoverRow } from '../../src/web-data'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 电脑宽屏用 src/desktop/TodayWide.tsx；手机和浏览器窄屏用下面原来的页面
 export default function TodayScreen() {

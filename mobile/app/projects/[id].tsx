@@ -4,9 +4,9 @@ import type { GoalsList, ProjectDetail, Snapshot } from '../../src/api/types'
 import { ProjectDecision } from '../../src/components/Decision'
 import { ItemRow } from '../../src/components/ItemRow'
 import { RecordLine } from '../../src/components/RecordLine'
-import { Evidence, RichText } from '../../src/components/RichText'
+import { OverviewCard, ScoreBadge } from '../../src/components/ProjectOverview'
 import { Screen } from '../../src/components/Screen'
-import { Card, Dot, Empty, Rows, Section, Tag } from '../../src/components/ui'
+import { Card, Empty, Rows, Section, Tag } from '../../src/components/ui'
 import { category, projectStatus } from '../../src/labels'
 import { ago, when } from '../../src/time'
 import { colors, desktop, font, size } from '../../src/theme'
@@ -14,8 +14,9 @@ import { useHub } from '../../src/use-hub'
 import { useScreenIds, useViewTracking } from '../../src/usage'
 import { useChatSubject } from '../../src/wide'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
-// 项目详情：现状、事项、Orca 快照（worktree 和最近提交）、最近记录
+// 项目详情：标题旁分数徽章、概况各块（design.md 8.11 和 api.md"项目概况"补充，不再显示现状 summary）、事项、Orca 快照（worktree 和最近提交）、最近记录
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   return <ProjectPane id={id} head={{ kind: 'back', label: t('项目') }} />
@@ -33,7 +34,10 @@ export function ProjectPane({ id, head }: { id: string; head: { kind: 'back'; la
       {({ project: p, items, snapshot, records }) => (
         <>
           <View style={styles.dh}>
-            <Text style={styles.h2}>{p.title}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.h2}>{p.title}</Text>
+              <ScoreBadge overview={p.overview} />
+            </View>
             <View style={styles.chips}>
               <View style={styles.chip}>
                 <Text style={styles.chipText}>{category[p.area].label}</Text>
@@ -42,30 +46,13 @@ export function ProjectPane({ id, head }: { id: string; head: { kind: 'back'; la
               {p.stale ? <Tag label={t('7 天没动静')} tone="r" /> : null}
             </View>
             {p.repo_path === null ? null : <Text style={styles.repo}>{p.repo_path}</Text>}
-          </View>
-
-          <Card style={styles.summary}>
-            {p.summary === null ? (
-              <Text style={styles.summaryText}>{t('还没有现状总结，刷新时 worker 会写一句。')}</Text>
-            ) : (
-              <RichText text={p.summary} style={styles.summaryText} enums={false} />
-            )}
-            {p.summary_at === null ? null : (
-              <Text style={styles.meta}>
-                {when(p.summary_at)}
-                {p.summary_evidence === null ? null : (
-                  <>
-                    {` · ${t('依据：')}`}
-                    <Evidence evidence={p.summary_evidence} style={styles.meta} />
-                  </>
-                )}
-              </Text>
-            )}
             <Text style={styles.meta}>
               {t('{n} 件进行中', { n: p.open_items })} ·{' '}
               {p.last_activity_at === null ? t('还没有动静') : t('最近动静 {ago}', { ago: ago(p.last_activity_at) })}
             </Text>
-          </Card>
+          </View>
+
+          <OverviewCard overview={p.overview} />
           <ProjectDecision project={p} />
 
           <Section title={t('事项')} right={String(items.length)}>
@@ -152,7 +139,8 @@ function SnapshotView({ snapshot }: { snapshot: Snapshot }) {
 
 const styles = StyleSheet.create({
   dh: { gap: 6 },
-  h2: { ...font.bold, fontSize: size.page, color: colors.tx, letterSpacing: desktop ? 0 : -0.4, marginTop: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  h2: { ...font.bold, flexShrink: 1, fontSize: size.page, color: colors.tx, letterSpacing: desktop ? 0 : -0.4, marginTop: 4 },
   chips: { flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
   chip: {
     flexDirection: 'row',
@@ -165,8 +153,6 @@ const styles = StyleSheet.create({
   },
   chipText: { ...font.regular, fontSize: size.small, color: colors.tx2 },
   repo: { ...font.mono, fontSize: size.small, color: colors.tx2 },
-  summary: { paddingVertical: 11, paddingHorizontal: 13, gap: 5 },
-  summaryText: { ...font.regular, fontSize: size.body, color: colors.tx },
   meta: { ...font.regular, fontSize: size.small, color: colors.tx2 },
   wt: { paddingVertical: 9, paddingHorizontal: 13, gap: 3 },
   wtTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },

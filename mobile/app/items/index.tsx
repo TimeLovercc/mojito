@@ -8,6 +8,7 @@ import { category, itemStatus } from '../../src/labels'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 const CATEGORIES = Object.keys(category) as ItemCategory[]
 const STATUSES = Object.keys(itemStatus) as ItemStatus[]

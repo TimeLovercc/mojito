@@ -12,6 +12,7 @@ import { useErrorToast, useToast } from '../src/toast'
 import { colors, font, size } from '../src/theme'
 import { useHub } from '../src/use-hub'
 import { t } from '../src/i18n'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 // 口味笔记：你在对话里说过的论文偏好（"多推开源工具""少推综述"），每天挑论文时参考。
 // 不想再参考的点"不再生效"（POST /taste/{id}/retire）。新增在对话里说就行。

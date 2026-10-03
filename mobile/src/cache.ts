@@ -1,16 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { bundleId } from './bundle'
 
 // 每个 GET 路径缓存上次成功的响应，离线时拿来显示并标注"数据来自 <时间>"。
 export type Cached<T> = { data: T; fetchedAt: string }
 
-// 响应结构变了（比如 /today 加了 schedule、drafts、needs_you.projects，Record 加 attachments、card_id，Plan 加 revises，needs_you 加 feedback，Record 加 feedback_id，/today 加 overdue、days_until，Source 加 health）就把版本号加一：旧缓存不再读取，启动时清掉
-const CACHE_VERSION = 13
-const PREFIX = `mojito.cache.v${CACHE_VERSION}:`
-const OLD_PREFIX = /^mojito\.cache(\.v\d+)?:/
+// 缓存按 JS 包分开：换了包（空中更新、Mac 新版本、网页版新构建）就不再读旧包存的缓存，启动时清掉。
+// 新包可能改了响应结构（如 Project 加 overview），旧缓存喂给新代码会让页面崩掉
+const PREFIX = `mojito.cache.${bundleId}:`
+const ANY_PREFIX = /^mojito\.cache(\.[^:]+)?:/
 
 export async function dropOldCache(): Promise<void> {
   const keys = await AsyncStorage.getAllKeys()
-  await AsyncStorage.multiRemove(keys.filter((k) => OLD_PREFIX.test(k) && !k.startsWith(PREFIX)))
+  await AsyncStorage.multiRemove(keys.filter((k) => ANY_PREFIX.test(k) && !k.startsWith(PREFIX)))
 }
 const LAST_SYNC = 'mojito.lastSync'
 

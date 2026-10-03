@@ -1,5 +1,5 @@
-import type { HubRecord, Item, JobStatus, Plan } from './api/types'
-import { t } from './i18n'
+import type { HubRecord, Item, JobStatus, KillState, Plan } from './api/types'
+import { t, tc } from './i18n'
 import { colors } from './theme'
 
 // b：品牌色，只给信息流的"新动态"标签（design.md 8.10 醒目）
@@ -27,6 +27,16 @@ export const projectStatus: Record<'proposed' | 'active' | 'paused' | 'done' | '
   paused: { label: t('暂停'), tone: 'n' },
   done: { label: t('完成'), tone: 'g' },
   declined: { label: t('不要了'), tone: 'n' },
+}
+
+// 生死实验状态（api.md"项目概况"）：通过 / 完成绿、没过红，其余中性。"已完成"在别处是 Marked done，所以带上下文
+export const killState: Record<KillState, { label: string; tone: Tone }> = {
+  running: { label: tc('生死实验', '在跑'), tone: 'n' },
+  queued: { label: tc('生死实验', '排队中'), tone: 'n' },
+  not_started: { label: tc('生死实验', '未开始'), tone: 'n' },
+  passed: { label: tc('生死实验', '通过'), tone: 'g' },
+  failed: { label: tc('生死实验', '没过'), tone: 'r' },
+  done: { label: tc('生死实验', '已完成'), tone: 'g' },
 }
 
 export const feedbackStatus: Record<

@@ -1,6 +1,7 @@
 import { Children, Fragment, type ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import type { LucideIcon } from 'lucide-react-native'
+import type { Tone } from '../labels'
 import { colors, font, overlay, shadow, size } from '../theme'
 import { hoverRow } from '../web-data'
 import { dt } from './tokens'
@@ -72,6 +73,8 @@ const pillTone: Record<PillTone, { bg: string; fg: string }> = {
   ok: { bg: colors.okSoft, fg: colors.ok },
   brand: { bg: colors.brandSoft, fg: colors.brand },
 }
+// labels.ts 的标签色（手机 Tag 用）对应的胶囊色
+export const pillOf: Record<Tone, PillTone> = { g: 'ok', a: 'warn', r: 'bad', n: 'neutral', b: 'brand' }
 // mono：纯时间 / 数字用 Geist Mono（菜单栏主块的"17:00"）
 export function Pill({ label, tone, mono }: { label: string; tone: PillTone; mono?: boolean }) {
   const t = pillTone[tone]

@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 
 from mojito_agent.config import TIMEZONE
 from mojito_agent.hub import Hub
-from mojito_agent.validate import ValidationError, require_aware_datetime_or_null, require_enum, require_nonempty_str
+from mojito_agent.validate import (ValidationError, require_aware_datetime_or_null, require_enum, require_fields,
+                                   require_nonempty_str)
 
 LOCAL_TZ = ZoneInfo(TIMEZONE)
 ITEM_STATUSES = ("active", "waiting_you", "scheduled", "standing", "done", "closed")
@@ -146,6 +147,43 @@ CARD_STATUSES = ("saved", "dismissed", "new")
 HHMM = r"^([01][0-9]|2[0-3]):[0-5][0-9]$"
 
 ID_PATTERN = r"^[a-z0-9][a-z0-9-]{0,62}$"
+# Project overview (api.md 项目概况): the keys a chat may change; kill and paper are replaced whole.
+OVERVIEW_FIELDS = ("one_liner", "status", "kill", "paper", "score", "abstract", "novelty", "significance", "objections",
+                   "decision")
+SCORE_RANGE = (0, 5)
+KILL_STATES = ("running", "queued", "not_started", "passed", "failed", "done")
+PAPER_FIELDS = ("title", "format", "pending", "review", "advice", "note", "pdf_path", "review_path", "dir_path")
+OVERVIEW_CHANGES_SCHEMA = {
+    "type": "object",
+    "description": "only the keys to change; kill / paper / objections are given whole (unchanged parts copied) or null",
+    "properties": {
+        "one_liner": {"type": ["string", "null"]},
+        "status": {"type": ["string", "null"]},
+        "kill": {
+            "type": ["object", "null"],
+            "properties": {
+                "state": {"type": "string", "enum": list(KILL_STATES)},
+                "setting": {"type": "string"},
+                "progress": {"type": "string"},
+            },
+            "required": ["state", "setting", "progress"],
+            "additionalProperties": False,
+        },
+        "paper": {
+            "type": ["object", "null"],
+            "properties": {f: {"type": ["integer", "null"] if f == "pending" else ["string", "null"]} for f in PAPER_FIELDS},
+            "required": list(PAPER_FIELDS),
+            "additionalProperties": False,
+        },
+        "score": {"type": ["number", "null"], "minimum": SCORE_RANGE[0], "maximum": SCORE_RANGE[1]},
+        "abstract": {"type": ["string", "null"]},
+        "novelty": {"type": ["string", "null"], "description": "may contain Markdown links (e.g. arXiv)"},
+        "significance": {"type": ["string", "null"]},
+        "objections": {"type": ["array", "null"], "items": {"type": "string"}, "description": "the whole new list"},
+        "decision": {"type": ["string", "null"]},
+    },
+    "additionalProperties": False,
+}
 GOAL_UPDATES_SCHEMA = {
     "type": "array",
     "items": {
@@ -194,6 +232,7 @@ PROJECT_UPDATES_SCHEMA = {
                     "status": {"type": "string", "enum": list(PROJECT_STATUSES)},
                     "repo_path": {"type": ["string", "null"]},
                     "goal_id": {"type": ["string", "null"]},
+                    "overview": OVERVIEW_CHANGES_SCHEMA,
                 },
                 "additionalProperties": False,
             },
@@ -333,19 +372,53 @@ def validate_project_updates(updates: list[dict], projects_by_id: dict[str, dict
             require_nonempty_str(changes, "title", where)
         if "goal_id" in changes and changes["goal_id"] is not None and changes["goal_id"] not in goal_ids:
             raise ValidationError(f"{where}: goal_id={changes['goal_id']!r} does not exist")
+        if "overview" in changes:
+            _validate_overview_changes(changes["overview"], f"{where} overview")
+
+
+def _validate_overview_changes(changes: dict, where: str) -> None:
+    if not changes:
+        raise ValidationError(f"{where}: changes nothing")
+    if "kill" in changes and changes["kill"] is not None:
+        require_enum(changes["kill"], "state", KILL_STATES, f"{where} kill")
+    if "paper" in changes and changes["paper"] is not None:
+        require_fields(changes["paper"], PAPER_FIELDS, f"{where} paper")
+    if "score" in changes and changes["score"] is not None and not SCORE_RANGE[0] <= changes["score"] <= SCORE_RANGE[1]:
+        raise ValidationError(f"{where}: score={changes['score']!r} outside {SCORE_RANGE}")
 
 
 def apply_project_updates(hub: Hub, updates: list[dict], projects_by_id: dict[str, dict]) -> None:
     for u in updates:
-        changes = u["changes"]
+        changes = {f: v for f, v in u["changes"].items() if f != "overview"}
         if u["project_id"] not in projects_by_id:
             hub.post_project(project_id=u["project_id"], title=changes["title"], area=changes["area"],
                              repo_path=changes["repo_path"] if "repo_path" in changes else None, goal_id=changes["goal_id"])
-            continue
-        project = projects_by_id[u["project_id"]]
-        body = {f: project[f] for f in ("title", "area", "status", "repo_path", "goal_id")}
-        if {**body, **changes} != body:
-            hub.put_project(project["id"], {**body, **changes})
+            overview = None
+        else:
+            project = projects_by_id[u["project_id"]]
+            body = {f: project[f] for f in ("title", "area", "status", "repo_path", "goal_id")}
+            if {**body, **changes} != body:
+                hub.put_project(project["id"], {**body, **changes})
+            overview = project["overview"]
+        if "overview" in u["changes"]:
+            _put_overview(hub, u["project_id"], overview, u["changes"]["overview"])
+
+
+def _put_overview(hub: Hub, project_id: str, current: dict | None, changes: dict) -> None:
+    """Chat edit of a project overview (api.md 项目概况): the changed keys over the current overview (all null when the
+    project has none), written as source=me; the hub records it with an undo."""
+    if current is not None and current["source"] == "me" and all(current[f] == v for f, v in changes.items()):
+        return
+    kept = {f: None for f in OVERVIEW_FIELDS} if current is None else {f: current[f] for f in OVERVIEW_FIELDS}
+    hub.put_project_overview(project_id, {
+        **kept,
+        **changes,
+        "source": "me",
+        "checked_at": datetime.now(NY).isoformat(timespec="seconds"),
+        "status_file": None,
+        "status_changed": False,
+        "evidence": None,
+    })
 
 
 def validate_settings_update(update: dict | None) -> None:

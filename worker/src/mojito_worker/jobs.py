@@ -272,6 +272,7 @@ def refresh(hub: Hub, job: dict, lang: str) -> None:
     _refresh_items(hub, lang)
     projects.sync(hub, lang)
     projects.write_summaries(hub, lang)
+    projects.write_overviews(hub, lang)
 
 
 def _refresh_items(hub: Hub, lang: str) -> None:

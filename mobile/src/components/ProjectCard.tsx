@@ -1,13 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import type { Project } from '../api/types'
-import { projectStatus } from '../labels'
+import { killState, projectStatus } from '../labels'
 import { ago } from '../time'
 import { colors, font, size } from '../theme'
 import { Tag } from './ui'
 import { t } from '../i18n'
 
-// 项目列表里的一行：名称、状态、Claude 写的一句话现状、进行中事项数和最近动静
+// 项目列表里的一行：名称、生死实验状态、项目状态、Claude 写的一句话现状、进行中事项数和最近动静
 export function ProjectRow({ project: p }: { project: Project }) {
   const router = useRouter()
   const meta = [
@@ -22,6 +22,7 @@ export function ProjectRow({ project: p }: { project: Project }) {
       <View style={styles.top}>
         <Text style={styles.title}>{p.title}</Text>
         <View style={styles.tags}>
+          {p.overview === null || p.overview.kill === null ? null : <Tag {...killState[p.overview.kill.state]} />}
           {p.stale ? <Tag label={t('7 天没动静')} tone="r" /> : null}
           {p.status === 'active' ? null : <Tag {...projectStatus[p.status]} />}
         </View>

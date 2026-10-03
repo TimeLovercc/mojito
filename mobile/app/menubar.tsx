@@ -16,6 +16,7 @@ import { useErrorToast } from '../src/toast'
 import { trackAction } from '../src/usage'
 import { useHub } from '../src/use-hub'
 import { hoverRow } from '../src/web-data'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 // Mac 菜单栏小面板（docs/desktop-v2.md 逐页方案 8、内部界面稿（未公开） 第 4 节；desktop 开 380 宽的 Popover 窗口加载 /menubar）：
 // 头部"今天 周一 9/28"+ 更新时间；主块是下一件事（focus[0]），其余今日重点每行 32；等你拍板有才显示，主操作在右；

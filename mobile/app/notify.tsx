@@ -12,6 +12,7 @@ import { colors, desktop, font, size } from '../src/theme'
 import { useHub } from '../src/use-hub'
 import { useWide } from '../src/wide'
 import { t, tc } from '../src/i18n'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 const LABEL: Record<NotifyKind, { name: string; note: string }> = {
   brief: { name: t('早晚消息'), note: t('早上简报、晚间提问') },

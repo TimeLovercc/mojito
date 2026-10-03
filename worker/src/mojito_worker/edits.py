@@ -21,6 +21,14 @@ from mojito_worker.jobs import (
     OWNERS,
     validate_item_draft,
 )
+from mojito_worker.projects import (
+    KILL_SCHEMA,
+    OVERVIEW_FIELDS,
+    PAPER_SCHEMA,
+    REVIEW_FIELDS,
+    REVIEW_SCHEMA_PROPERTIES,
+    check_overview_content,
+)
 from mojito_worker.validate import (
     ValidationError,
     require_aware_datetime_or_null,
@@ -35,6 +43,18 @@ GOAL_STATUSES = ("active", "done", "dropped")
 PROJECT_AREAS = ("research", "life")
 PROJECT_STATUSES = ("active", "paused", "done")  # what chat may set; proposed/declined go through 等你拍板
 PROJECT_FIELDS = ("title", "area", "status", "goal_id")
+# api.md 项目概况: only the overview keys to change; kill / paper are given whole or null.
+OVERVIEW_CHANGES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "one_liner": {"type": ["string", "null"]},
+        "status": {"type": ["string", "null"]},
+        "kill": KILL_SCHEMA,
+        "paper": PAPER_SCHEMA,
+        **REVIEW_SCHEMA_PROPERTIES,
+    },
+    "additionalProperties": False,
+}
 EDITABLE_PLAN_STATUSES = ("active", "draft")
 CARD_STATUSES = ("saved", "dismissed", "new")
 SETTINGS_FIELDS = ("morning_at", "evening_at", "evening_enabled")
@@ -88,6 +108,7 @@ SCHEMAS = {
         "area": {"type": "string", "enum": list(PROJECT_AREAS)},
         "status": {"type": "string", "enum": list(PROJECT_STATUSES)},
         "goal_id": {"type": ["string", "null"]},
+        "overview": OVERVIEW_CHANGES_SCHEMA,
     }),
     "plan_updates": {
         "type": "array",
@@ -171,8 +192,15 @@ reply 里说清改了什么，并说可以在动态里撤销。只放用户要�
   done_definition 永远不能改。
 - goal_updates [{goal_id, changes}]：title、status（active / done / dropped）。新建目标：goal_id 用一个新的
   小写字母数字连字符 id（如 g-trip），changes 里 title 和 status 都要给。
-- project_updates [{project_id, changes}]：title、area（research / life）、status（active / paused / done）、goal_id。
+- project_updates [{project_id, changes}]：title、area（research / life）、status（active / paused / done）、goal_id、overview。
   新建项目：project_id 用新的小写 id，changes 里 title、area、goal_id 都要给（新建即进行中）。
+  overview（项目页的概况，只放要改的键）：one_liner（一句话）、status（状态，一段文字）、
+  kill（生死实验 {state, setting, progress}，state 为 running / queued / not_started / passed / failed / done）、
+  paper（论文 {title, format, pending, review, advice, note, pdf_path, review_path, dir_path}，pending 为整数或 null）。
+  评审卡片：score（0–5 的数，如 3.0）、abstract（摘要）、novelty（查新，可含 Markdown 链接）、significance（意义与下一步）、
+  objections（审稿质疑，字符串数组，每条一项，要整个列表给出）、decision（决定）。
+  kill、paper 要整个给出（没改的子字段照抄当前值），"没有生死实验 / 论文"就给 null；评审卡片的字段"删掉 / 没有"也给 null。
+  项目当前 overview.source 是 project 时不要改，reply 里说"这个项目的卡片由它自己的会话维护，请在那个会话里改"。
 - plan_updates [{plan_id, add_item_ids, remove_item_ids, goal_ids, start, end}]：用户要求改当前（或草稿）计划时直接改；
   goal_ids / start / end 不改就 null，日期格式 YYYY-MM-DD。
 - plan_changes：只有你自己觉得计划该调整、用户没要求时才用（起草修订版进"等你拍板"，用户批准才生效）；否则 null。
@@ -253,7 +281,7 @@ def validate(answer: dict, ctx: EditContext, hub: Hub) -> None:
         where = f"claude reply project_updates[{i}]"
         require_fields(u, ("project_id", "changes"), where)
         ch = u["changes"]
-        _check_changes(ch, PROJECT_FIELDS, where)
+        _check_changes(ch, (*PROJECT_FIELDS, "overview"), where)
         if u["project_id"] not in ctx.projects:
             _check_new_id(u["project_id"], project_ids, where)
             require_fields(ch, ("title", "area", "goal_id"), where)
@@ -268,6 +296,9 @@ def validate(answer: dict, ctx: EditContext, hub: Hub) -> None:
             require_enum(ch, "status", PROJECT_STATUSES, where)
         if "goal_id" in ch:
             _check_ref(ch["goal_id"], goal_ids, "goal_id", where)
+        if "overview" in ch:
+            current = ctx.projects[u["project_id"]]["overview"] if u["project_id"] in ctx.projects else None
+            _check_overview_changes(ch["overview"], current, f"{where} overview")
 
     for i, item in enumerate(answer["new_items"]):
         where = f"claude reply new_items[{i}]"
@@ -368,6 +399,15 @@ def validate(answer: dict, ctx: EditContext, hub: Hub) -> None:
                 raise ValidationError(f"{where}: labs must not be empty")
 
 
+def _check_overview_changes(ch: dict, current: dict | None, where: str) -> None:
+    """`current` is the project's overview: None when it has none (or the reply creates the project)."""
+    if not ch:
+        raise ValidationError(f"{where}: empty changes")
+    if current is not None and current["source"] == "project":
+        raise ValidationError(f"{where}: the overview is kept by the project's own session (overview.json); edit it there")
+    check_overview_content(ch, where)
+
+
 def _check_plan_delta(delta: dict, plan: dict, item_ids: set[str], goal_ids: set[str], where: str) -> None:
     if not set(delta["add_item_ids"]) <= item_ids:
         raise ValidationError(f"{where}: add_item_ids {delta['add_item_ids']} not all known items")
@@ -390,13 +430,18 @@ def apply(hub: Hub, answer: dict, ctx: EditContext) -> None:
         hub.put_goal(u["goal_id"], {**base, **u["changes"]})
 
     for u in answer["project_updates"]:
+        ch = {f: v for f, v in u["changes"].items() if f != "overview"}
         if u["project_id"] in ctx.projects:
             p = ctx.projects[u["project_id"]]
-            hub.put_project(p["id"], {**{k: p[k] for k in (*PROJECT_FIELDS, "repo_path")}, **u["changes"]})
+            if ch:
+                hub.put_project(p["id"], {**{k: p[k] for k in (*PROJECT_FIELDS, "repo_path")}, **ch})
+            overview = p["overview"]
         else:
-            ch = u["changes"]
             hub.create_project({"id": u["project_id"], "title": ch["title"], "area": ch["area"],
                                 "repo_path": None, "goal_id": ch["goal_id"]})
+            overview = None
+        if "overview" in u["changes"]:
+            _put_my_overview(hub, u["project_id"], overview, u["changes"]["overview"])
 
     for n, item in enumerate(answer["new_items"], start=1):
         hub.put_item(f"{ctx.new_item_prefix}-{n}", {
@@ -453,6 +498,29 @@ def apply(hub: Hub, answer: dict, ctx: EditContext) -> None:
     # Last, so a run sees this message's other edits (e.g. new labs).
     for kind in answer["run_jobs"]:
         hub.create_job(kind, "mac", None)
+
+
+def _put_my_overview(hub: Hub, project_id: str, current: dict | None, changes: dict) -> None:
+    """api.md 项目概况: the changed keys over the current overview (all null when there is none), written as
+    source=me; the hub records "从 X 改成 Y" with an undo."""
+    if current is None:
+        base = dict.fromkeys(OVERVIEW_FIELDS)
+    else:
+        # Rollout (api.md 补充 16:50): the worker ships before the hub, whose overviews do not carry the
+        # review-card fields yet and which ignores them on PUT; until then they are sent as null.
+        base = {**dict.fromkeys(REVIEW_FIELDS),
+                **{f: current[f] for f in OVERVIEW_FIELDS if f not in REVIEW_FIELDS or f in current}}
+        if current["source"] == "me" and all(f in current and current[f] == v for f, v in changes.items()):
+            return
+    hub.put_project_overview(project_id, {
+        **base,
+        **changes,
+        "source": "me",
+        "checked_at": datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds"),
+        "status_file": None,
+        "status_changed": False,
+        "evidence": None,
+    })
 
 
 def draft_plan_revision(hub: Hub, plan_changes: dict, active_plan: dict) -> str:

@@ -1244,7 +1244,7 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
   - 论文：沿用原 `feed_papers` 的扫描与两轮筛选（候选去掉已出现过的：旧论文卡和历次简报里的 arXiv id），选 5–10 篇；
   - 网页新闻：Google News RSS 搜索，中英文两版、过去 24 小时；几条通用的 AI 查询，加上 `watch.labs` 逐家一条。
 - 输出一张卡：`kind=brief`、`origin=brief`、`title="今日 AI 简报 · M/D"`（英文 "Daily AI brief · M/D"）、`summary` 3 行要点、`dedupe_key` = 配置时区的日期（当天已发过就跳过）。`body` 按顺序分节：新模型发布、重要论文、开源项目、行业新闻、趋势解读、实验室覆盖；没有内容的节写"今天没有"。
-- 写法：每条一行（一句话 + 链接）；论文每篇"做了什么"一句 +"和你有关"一句；趋势解读 ≤ 3 句；实验室覆盖按名单顺序每家一条，上面已写过的写"见上"。引用的每条链接必须来自素材，同一链接不许引两次（同一件事只写一次）；正文去掉链接地址后 ≤ 4000 字，超了报错。
+- 写法：每条一行（一句话 + 链接）；论文每篇"做了什么"一句 +"和你有关"一句；趋势解读 ≤ 3 句；实验室覆盖按名单顺序每家一条，上面已写过的写"见上"。素材每条带一个编号（`n1`、`n2`…，同一链接一个编号），Claude 只填编号、不写链接，脚本按编号查回链接（长链接让模型抄写容易抄错）；编号不在素材里报错，同一编号不许引两次（同一件事只写一次）；正文去掉链接地址后 ≤ 4000 字，超了报错。
 - 链接文字写具体出处：素材里的媒体或网站名，没有名字时用域名（去掉 `www.`）；论文以标题为链接文字。引用的 Google News 跳转链接由脚本解析成原文地址，解析不了保留原链接。
 - 订阅 result 报一句（"简报写好：论文 N 篇、新闻 M 条"）；任一素材源失败 → 跳过它、health=warn 并写是哪个源，简报照写，正文末尾注明没取到的来源。
 - 数据源 `feed-papers`：worker 每次写完简报为它心跳（`expected_interval_s=93600`）并报健康：论文抓取失败 → error，抓到但筛完 0 篇 → warn，其余 ok（detail 写篇数或失败原因）。
@@ -1252,7 +1252,7 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 ## feed_watch（worker）
 - 查上次成功运行以来（首次：过去 `every_hours` 小时）`labs` 逐家的网页新闻。
 - `claude -p` 只留实质事件：新发布、开源（权重、代码）、重要技术报告或论文、争议或安全事件，也包括关于这些的传闻、泄露、曝光；股价、融资、泛泛评测、旧闻不算。没有就不发卡，result 写"没有新动态"。
-- 每个事件一张卡：`kind=alert`、`origin="watch:<实验室>"`、`title` 前加【传闻】或【确认】（英文 "[Rumor] " / "[Confirmed] "）、`summary` 3 行（第一行写消息来源和可信度）、`body` = 细节一段 + "相关链接"（每条写"出处：文章标题"，标题过长截断）、`link` = 第一条链接。
+- 每个事件一张卡：`kind=alert`、`origin="watch:<实验室>"`、`title` 前加【传闻】或【确认】（英文 "[Rumor] " / "[Confirmed] "）、`summary` 3 行（第一行写消息来源和可信度）、`body` = 细节一段 + "相关链接"（每条写"出处：文章标题"，标题过长截断）、`link` = 第一条链接。出处同简报只填素材编号（`refs`，1–3 个），脚本查回链接。
 - 去重：事件键 `<实验室>:<事件简称>`，确认的加 `:confirmed`，作为 `dedupe_key`；worker 把已报的键和上次成功时间记在本机 `~/.mojito-worker/watch.json`。同一事件按传闻报一次、确认后再报一次；确认过的不再按传闻报。
 - 读 X 的插件：hub 的授权状态接受名字 `x`（显示为 X），留给自己加的读 X 的插件报登录状态；公开版不自带。
 
@@ -1319,6 +1319,71 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 # Mac app 打开外部链接（design.md 8.4）
 
 - 网页版里 `Linking.openURL` 就是 `window.open`，Mac app 的 WebView 会直接丢掉。Mac 外壳注入的脚本接管 `window.open` 和指向外站的 `<a>` 点击，交给 Tauri 命令 `open_external`，用系统默认浏览器（或对应 app）打开；只放行 `http`、`https`、`orca`，其他协议拒绝并记日志。主窗口和菜单栏面板都生效。
+
+---
+
+# 项目概况（design.md 8.11）
+
+起因：项目页只有标题、会话和最近记录，看不出项目到哪一步。每个项目都有一张概况卡片：一句话、状态、生死实验、论文，加上评审卡片（摘要、查新、意义与下一步、审稿质疑、分数、决定）。卡片由**项目自己的会话**维护在它目录里的 `overview.json`，worker 照抄；没有这个文件的项目，刷新时由 Claude 整理。
+
+## ProjectOverview（Project 新增字段 `overview: ProjectOverview | null`）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `source` | `project` \| `claude` \| `me` | project = 从项目的 `overview.json` 抄来；claude = 刷新时 Claude 写；me = 用户在对话里改 |
+| `one_liner` | str \| null | 一句话 |
+| `status` | str \| null | 状态（一段文字；和 Project.status 枚举无关） |
+| `kill` | object \| null | 生死实验 `{state, setting, progress}`：`state` ∈ `running` \| `queued` \| `not_started` \| `passed` \| `failed` \| `done`；`setting`、`progress` 为 str。没有生死实验时为 null |
+| `paper` | object \| null | 论文 `{title, format, pending, review, advice, note, pdf_path, review_path, dir_path}`：`pending` 为 int \| null，其余为 str \| null；`*_path` 是 Mac 上的绝对路径。没有论文时为 null |
+| `score` | number \| null | 分数（0–5，如 3.0） |
+| `abstract` | str \| null | 摘要 |
+| `novelty` | str \| null | 查新（可含 Markdown 链接，如 arXiv） |
+| `significance` | str \| null | 意义与下一步 |
+| `objections` | list[str] \| null | 审稿质疑，每条一项（含"能回答 / 只能部分回答"） |
+| `decision` | str \| null | 决定 |
+| `checked_at` | datetime | project：`overview.json` 的 `updated_at`；claude / me：写入时间 |
+| `status_file` | str \| null | project：同目录 STATUS.md 的路径（不存在为 null）；其余 null |
+| `status_changed` | bool | project：STATUS.md 的修改时间晚于 `updated_at` 10 分钟以上；其余 false |
+| `evidence` | str \| null | project：该 `overview.json` 的路径；claude：依据（文件、提交、记录）或 `inferred`；me：null |
+
+- `GET /projects`、`GET /projects/{id}` 的 Project 都带 `overview`（从没写过为 null）。
+
+## 接口
+
+| 方法 | 路径 | 令牌 | 作用 |
+|---|---|---|---|
+| PUT | `/projects/{id}/overview` | worker / agent | 覆盖写，请求体为上表全部字段（可为 null 的显式传 null）→ Project。项目不存在 → 404 |
+
+- `source` 为 `project` / `claude` 时 hub 只存，不写记录（worker 每次同步都会写，不刷屏）。
+- `source` 为 `me` 时 hub 像其他对象一样写"<项目>：<字段> 从 X 改成 Y"记录（`kind=log`、`tier=log`；生死实验、论文按子字段比较，审稿质疑整列表比较），带 `undo = {"type": "project_overview", "project_id", "before": <原 overview 或 null>}`；撤销由 hub 直接恢复 `before`。之后又被写过 → 409（规则同事项）。
+
+## overview.json（项目会话维护）
+
+- 放在项目会话工作的目录（和它的 STATUS.md 同一层），全部键必填、可 null，多一个少一个都算格式不对：
+  `{"updated_at": "<ISO-8601 带时区>", "one_liner", "status", "kill": {"state", "setting", "progress"} | null, "paper": {"title", "format", "pending", "review", "advice", "note", "pdf_path", "review_path", "dir_path"} | null, "score", "abstract", "novelty", "significance", "objections", "decision"}`（类型同 ProjectOverview；`*_path` 为绝对路径）。
+- 谁更新：该项目的会话。状态和生死实验进展：每次改 STATUS.md 时一起改；一句话、摘要、查新、意义与下一步、审稿质疑、分数、决定：过关口、重新评审、改方向时改。每次改都更新 `updated_at`。
+
+## 谁来写
+
+1. **项目自己的卡片**（worker，`sync_projects` 每次跑）：对每个 hub 项目，在 `repo_path` 和 Orca 快照里该项目的所有 worktree 路径下找 `overview.json`，取 `updated_at` 最新的一份，写 `source=project` 的 overview（字段照抄；`checked_at`、`status_file`、`status_changed`、`evidence` 见上表）。每次覆盖，用户改过的也覆盖。文件格式不对 → 只跳过那个项目，`sync-projects` 健康报 error，detail 写项目和原因。
+2. **其他项目**（worker，`refresh` 时和 summary 一起写）：找不到 `overview.json` 的 active 项目，Claude 读仓库根目录的 BRIEF.md 和 STATUS.md（都没有就读 README / 交接文档）、Orca 快照、项目记录和事项，写 `source=claude` 的 overview；推断的内容 `evidence=inferred`。没有生死实验、论文或评审内容就写 null，不编；论文路径必须是存在的绝对路径。当前 `source=me` 的不覆盖。
+3. **对话里改**（agent / worker 的 chat_reply）：`project_updates` 的 `changes` 新增 `overview`（只放要改的键：`one_liner`、`status`、`kill`、`paper` 和评审卡片 6 个键；`kill`、`paper` 给完整对象或 null），脚本以当前 overview 为底合并后 `PUT /projects/{id}/overview`，`source=me`。`source=project` 的项目不改，回复"这个项目的卡片由它自己的会话维护，请在那个会话里改"。
+
+- `sync_projects` 发现新仓库建 `proposed` 项目时，标题用仓库目录名，Claude 只定 id 和分组。
+
+## app（项目页，手机和 Mac）
+
+- 项目详情：标题右侧分数徽章（`score` 为 null 不显示）；标题下依次 一句话 → 状态 → 生死实验 → 论文 → 摘要 → 查新 → 意义与下一步 → 审稿质疑（编号列表）→ 决定，**每个项目都显示**（取代 8.5a"空的块不显示"在这一页的规则）；字段为 null 显示"没有"（overview 整个为 null 时都显示"还没有"）；文字按 Markdown 渲染链接。
+  - 生死实验：状态胶囊（在跑 / 排队中 / 未开始 / 通过 / 没过 / 已完成），下面"进展"，"设置"默认折叠。
+  - 论文：标题 + 胶囊（format、"N 处 pending"、"评审 <review>"、advice）；只有 `note` 时只显示 note。Mac 上 `pdf_path` / `review_path` / `dir_path` 显示为可点的"PDF""评审""文件夹"，用系统默认程序打开（desktop 外壳的 Tauri 命令 `open_path`：只接受存在的绝对路径，否则拒绝并记日志）；手机不显示这三个链接。
+  - 卡片下一行来源小字：project 写"项目会话更新于 <本地时间>"，`status_changed=true` 时加琥珀胶囊"STATUS 之后有改动"；claude 写"Claude 整理 · <多久前>"；me 写"你改的 · <多久前>"。
+  - 原来的"现状"（Project.summary）在项目详情里不再显示；summary 字段保留给 agent 上下文用。事项、会话、最近记录照旧。
+- 项目列表：每个项目名右边一个生死实验状态小胶囊；`kill` 为 null 不显示。
+- 英文界面：One line / Status / Kill test / Paper / Abstract / Novelty / Significance & next / Objections / Decision、徽章 Score；胶囊词 Running / Queued / Not started / Passed / Failed / Done。
+
+## 上线顺序
+
+hub 先部署（`overview` 字段出现在响应里）→ worker → agent → app 空中更新 + Mac 新版本。app 读不到 `overview` 字段会报错，所以必须 hub 先上。
 
 ---
 

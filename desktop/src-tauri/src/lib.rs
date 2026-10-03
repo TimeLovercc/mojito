@@ -58,6 +58,22 @@ fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
     Ok(())
 }
 
+// 本地文件（项目页论文块的 PDF / 评审 / 文件夹，docs/api.md「项目概况」）：交给 macOS 的 open，
+// 用系统默认程序打开（PDF 用预览、文件夹用 Finder）。只接受存在的绝对路径；不接受的记日志
+#[tauri::command]
+fn open_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    if !path.starts_with('/') || !std::path::Path::new(&path).exists() {
+        weblog::write(&app, &format!("open_path refused {path}"))?;
+        return Err(format!("不打开 {path}（要存在的绝对路径）"));
+    }
+    let status = std::process::Command::new("/usr/bin/open").arg(&path).status().map_err(|e| format!("open {path}：{e}"))?;
+    if !status.success() {
+        weblog::write(&app, &format!("open_path failed {path}: {status}"))?;
+        return Err(format!("open {path} 失败：{status}"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn set_theme(app: tauri::AppHandle, scheme: String) -> Result<(), String> {
     theme::set(&app, &scheme)
@@ -160,7 +176,7 @@ pub fn run() {
             weblog::write(webview.app_handle(), &format!("{} web content process terminated, reloading", webview.label())).unwrap();
             webview.reload().unwrap();
         })
-        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, set_size, open_external, fetch::hub_fetch])
+        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, set_size, open_external, open_path, fetch::hub_fetch])
         .setup(|app| {
             build_main(app)?;
             tray::build(app)?;

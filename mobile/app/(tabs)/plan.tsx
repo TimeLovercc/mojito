@@ -13,6 +13,7 @@ import { colors, font, size } from '../../src/theme'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 type Tab = 'current' | 'history'
 

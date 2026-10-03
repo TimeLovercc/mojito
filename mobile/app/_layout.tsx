@@ -18,6 +18,7 @@ import { syncWindowTheme } from '../src/window-theme'
 import { useTauriEvents } from '../src/tauri-events'
 import { tauri } from '../src/tauri'
 import { useLanguageSync } from '../src/i18n/sync'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 installDesktopCss()
 syncWindowTheme(colorSchemeSetting)

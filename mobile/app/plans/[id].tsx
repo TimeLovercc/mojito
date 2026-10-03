@@ -8,6 +8,7 @@ import { Screen } from '../../src/components/Screen'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()

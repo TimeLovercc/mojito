@@ -4,7 +4,7 @@ and have no defaults except where api.md marks a field optional."""
 import base64
 import logging
 from contextvars import ContextVar
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
@@ -165,6 +165,56 @@ class Job(BaseModel):
     error: str | None
 
 
+KillState = Literal["running", "queued", "not_started", "passed", "failed", "done"]
+
+
+class OverviewKill(Body):
+    state: KillState
+    setting: str
+    progress: str
+
+
+class OverviewPaper(Body):
+    title: str | None
+    format: str | None
+    pending: int | None
+    review: str | None
+    advice: str | None
+    note: str | None
+    pdf_path: str | None  # *_path: absolute paths on the Mac
+    review_path: str | None
+    dir_path: str | None
+
+
+# api.md 项目概况 补充 (16:50): the idea review card's fields, in card order.
+OVERVIEW_REVIEW_FIELDS = ("abstract", "novelty", "significance", "objections", "score", "decision")
+
+
+class ProjectOverview(Body):
+    """api.md 项目概况: one line / status / kill test / paper plus the review card, written
+    whole by worker or agent."""
+    source: Literal["project", "claude", "me"]
+    one_liner: str | None
+    status: str | None  # free text, unrelated to Project.status
+    kill: OverviewKill | None
+    paper: OverviewPaper | None
+    abstract: str | None
+    novelty: str | None  # may hold Markdown links
+    significance: str | None
+    objections: list[str] | None
+    score: Annotated[float, Field(ge=0, le=5)] | None
+    decision: str | None
+    checked_at: AwareDatetime
+    status_file: str | None
+    status_changed: bool
+    evidence: str | None
+
+    @field_validator("checked_at")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return v.astimezone(UTC)  # stored and returned in UTC like every other time
+
+
 class Project(BaseModel):
     id: str
     title: str
@@ -178,6 +228,7 @@ class Project(BaseModel):
     last_activity_at: datetime | None
     stale: bool
     open_items: int
+    overview: ProjectOverview | None
 
 
 class SnapshotWorktree(Body):

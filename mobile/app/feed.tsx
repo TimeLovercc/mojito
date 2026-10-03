@@ -13,6 +13,7 @@ import { useHub } from '../src/use-hub'
 import { useViewTracking } from '../src/usage'
 import { useMarkReadOnLeave } from '../src/read-mark'
 import { t } from '../src/i18n'
+export { PageError as ErrorBoundary } from '../src/components/PageError'
 
 const PAGE = 30
 

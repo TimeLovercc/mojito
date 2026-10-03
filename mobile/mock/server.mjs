@@ -67,7 +67,14 @@ const projects = [
     ...(p.id in extra.project_summaries ? extra.project_summaries[p.id] : noSummary),
   })),
   ...extra.projects,
-].map((p) => ({ ...p, summary_at: toUtc(p.summary_at) }))
+  // 概况（api.md"项目概况"）：extra.json 的 project_overviews 演示 project / claude / me 三种来源，其余项目从没写过（null）
+].map((p) => ({
+  ...p,
+  summary_at: toUtc(p.summary_at),
+  overview: p.id in extra.project_overviews
+    ? { ...extra.project_overviews[p.id], checked_at: toUtc(extra.project_overviews[p.id].checked_at) }
+    : null,
+}))
 const snapshots = Object.fromEntries(
   Object.entries(extra.snapshots).map(([id, s]) => [
     id,

@@ -9,6 +9,7 @@ import { when } from '../../src/time'
 import { colors, font, size } from '../../src/theme'
 import { useHub } from '../../src/use-hub'
 import { t } from '../../src/i18n'
+export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 单条记录（文字里的记录链接跳到这里）：全文、项目、挂的事项
 export default function RecordScreen() {
