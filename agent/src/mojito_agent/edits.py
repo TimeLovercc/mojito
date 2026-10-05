@@ -151,7 +151,7 @@ ID_PATTERN = r"^[a-z0-9][a-z0-9-]{0,62}$"
 OVERVIEW_FIELDS = ("one_liner", "status", "kill", "paper", "score", "abstract", "novelty", "significance", "objections",
                    "decision")
 SCORE_RANGE = (0, 5)
-KILL_STATES = ("running", "queued", "not_started", "passed", "failed", "done")
+KILL_STATES = ("running", "queued", "not_started", "passed", "failed", "done", "paused", "stopped")
 PAPER_FIELDS = ("title", "format", "pending", "review", "advice", "note", "pdf_path", "review_path", "dir_path")
 OVERVIEW_CHANGES_SCHEMA = {
     "type": "object",

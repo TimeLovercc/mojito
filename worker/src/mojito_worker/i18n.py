@@ -62,6 +62,21 @@ EN = {
     "，新发现 {n} 个仓库": ", found {n} new repos",
     "，{n} 个项目概况来自项目的 overview.json": ", {n} project overviews from the projects' overview.json",
     "项目概况文件有问题：{problems}（{detail}）": "Problem in project overview files: {problems} ({detail})",
+    # overview.json check (overview.py)
+    "缺少键 {key}": "missing key {key}",
+    "{key} 必须是对象或 null，现在是 {value}": "{key} must be an object or null, got {value}",
+    "kill.state 只能是 {allowed}，现在是 {value}": "kill.state must be one of {allowed}, got {value}",
+    "{key} 必须是字符串，现在是 {value}": "{key} must be a string, got {value}",
+    "paper.pending 必须是整数或 null，现在是 {value}": "paper.pending must be an integer or null, got {value}",
+    "{key} 必须是字符串或 null，现在是 {value}": "{key} must be a string or null, got {value}",
+    "{key} 必须是绝对路径或 null（不许空串），现在是 {value}":
+        "{key} must be an absolute path or null (not an empty string), got {value}",
+    "score 必须是 0–5 的数字或 null，现在是 {value}": "score must be a number from 0 to 5 or null, got {value}",
+    "objections 必须是字符串列表或 null，现在是 {value}": "objections must be a list of strings or null, got {value}",
+    "updated_at 必须是带时区的 ISO-8601 时间，现在是 {value}":
+        "updated_at must be an ISO-8601 time with a timezone, got {value}",
+    "不是合法的 JSON：{error}": "not valid JSON: {error}",
+    "顶层必须是 JSON 对象，现在是 {value}": "the top level must be a JSON object, got {value}",
     # review
     "{summary}\n\n这两周用了哪些、没用哪些：{usage}": "{summary}\n\nWhat got used these two weeks and what didn't: {usage}",
     "{pattern}（依据：{evidence}）": "{pattern} (evidence: {evidence})",
@@ -80,6 +95,9 @@ EN = {
     "维护会话一直没有心跳，": "The maintainer session has never sent a heartbeat; ",
     "已在 mojito 主 worktree 开了新的维护会话接班，它会先读交接文档再继续。":
         "opened a new maintainer session in the main mojito worktree; it reads the handover doc first.",
+    "已请 Orca 在 mojito 主 worktree 开新的维护会话接班；Orca 回复超时，新会话可能几分钟后才出现。":
+        "asked Orca to open a new maintainer session in the main mojito worktree; Orca's reply timed out, "
+        "so the new session may take a few minutes to appear.",
 }
 
 

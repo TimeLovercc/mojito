@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 mojito-worker = "mojito_worker:main"
+mojito-overview-check = "mojito_worker.overview:main"
 
 [build-system]
 requires = ["hatchling"]

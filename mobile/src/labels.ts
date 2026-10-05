@@ -29,14 +29,16 @@ export const projectStatus: Record<'proposed' | 'active' | 'paused' | 'done' | '
   declined: { label: t('不要了'), tone: 'n' },
 }
 
-// 生死实验状态（api.md"项目概况"）：通过 / 完成绿、没过红，其余中性。"已完成"在别处是 Marked done，所以带上下文
+// 生死实验状态（api.md"项目概况"补充 2026-10-04）：只有通过绿、没过红，其余（含已完成）中性灰。"已完成"在别处是 Marked done，所以带上下文
 export const killState: Record<KillState, { label: string; tone: Tone }> = {
   running: { label: tc('生死实验', '在跑'), tone: 'n' },
   queued: { label: tc('生死实验', '排队中'), tone: 'n' },
   not_started: { label: tc('生死实验', '未开始'), tone: 'n' },
   passed: { label: tc('生死实验', '通过'), tone: 'g' },
   failed: { label: tc('生死实验', '没过'), tone: 'r' },
-  done: { label: tc('生死实验', '已完成'), tone: 'g' },
+  done: { label: tc('生死实验', '已完成'), tone: 'n' },
+  paused: { label: tc('生死实验', '暂停'), tone: 'n' },
+  stopped: { label: tc('生死实验', '已停'), tone: 'n' },
 }
 
 export const feedbackStatus: Record<

@@ -5,25 +5,35 @@ active project and a Claude overview for the active projects without an overview
 Orca and git are read-only here. Worktrees are tied to repos by Orca's repoId, repos to projects
 by repo_path (api.md 项目概况).
 """
-import json
+import logging
 import re
 import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from mojito_worker import claude, health, orca
+from mojito_worker import claude, health, orca, overview
 from mojito_worker.hub import Hub
 from mojito_worker.i18n import say
 from mojito_worker.local_facts import LocalFactError
+from mojito_worker.overview import (
+    KILL_SCHEMA,
+    OVERVIEW_FIELDS,
+    OVERVIEW_FILE,
+    PAPER_PATHS,
+    PAPER_SCHEMA,
+    REVIEW_SCHEMA_PROPERTIES,
+    check_overview_content,
+)
 from mojito_worker.prompting import user_text_rules, dump, now_context
 from mojito_worker.redact import redact
 from mojito_worker.validate import (
     ValidationError,
-    require_aware_datetime_or_null,
     require_enum,
     require_fields,
     require_nonempty_str,
 )
+
+log = logging.getLogger("mojito_worker.projects")
 
 PROJECT_STATUSES = ("proposed", "active", "paused", "done", "declined")
 AREAS = ("research", "life")
@@ -35,97 +45,10 @@ README_CHARS = 2000
 PROJECT_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
-# ---------------------------------------------------------------- overview (api.md 项目概况)
+# ---------------------------------------------------------------- overview.json (api.md 项目概况 补充 17:00)
 
-# api.md 项目概况 补充 16:50: the review-card fields.
-REVIEW_FIELDS = ("score", "abstract", "novelty", "significance", "objections", "decision")
-OVERVIEW_FIELDS = ("one_liner", "status", "kill", "paper", *REVIEW_FIELDS)  # the content; the rest is bookkeeping
-SCORE_RANGE = (0, 5)
-KILL_STATES = ("running", "queued", "not_started", "passed", "failed", "done")
-PAPER_FIELDS = ("title", "format", "pending", "review", "advice", "note", "pdf_path", "review_path", "dir_path")
-PAPER_PATHS = ("pdf_path", "review_path", "dir_path")
-KILL_SCHEMA = {
-    "type": ["object", "null"],
-    "properties": {
-        "state": {"type": "string", "enum": list(KILL_STATES)},
-        "setting": {"type": "string"},
-        "progress": {"type": "string"},
-    },
-    "required": ["state", "setting", "progress"],
-    "additionalProperties": False,
-}
-PAPER_SCHEMA = {
-    "type": ["object", "null"],
-    "properties": {f: {"type": ["integer", "null"] if f == "pending" else ["string", "null"]} for f in PAPER_FIELDS},
-    "required": list(PAPER_FIELDS),
-    "additionalProperties": False,
-}
-REVIEW_SCHEMA_PROPERTIES = {
-    "score": {"type": ["number", "null"]},
-    "abstract": {"type": ["string", "null"]},
-    "novelty": {"type": ["string", "null"]},
-    "significance": {"type": ["string", "null"]},
-    "objections": {"type": ["array", "null"], "items": {"type": "string"}},
-    "decision": {"type": ["string", "null"]},
-}
-TEXT_FIELDS = ("one_liner", "status", "abstract", "novelty", "significance", "decision")
-# api.md 补充 17:00: each project's session keeps overview.json next to its STATUS.md.
-OVERVIEW_FILE = "overview.json"
 STATUS_FILE = "STATUS.md"
-FILE_FIELDS = ("updated_at", *OVERVIEW_FIELDS)
 STATUS_CHANGED_AFTER = timedelta(minutes=10)  # STATUS.md edited this long after updated_at = changed since
-
-
-def _require_exact_keys(obj, keys: tuple[str, ...], where: str) -> None:
-    if not isinstance(obj, dict):
-        raise ValidationError(f"{where}: expected an object, got {obj!r}")
-    missing, unknown = sorted(set(keys) - set(obj)), sorted(set(obj) - set(keys))
-    if missing or unknown:
-        raise ValidationError(f"{where}: missing keys {missing}, unknown keys {unknown}")
-
-
-def _is_str_or_null(value) -> bool:
-    return value is None or isinstance(value, str)
-
-
-def _check_kill(kill, where: str) -> None:
-    _require_exact_keys(kill, ("state", "setting", "progress"), where)
-    require_enum(kill, "state", KILL_STATES, where)
-    if not isinstance(kill["setting"], str) or not isinstance(kill["progress"], str):
-        raise ValidationError(f"{where}: setting and progress must be strings, got {kill}")
-
-
-def _check_paper(paper, where: str) -> None:
-    _require_exact_keys(paper, PAPER_FIELDS, where)
-    pending = paper["pending"]
-    if pending is not None and (isinstance(pending, bool) or not isinstance(pending, int)):
-        raise ValidationError(f"{where}: pending must be an integer or null, got {pending!r}")
-    bad = [f for f in PAPER_FIELDS if f != "pending" and not _is_str_or_null(paper[f])]
-    bad += [f for f in PAPER_PATHS if isinstance(paper[f], str) and not Path(paper[f]).is_absolute()]
-    if bad:
-        raise ValidationError(f"{where}: {bad} must be strings or null (paths absolute), got {paper}")
-
-
-def check_overview_content(o: dict, where: str) -> None:
-    """The overview content keys present in `o`: all of them in a full overview, some in a chat change."""
-    bad = [f for f in TEXT_FIELDS if f in o and not _is_str_or_null(o[f])]
-    if bad:
-        raise ValidationError(f"{where}: {bad} must be strings or null")
-    if "kill" in o and o["kill"] is not None:
-        _check_kill(o["kill"], f"{where} kill")
-    if "paper" in o and o["paper"] is not None:
-        _check_paper(o["paper"], f"{where} paper")
-    if "score" in o and o["score"] is not None:
-        score = o["score"]
-        if isinstance(score, bool) or not isinstance(score, int | float) or not SCORE_RANGE[0] <= score <= SCORE_RANGE[1]:
-            raise ValidationError(f"{where}: score={score!r} is not a number in {SCORE_RANGE}")
-    if "objections" in o and o["objections"] is not None and not _nonempty_strings(o["objections"]):
-        raise ValidationError(f"{where}: objections must be a non-empty list of non-empty strings (or null), "
-                              f"got {o['objections']!r}")
-
-
-def _nonempty_strings(values) -> bool:
-    return isinstance(values, list) and bool(values) and all(isinstance(v, str) and v.strip() for v in values)
 
 
 def _project_dirs(repo_path: str | None, worktrees: list[dict]) -> list[str]:
@@ -137,23 +60,19 @@ def _overview_files(dirs: list[str]) -> list[Path]:
     return [Path(d) / OVERVIEW_FILE for d in dirs if (Path(d) / OVERVIEW_FILE).is_file()]
 
 
-def _read_overview_file(path: Path) -> dict:
-    """One overview.json, validated: any format problem is a ValidationError naming the file."""
-    try:
-        data = json.loads(path.read_text())
-    except json.JSONDecodeError as e:
-        raise ValidationError(f"{path}: not valid JSON ({e})") from e
-    _require_exact_keys(data, FILE_FIELDS, str(path))
-    if not isinstance(data["updated_at"], str):
-        raise ValidationError(f"{path}: updated_at must be an ISO-8601 string, got {data['updated_at']!r}")
-    require_aware_datetime_or_null(data, "updated_at", str(path))
-    check_overview_content(data, str(path))
+def _read_overview_file(project_id: str, path: Path, lang: str) -> dict:
+    """One overview.json without its ignored keys (logged); any problem is a ValidationError naming the file."""
+    data, problems, ignored = overview.check_file(path, lang)
+    if ignored:
+        log.info("%s: %s: ignored unknown keys %s", project_id, path, ignored)
+    if problems:
+        raise ValidationError(f"{path}: " + "; ".join(problems))
     return data
 
 
-def _project_overview(files: list[Path]) -> dict:
+def _project_overview(project_id: str, files: list[Path], lang: str) -> dict:
     """The newest (by updated_at) of a project's overview.json files as a source=project overview."""
-    path, data = max(((f, _read_overview_file(f)) for f in files),
+    path, data = max(((f, _read_overview_file(project_id, f, lang)) for f in files),
                      key=lambda fd: datetime.fromisoformat(fd[1]["updated_at"]))
     updated_at = datetime.fromisoformat(data["updated_at"])
     status = path.parent / STATUS_FILE
@@ -374,11 +293,11 @@ def _sync(hub: Hub, lang: str) -> tuple[int, int, int, list[str]]:
         if not files:
             continue
         try:
-            overview = _project_overview(files)
+            project_overview = _project_overview(project_id, files, lang)
         except ValidationError as e:  # only this project fails; reported in sync-projects health
             bad_files.append(f"{project_id}: {e}")
             continue
-        hub.put_project_overview(project_id, overview)
+        hub.put_project_overview(project_id, project_overview)
         overviews += 1
     return len(snapshot_worktrees), len(proposed), overviews, bad_files
 
@@ -478,8 +397,11 @@ OVERVIEW_PROMPT = """为用户 mojito 里下面每个进行中的项目写项目
 
 - one_liner：一句话说清这个项目要回答的问题或要做成的东西（≤60 字或 30 个英文词）。
 - status：现在到哪一步、卡在哪、下一步（1–3 句）。
-- kill：生死实验 = 决定项目继续还是放弃的那个实验。state：running（在跑）/ queued（排队中）/ not_started（未开始）/
-  passed（通过）/ failed（没过）/ done（已完成）；setting 写实验设置和成立标准；progress 写进展。材料里没有就写 null。
+- kill：生死实验 = 决定项目继续还是放弃的那个实验；setting 写实验设置和成立标准，progress 写进展。材料里没有就写 null。
+  state 按实际情况选：running（在跑）/ queued（排队中）/ not_started（还没开始，项目也没停）/ passed（判定通过）/
+  failed（判定没过）/ paused（暂停：暂时停下、打算回来继续，比如项目暂停中、没在跑）/
+  stopped（已停：停项不再继续，但没有判定没过，如行政停项、方向或资源原因、结果没有结论）/
+  done（跑完了但没有通过 / 没过之分，少用）。项目暂停时写 paused，不要写 not_started；停项但没判定没过写 stopped，不要写 done 或 failed。
 - paper：论文。title、format（如 长文 / 短文）、review（评审分数）、advice（评审建议）、note（备注）不知道就 null；
   pending 是稿子里还没补的 \\pending 处数（整数），不知道就 null；pdf_path / review_path / dir_path 只能照抄材料里出现过的
   Mac 绝对路径（PDF、评审文件、论文目录），否则 null。材料里看不出有论文就整个写 null。

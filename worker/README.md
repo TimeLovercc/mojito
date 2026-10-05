@@ -19,6 +19,16 @@ Mac 上的长驻工人：轮询 hub 队列，事实用脚本查、判断交给 `
 
 固定项在 `src/mojito_worker/config.py`：轮询 15 秒、心跳 `expected_interval_s=86400`、`claude -p` 超时 600 秒。`claude -p` 一律不给工具（`--tools "" --strict-mcp-config`），查事实、动作都由脚本执行（报告的网页新闻也是脚本抓）。
 
+## 自查命令 `mojito-overview-check`
+
+项目会话改完 `overview.json` 后跑 `mojito-overview-check <overview.json 路径>`：和 sync 用同一套校验（`overview.py`），不联网、不写 hub；导入 worker 包时 `config.py` 会读 `worker/.env`，所以在配好 worker 的那台机器上跑。合格时退出码 0、打印"合格"；不合格时退出码 1，逐条列出问题；不认识的键单独提醒，不算不合格。
+
+安装（入口在 `pyproject.toml` 的 `[project.scripts]`，`uv sync` 或 launchd 启动 worker 时的 `uv run` 会把它装进 `worker/.venv`），在 `worker/` 目录里：
+
+```
+ln -sf "$PWD/.venv/bin/mojito-overview-check" ~/.local/bin/mojito-overview-check
+```
+
 ## 运行
 
 ```
@@ -40,13 +50,13 @@ uv run mojito-worker
 | `feed_watch` | 实验室动态：`labs` 逐家查上次成功运行以来（首次：过去 `every_hours` 小时）的新闻 → `claude -p` 只留实质事件（发布、开源、重要技术报告、争议或安全事件，含传闻 / 泄露 / 曝光；出处同简报只填素材编号 `refs`，脚本查回链接）→ 每个事件一张 `kind=alert` 卡（标题前加【传闻】或【确认】，summary 第一行写来源可信度，底部"相关链接"每条写"出处：文章标题"；`origin=watch:<实验室>`，`dedupe_key` = `实验室:事件简称`，确认的加 `:confirmed`）；已报事件键和上次成功时间记在本地 `~/.mojito-worker/watch.json`，同一事件按传闻报一次、确认后再报一次 |
 | `feed_mail` | Gmail 只读取过去 24 小时收件（不含已发/草稿）的发件人/主题/摘要片段 → `claude -p` 挑值得看的 ≤8 封 → 一张 `kind=mail` "今日邮件：N 封值得看"卡（每封一行"发件人 · 主题 —— 一句话（为什么要看）[打开](Gmail 链接)"，`dedupe_key` = 本地日期）；没有就写"今天没有要紧邮件"。**邮件正文不发给 hub** |
 | `feed_weekly` | 本周简报里的论文（及旧论文卡）→ "本周论文"`kind=report` 卡片（前 3 篇 + 趋势） |
-| `sync_projects` | Orca 只读 → 项目快照、新仓库起草为待确认项目（Claude 只定 id 和分组；标题用仓库目录名）；每个项目在 `repo_path` 和快照里它的所有 worktree 根目录找 `overview.json`，取 `updated_at` 最新的一份 → `PUT /projects/{id}/overview`（`source=project`，字段照抄，`checked_at`=`updated_at`，`status_file`=同目录 STATUS.md，`status_changed`=STATUS.md 比 `updated_at` 晚 10 分钟以上，`evidence`=文件路径；每次覆盖，用户改过的也覆盖）。文件格式不对（键要恰好齐全）只跳过那个项目，`sync-projects` 健康报 error 并写项目和原因。每次 `refresh` 后也跑，并给 active 项目写一句话现状，再给找不到 `overview.json`、概况不是用户改的 active 项目写 `source=claude` 概况（材料：仓库根目录 BRIEF.md 和 STATUS.md，都没有就 README / HANDOFF / SOURCE_OF_TRUTH，加快照、事项、记录；论文路径必须是存在的绝对路径；评审卡片只取材料里有的，score 0–5）。上报 `sync-projects` 结果健康 |
+| `sync_projects` | Orca 只读 → 项目快照、新仓库起草为待确认项目（Claude 只定 id 和分组；标题用仓库目录名）；每个项目在 `repo_path` 和快照里它的所有 worktree 根目录找 `overview.json`，取 `updated_at` 最新的一份 → `PUT /projects/{id}/overview`（`source=project`，字段照抄，`checked_at`=`updated_at`，`status_file`=同目录 STATUS.md，`status_changed`=STATUS.md 比 `updated_at` 晚 10 分钟以上，`evidence`=文件路径；每次覆盖，用户改过的也覆盖）。顶层、`kill`、`paper` 里不认识的键忽略（记一行日志：项目 + 键名），缺键或值不对（规则在 `overview.py`，同 api.md 项目概况）只跳过那个项目，`sync-projects` 健康报 error 并写项目和原因。每次 `refresh` 后也跑，并给 active 项目写一句话现状，再给找不到 `overview.json`、概况不是用户改的 active 项目写 `source=claude` 概况（材料：仓库根目录 BRIEF.md 和 STATUS.md，都没有就 README / HANDOFF / SOURCE_OF_TRUTH，加快照、事项、记录；论文路径必须是存在的绝对路径；评审卡片只取材料里有的，score 0–5）。上报 `sync-projects` 结果健康 |
 | `weekly_summary` | 过去 7 天的记录、有更新的事项、本地提交、active 计划 → `claude -p` → `kind=chat tier=digest`"本周总结" |
 
 `feed_brief` / `feed_watch` / `feed_mail` 由 hub 按订阅入队，跑完都 `POST /subscriptions/{id}/result`（`{result, health}`，出错报 error 并让任务失败）；订阅按 `kind` 从 `GET /subscriptions` 找。
 
 其他常驻职责（主循环里顺带做）：
-- 维护会话看门狗（`watchdog.py`）：每 5 分钟看 `maintainer` 心跳，失联 ≥30 分钟且 60 分钟内没拉起过 → `orca terminal create` 在主 checkout 开新的维护会话，并推送。这是 Mac agent 对 Orca 唯一的写操作。
+- 维护会话看门狗（`watchdog.py`）：每 5 分钟看 `maintainer` 心跳，失联 ≥30 分钟且 60 分钟内没拉起过 → `orca terminal create` 在主 checkout 开新的维护会话，并推送。命令非 0 时把退出码、stdout、stderr 记进日志，按 stdout 的 JSON 判断：拿到 handle 照常；`runtime_timeout`（Orca 已收到请求、回复超时，终端几分钟后才出现）也照常写记录和推送（正文说明可能晚几分钟），60 分钟冷却生效；其他错误码或 stdout 不是 JSON 才报错。这是 Mac agent 对 Orca 唯一的写操作。
 - 授权状态：`gmail-read`（每小时）、`claude-mac`（认证失败/恢复时）。
 - hub 重启时（502/503/504、连接失败）退避重试约 30 秒。
 

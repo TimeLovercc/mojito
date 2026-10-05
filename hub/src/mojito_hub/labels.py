@@ -160,9 +160,9 @@ NAMES = {
                         "significance": "Significance & next", "objections": "Objections", "score": "Score",
                         "decision": "Decision"}),
     "kill_state": ({"running": "在跑", "queued": "排队中", "not_started": "未开始", "passed": "通过", "failed": "没过",
-                    "done": "已完成"},
+                    "done": "已完成", "paused": "暂停", "stopped": "已停"},
                    {"running": "Running", "queued": "Queued", "not_started": "Not started", "passed": "Passed",
-                    "failed": "Failed", "done": "Done"}),
+                    "failed": "Failed", "done": "Done", "paused": "Paused", "stopped": "Stopped"}),
 }
 
 

@@ -559,7 +559,10 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
                             f"{app}: session progress, notes and the two-week plan, all on the phone"),
                 status=t("最近 3 条反馈都已修好上线；今天页还想再精简。",
                          "The last 3 feedback items all shipped; the Today page could be leaner."),
-                kill=None, score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
+                kill={"state": "paused",
+                      "setting": t("连用两周，看是不是每天都会打开", "Use it for two weeks and see whether it gets opened every day"),
+                      "progress": t("等今天页精简完再接着测", "Resumes once the leaner Today page ships")},
+                score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
                 status_file=None, status_changed=False, evidence="inferred"),
             "p-guitar": overview_of(
                 "me", c.iso(-3, "21:30"),

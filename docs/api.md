@@ -1333,7 +1333,7 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 | `source` | `project` \| `claude` \| `me` | project = 从项目的 `overview.json` 抄来；claude = 刷新时 Claude 写；me = 用户在对话里改 |
 | `one_liner` | str \| null | 一句话 |
 | `status` | str \| null | 状态（一段文字；和 Project.status 枚举无关） |
-| `kill` | object \| null | 生死实验 `{state, setting, progress}`：`state` ∈ `running` \| `queued` \| `not_started` \| `passed` \| `failed` \| `done`；`setting`、`progress` 为 str。没有生死实验时为 null |
+| `kill` | object \| null | 生死实验 `{state, setting, progress}`：`state` ∈ `running` \| `queued` \| `not_started` \| `passed` \| `failed` \| `done` \| `paused` \| `stopped`（含义见下）；`setting`、`progress` 为 str。没有生死实验时为 null |
 | `paper` | object \| null | 论文 `{title, format, pending, review, advice, note, pdf_path, review_path, dir_path}`：`pending` 为 int \| null，其余为 str \| null；`*_path` 是 Mac 上的绝对路径。没有论文时为 null |
 | `score` | number \| null | 分数（0–5，如 3.0） |
 | `abstract` | str \| null | 摘要 |
@@ -1347,6 +1347,7 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 | `evidence` | str \| null | project：该 `overview.json` 的路径；claude：依据（文件、提交、记录）或 `inferred`；me：null |
 
 - `GET /projects`、`GET /projects/{id}` 的 Project 都带 `overview`（从没写过为 null）。
+- 生死实验 `kill.state` 的 8 个值：`running` 在跑、`queued` 排队中、`not_started` 未开始、`passed` 通过（生死实验判定通过）、`failed` 没过（判定没过）、`paused` 暂停（暂时停下、打算回来继续）、`stopped` 已停（停项不再继续，但没有判定没过：行政停项、方向或资源原因、结果没有结论）、`done` 已完成（跑完但没有通过 / 没过之分，少用）。项目暂停时写 `paused`，不写 `not_started`；停项但没判定没过写 `stopped`，不写 `done` 或 `failed`。写 overview 的所有路径（项目的 `overview.json`、refresh 时 Claude 整理、对话里改、自查命令、hub 的 `PUT` 校验）都用这 8 个值。
 
 ## 接口
 
@@ -1359,13 +1360,16 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 
 ## overview.json（项目会话维护）
 
-- 放在项目会话工作的目录（和它的 STATUS.md 同一层），全部键必填、可 null，多一个少一个都算格式不对：
+- 放在项目会话工作的目录（和它的 STATUS.md 同一层），下面的键全部必填、可 null，少一个算格式不对：
   `{"updated_at": "<ISO-8601 带时区>", "one_liner", "status", "kill": {"state", "setting", "progress"} | null, "paper": {"title", "format", "pending", "review", "advice", "note", "pdf_path", "review_path", "dir_path"} | null, "score", "abstract", "novelty", "significance", "objections", "decision"}`（类型同 ProjectOverview；`*_path` 为绝对路径）。
+- **多出的键忽略**：顶层、`kill`、`paper` 里不认识的键一律忽略，worker 记一行日志（项目 + 键名），不算格式不对、不报健康错误。项目会话可以在文件里放自己的记账字段，但 app 不会显示它们。
+- **值的规则**：`updated_at` 是带时区的 ISO-8601；`kill.state` 只能是上面 8 个值之一，`kill.setting` / `kill.progress` 是字符串；`paper.pending` 是整数或 null；`paper.pdf_path` / `review_path` / `dir_path` 是绝对路径或 null，不许空串；`paper` 其余字段是字符串或 null；`score` 是 0–5 的数字或 null；`objections` 是字符串列表或 null；其余文字字段是字符串或 null。
+- **自查命令** `mojito-overview-check <overview.json 路径>`（worker 提供，见 worker/README.md）：和 sync 用同一套校验代码，不联网、不写 hub（要在配好 `worker/.env` 的机器上跑）。合格时退出码 0、打印"合格"；不合格时退出码 1，逐条列出问题；被忽略的多余键单独列出作为提醒，不算不合格。项目会话每次改完 `overview.json` 跑一次。
 - 谁更新：该项目的会话。状态和生死实验进展：每次改 STATUS.md 时一起改；一句话、摘要、查新、意义与下一步、审稿质疑、分数、决定：过关口、重新评审、改方向时改。每次改都更新 `updated_at`。
 
 ## 谁来写
 
-1. **项目自己的卡片**（worker，`sync_projects` 每次跑）：对每个 hub 项目，在 `repo_path` 和 Orca 快照里该项目的所有 worktree 路径下找 `overview.json`，取 `updated_at` 最新的一份，写 `source=project` 的 overview（字段照抄；`checked_at`、`status_file`、`status_changed`、`evidence` 见上表）。每次覆盖，用户改过的也覆盖。文件格式不对 → 只跳过那个项目，`sync-projects` 健康报 error，detail 写项目和原因。
+1. **项目自己的卡片**（worker，`sync_projects` 每次跑）：对每个 hub 项目，在 `repo_path` 和 Orca 快照里该项目的所有 worktree 路径下找 `overview.json`，取 `updated_at` 最新的一份，写 `source=project` 的 overview（字段照抄；`checked_at`、`status_file`、`status_changed`、`evidence` 见上表）。每次覆盖，用户改过的也覆盖。缺键或值不对 → 只跳过那个项目，`sync-projects` 健康报 error，detail 写项目和原因；多出的键只记日志（见上）。
 2. **其他项目**（worker，`refresh` 时和 summary 一起写）：找不到 `overview.json` 的 active 项目，Claude 读仓库根目录的 BRIEF.md 和 STATUS.md（都没有就读 README / 交接文档）、Orca 快照、项目记录和事项，写 `source=claude` 的 overview；推断的内容 `evidence=inferred`。没有生死实验、论文或评审内容就写 null，不编；论文路径必须是存在的绝对路径。当前 `source=me` 的不覆盖。
 3. **对话里改**（agent / worker 的 chat_reply）：`project_updates` 的 `changes` 新增 `overview`（只放要改的键：`one_liner`、`status`、`kill`、`paper` 和评审卡片 6 个键；`kill`、`paper` 给完整对象或 null），脚本以当前 overview 为底合并后 `PUT /projects/{id}/overview`，`source=me`。`source=project` 的项目不改，回复"这个项目的卡片由它自己的会话维护，请在那个会话里改"。
 
@@ -1374,16 +1378,18 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
 ## app（项目页，手机和 Mac）
 
 - 项目详情：标题右侧分数徽章（`score` 为 null 不显示）；标题下依次 一句话 → 状态 → 生死实验 → 论文 → 摘要 → 查新 → 意义与下一步 → 审稿质疑（编号列表）→ 决定，**每个项目都显示**（取代 8.5a"空的块不显示"在这一页的规则）；字段为 null 显示"没有"（overview 整个为 null 时都显示"还没有"）；文字按 Markdown 渲染链接。
-  - 生死实验：状态胶囊（在跑 / 排队中 / 未开始 / 通过 / 没过 / 已完成），下面"进展"，"设置"默认折叠。
+  - 生死实验：状态胶囊（在跑 / 排队中 / 未开始 / 通过 / 没过 / 已完成 / 暂停 / 已停），下面"进展"，"设置"默认折叠。胶囊颜色：只有通过用绿、没过用红，其余 6 个（含已完成）都用中性灰，免得停掉的项目看起来像成功。
   - 论文：标题 + 胶囊（format、"N 处 pending"、"评审 <review>"、advice）；只有 `note` 时只显示 note。Mac 上 `pdf_path` / `review_path` / `dir_path` 显示为可点的"PDF""评审""文件夹"，用系统默认程序打开（desktop 外壳的 Tauri 命令 `open_path`：只接受存在的绝对路径，否则拒绝并记日志）；手机不显示这三个链接。
   - 卡片下一行来源小字：project 写"项目会话更新于 <本地时间>"，`status_changed=true` 时加琥珀胶囊"STATUS 之后有改动"；claude 写"Claude 整理 · <多久前>"；me 写"你改的 · <多久前>"。
   - 原来的"现状"（Project.summary）在项目详情里不再显示；summary 字段保留给 agent 上下文用。事项、会话、最近记录照旧。
 - 项目列表：每个项目名右边一个生死实验状态小胶囊；`kill` 为 null 不显示。
-- 英文界面：One line / Status / Kill test / Paper / Abstract / Novelty / Significance & next / Objections / Decision、徽章 Score；胶囊词 Running / Queued / Not started / Passed / Failed / Done。
+- 英文界面：One line / Status / Kill test / Paper / Abstract / Novelty / Significance & next / Objections / Decision、徽章 Score；胶囊词 Running / Queued / Not started / Passed / Failed / Done / Paused / Stopped。
 
 ## 上线顺序
 
 hub 先部署（`overview` 字段出现在响应里）→ worker → agent → app 空中更新 + Mac 新版本。app 读不到 `overview` 字段会报错，所以必须 hub 先上。
+
+`paused` / `stopped` 两个值反过来：app 空中更新 + Mac 新版本先上（认识 8 个值、换颜色）→ hub + agent 部署、worker 重启（接受新值）→ 各项目会话按实际情况改卡片。
 
 ---
 

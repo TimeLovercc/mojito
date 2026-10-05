@@ -21,7 +21,7 @@ from mojito_worker.jobs import (
     OWNERS,
     validate_item_draft,
 )
-from mojito_worker.projects import (
+from mojito_worker.overview import (
     KILL_SCHEMA,
     OVERVIEW_FIELDS,
     PAPER_SCHEMA,
@@ -195,7 +195,8 @@ reply 里说清改了什么，并说可以在动态里撤销。只放用户要�
 - project_updates [{project_id, changes}]：title、area（research / life）、status（active / paused / done）、goal_id、overview。
   新建项目：project_id 用新的小写 id，changes 里 title、area、goal_id 都要给（新建即进行中）。
   overview（项目页的概况，只放要改的键）：one_liner（一句话）、status（状态，一段文字）、
-  kill（生死实验 {state, setting, progress}，state 为 running / queued / not_started / passed / failed / done）、
+  kill（生死实验 {state, setting, progress}，state 为 running / queued / not_started / passed / failed / done / paused / stopped；
+  failed = 判定没过，paused = 暂停、打算回来，stopped = 停项但没判定没过，done = 跑完无通过 / 没过之分，少用）、
   paper（论文 {title, format, pending, review, advice, note, pdf_path, review_path, dir_path}，pending 为整数或 null）。
   评审卡片：score（0–5 的数，如 3.0）、abstract（摘要）、novelty（查新，可含 Markdown 链接）、significance（意义与下一步）、
   objections（审稿质疑，字符串数组，每条一项，要整个列表给出）、decision（决定）。

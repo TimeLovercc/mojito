@@ -641,4 +641,6 @@ export const EN: Record<string, string> = {
   "STATUS 之后有改动": "STATUS changed since",
   "这一页出错了": "Something went wrong on this page",
   "重新加载": "Reload",
+  "生死实验|暂停": "Paused",
+  "生死实验|已停": "Stopped",
 }

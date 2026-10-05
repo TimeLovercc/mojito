@@ -190,7 +190,7 @@ export type Project = {
   overview: ProjectOverview | null
 }
 
-export type KillState = 'running' | 'queued' | 'not_started' | 'passed' | 'failed' | 'done'
+export type KillState = 'running' | 'queued' | 'not_started' | 'passed' | 'failed' | 'done' | 'paused' | 'stopped'
 
 // source：project 从项目会话自己维护的 overview.json 抄来；claude 刷新时 Claude 写；me 用户在对话里改。
 // checked_at：project 为 overview.json 的 updated_at，其余为写入时间；

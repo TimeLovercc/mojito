@@ -165,7 +165,7 @@ class Job(BaseModel):
     error: str | None
 
 
-KillState = Literal["running", "queued", "not_started", "passed", "failed", "done"]
+KillState = Literal["running", "queued", "not_started", "passed", "failed", "done", "paused", "stopped"]
 
 
 class OverviewKill(Body):

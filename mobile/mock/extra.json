@@ -456,7 +456,11 @@
       "source": "claude",
       "one_liner": "Mojito: session progress, notes and the two-week plan, all on the phone",
       "status": "The last 3 feedback items all shipped; the Today page could be leaner.",
-      "kill": null,
+      "kill": {
+        "state": "paused",
+        "setting": "Use it for two weeks and see whether it gets opened every day",
+        "progress": "Resumes once the leaner Today page ships"
+      },
       "paper": null,
       "abstract": null,
       "novelty": null,
