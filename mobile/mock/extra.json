@@ -432,21 +432,52 @@
       "source": "project",
       "one_liner": "A sourdough bake log: snap every rise and bake, and remember which recipe works",
       "status": "The new onboarding only needs its walkthrough video; the photo-upload crash soak is at 31/40 runs. Next: **pricing**.",
-      "kill": {
-        "state": "running",
-        "setting": "40 beta testers for two weeks; if under 30% still log in week two, hold 1.0 and rework the logging flow",
-        "progress": "Day 9: 31 of 40 still logging this week (78%)"
-      },
+      "kill": null,
       "paper": null,
-      "abstract": "Rise times, temperatures and photos of every bake in one place, with a comparison of which recipe holds up; works offline, no account needed.",
-      "novelty": "Similar apps are recipe collections that keep results, not the process; see the [competitor notes](https://example.com/loaflog-competitors).",
-      "significance": "The beta's most common comment: “now I know why the last one collapsed.” Next: pricing, then a public 1.0.",
-      "objections": [
-        "Too much logging for beginners to last two weeks? Answered: 78% still log on day 9, and onboarding drops to three screens.",
-        "Why not just a notes app? Partly answered: notes can't compare recipes, but there is no data on it yet."
-      ],
-      "score": 3.5,
-      "decision": "Keep going; decide on 1.0 after the two-week beta.",
+      "abstract": null,
+      "novelty": null,
+      "significance": null,
+      "objections": null,
+      "score": null,
+      "decision": null,
+      "card": {
+        "run_state": "running",
+        "stage": "confirm",
+        "main_exp": "40 beta testers for two weeks; if under 30% still log in week two, 1.0 waits. Day 9: 31 of 40 still logging this week (78%).",
+        "contribution": "Rise times, temperatures and photos of every bake in one place, with a comparison of which recipe holds up; similar apps are recipe collections that keep results, not the process.",
+        "comment": "Retention is better than expected; “why not a notes app?” has no data behind its answer yet. Next: **pricing**, then decide on 1.0 after the two-week beta.",
+        "decisions": [
+          "Which day the beta closes (the poll to the three lead testers is out)"
+        ],
+        "development": [
+          {
+            "title": "First idea",
+            "text": "Nobody can say why a loaf collapsed: log each bake's process, not just the recipe."
+          },
+          {
+            "title": "Beta",
+            "text": "A two-week beta with 40 testers, watching **how many still log in week two**."
+          },
+          {
+            "title": "Now",
+            "text": "Onboarding is down to three screens and the photo-upload crash is being fixed; pricing comes first next period."
+          }
+        ],
+        "history": [
+          {
+            "at": "2026-09-27T22:45:00+00:00",
+            "change": "Day 9 retention is 78%; main experiment updated."
+          },
+          {
+            "at": "2026-09-25T20:10:00+00:00",
+            "change": "Onboarding cut from five screens to three."
+          },
+          {
+            "at": "2026-09-19T21:00:00+00:00",
+            "change": "The beta started; stage moved to confirm."
+          }
+        ]
+      },
       "checked_at": "2026-09-27T22:45:00+00:00",
       "status_file": "~/code/loaflog/STATUS.md",
       "status_changed": true,
@@ -468,6 +499,7 @@
       "objections": null,
       "score": null,
       "decision": null,
+      "card": null,
       "checked_at": "2026-09-27T23:00:00+00:00",
       "status_file": null,
       "status_changed": false,
@@ -489,11 +521,113 @@
       "objections": null,
       "score": null,
       "decision": null,
+      "card": null,
       "checked_at": "2026-09-25T21:30:00+00:00",
       "status_file": null,
       "status_changed": false,
       "evidence": null
     }
+  },
+  "research_map": {
+    "updated_at": "2026-09-27T22:50:00+00:00",
+    "principles": [
+      {
+        "id": "pr-process",
+        "label": "Log the process, not just the result",
+        "text": "To get better at something, record how each attempt went; only then can the results be compared."
+      },
+      {
+        "id": "pr-small",
+        "label": "Small and offline first",
+        "text": "First build a small tool one person can use offline; accounts and sync can wait."
+      }
+    ],
+    "areas": [
+      {
+        "id": "apps",
+        "name": "Apps",
+        "children": [
+          {
+            "id": "apps-baking",
+            "name": "Baking",
+            "origins": [
+              {
+                "id": "o-bake-log",
+                "label": "Know why a bake failed",
+                "text": "Keep every bake's rise time, temperature and photos in one place and compare which recipe holds up.",
+                "principles": [
+                  "pr-process",
+                  "pr-small"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "apps-tools",
+            "name": "Tools for me",
+            "origins": [
+              {
+                "id": "o-own-app",
+                "label": "An app that changes itself",
+                "text": "Mojito changes itself from the feedback I give inside it.",
+                "principles": [
+                  "pr-small"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "life",
+        "name": "Life",
+        "children": []
+      }
+    ],
+    "projects": [
+      {
+        "id": "p-loaflog",
+        "area": "o-bake-log",
+        "chats": {
+          "claude": [],
+          "chatgpt": []
+        }
+      },
+      {
+        "id": "p-app",
+        "area": "o-own-app",
+        "chats": {
+          "claude": [],
+          "chatgpt": []
+        }
+      },
+      {
+        "id": "p-guitar",
+        "area": "life",
+        "chats": {
+          "claude": [],
+          "chatgpt": []
+        }
+      },
+      {
+        "id": "p-closet",
+        "area": "life",
+        "chats": {
+          "claude": [],
+          "chatgpt": []
+        }
+      }
+    ],
+    "hidden": [],
+    "inbox": [
+      {
+        "at": "2026-09-26T08:20:00+00:00",
+        "text": "Success rate by flour brand",
+        "source": "note",
+        "area": "apps-baking",
+        "note": null
+      }
+    ]
   },
   "cards": [
     {

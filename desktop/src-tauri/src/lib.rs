@@ -43,19 +43,69 @@ fn set_size(app: tauri::AppHandle, height: f64) -> Result<(), String> {
 
 // 外部链接（shell.js 接管 window.open 和外链 <a> 后调）：交给 macOS 的 open，用系统默认浏览器或对应 app 打开。
 // WKWebView 自己会把 window.open 直接丢掉。只放行 app 用到的协议：http / https（简报、卡片原文），
-// orca（系统页"去 Orca"，Orca.app 注册的 orca://）；其他拒绝并记日志
+// orca（系统页"去 Orca"，Orca.app 注册的 orca://），claude（研究卡片的 Claude 按钮，Claude.app 注册的
+// claude://claude.ai/<路径>，design.md 8.13）；其他拒绝并记日志
 #[tauri::command]
 fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
     let scheme = reqwest::Url::parse(&url).map_err(|e| format!("链接 {url}：{e}"))?.scheme().to_string();
-    if !matches!(scheme.as_str(), "http" | "https" | "orca") {
+    if !matches!(scheme.as_str(), "http" | "https" | "orca" | "claude") {
         weblog::write(&app, &format!("open_external refused {url}"))?;
-        return Err(format!("不打开 {scheme}: 链接（只放行 http、https、orca）"));
+        return Err(format!("不打开 {scheme}: 链接（只放行 http、https、orca、claude）"));
     }
     let status = std::process::Command::new("/usr/bin/open").arg(&url).status().map_err(|e| format!("open {url}：{e}"))?;
     if !status.success() {
         return Err(format!("open {url} 失败：{status}"));
     }
     Ok(())
+}
+
+// 研究卡片的 ChatGPT 按钮（design.md 8.13）：ChatGPT 对话只能开网页。默认浏览器是 Chrome，先用 AppleScript 在 Chrome 各窗口里
+// 找网址以这个链接开头的标签页，找到就切过去（窗口提到最前），找不到再在最前面的窗口新开一个，不重复开标签。
+// 第一次会弹 macOS 的"Mojito 想控制 Google Chrome"，用户不允许时报错并说明去哪里打开（Info.plist 有用途说明）
+const CHROME_TAB_SCRIPT: &[&str] = &[
+    "on run argv",
+    "set target to item 1 of argv",
+    "tell application \"Google Chrome\"",
+    "repeat with w in windows",
+    "set n to count of tabs of w",
+    "repeat with i from 1 to n",
+    "if (URL of tab i of w) starts with target then",
+    "set active tab index of w to i",
+    "set index of w to 1",
+    "activate",
+    "return \"reused\"",
+    "end if",
+    "end repeat",
+    "end repeat",
+    "if (count of windows) = 0 then make new window",
+    "tell window 1 to make new tab with properties {URL:target}",
+    "activate",
+    "return \"opened\"",
+    "end tell",
+    "end run",
+];
+
+#[tauri::command]
+fn open_chat_tab(app: tauri::AppHandle, url: String) -> Result<String, String> {
+    if reqwest::Url::parse(&url).map_err(|e| format!("链接 {url}：{e}"))?.scheme() != "https" {
+        weblog::write(&app, &format!("open_chat_tab refused {url}"))?;
+        return Err(format!("不打开 {url}（只接受 https 链接）"));
+    }
+    let mut cmd = std::process::Command::new("/usr/bin/osascript");
+    for line in CHROME_TAB_SCRIPT {
+        cmd.arg("-e").arg(line);
+    }
+    // 链接作为参数传进脚本（argv），不拼进脚本文本
+    let out = cmd.arg(&url).output().map_err(|e| format!("osascript：{e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        weblog::write(&app, &format!("open_chat_tab failed {url}: {err}"))?;
+        if err.contains("-1743") {
+            return Err("Mojito 没有控制 Google Chrome 的权限：在 系统设置 › 隐私与安全性 › 自动化 里打开 Mojito 下的 Google Chrome".to_string());
+        }
+        return Err(format!("在 Chrome 里打开 {url} 失败：{err}"));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 // 本地文件（项目页论文块的 PDF / 评审 / 文件夹，docs/api.md「项目概况」）：交给 macOS 的 open，
@@ -176,7 +226,7 @@ pub fn run() {
             weblog::write(webview.app_handle(), &format!("{} web content process terminated, reloading", webview.label())).unwrap();
             webview.reload().unwrap();
         })
-        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, set_size, open_external, open_path, fetch::hub_fetch])
+        .invoke_handler(tauri::generate_handler![secret_get, secret_set, secret_remove, open_main, log_web, relaunch, set_theme, set_size, open_external, open_chat_tab, open_path, fetch::hub_fetch])
         .setup(|app| {
             build_main(app)?;
             tray::build(app)?;

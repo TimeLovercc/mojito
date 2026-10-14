@@ -516,6 +516,7 @@ def _put_my_overview(hub: Hub, project_id: str, current: dict | None, changes: d
     hub.put_project_overview(project_id, {
         **base,
         **changes,
+        "card": None,  # api.md 研究地图: chat edits only reach overviews no project file keeps, which have no card
         "source": "me",
         "checked_at": datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds"),
         "status_file": None,

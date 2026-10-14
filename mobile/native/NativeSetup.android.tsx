@@ -8,8 +8,10 @@ import { t } from '../src/i18n'
 import { useErrorToast, useToast } from '../src/toast'
 import { ensureChannels, isReply, registerDevice, routeOf, sendReply, type Target } from './push'
 import { refreshTodayWidget } from './widgets/today'
+import { UpdateBanner } from './UpdateBanner'
 
-// 挂在根 _layout 里，不渲染任何东西：通知权限与渠道、向 hub 登记 FCM token、点通知跳转、前台内联回复、退到后台时刷新 widget。
+// 挂在根 _layout 里：通知权限与渠道、向 hub 登记 FCM token、点通知跳转、前台内联回复、退到后台时刷新 widget；
+// 只渲染新版提示横幅（UpdateBanner.tsx，design.md 8.12）。
 export function NativeSetup() {
   const { config } = useConfig()
   const router = useRouter()
@@ -57,5 +59,5 @@ export function NativeSetup() {
     return () => sub.remove()
   }, [])
 
-  return null
+  return <UpdateBanner />
 }

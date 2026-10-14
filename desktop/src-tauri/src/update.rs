@@ -1,5 +1,6 @@
 // 自动更新（design 8.4 第 4 步）：发布脚本（scripts/release.mjs）把新版装进 ~/Applications/Mojito.app。
-// 正在运行的旧版每轮检查磁盘上的版本号，变了就弹一次通知"新版已装好，点这里重启"，并通知页面（事件 update-ready）。
+// 正在运行的旧版每轮检查磁盘上的版本号，变了就弹一次通知"新版已装好，点这里重启"；
+// 页面事件 update-ready 每轮都发（页面重新加载后 30 秒内也能再收到，常驻横幅靠它）。
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 
@@ -12,7 +13,7 @@ pub fn installed_path() -> std::path::PathBuf {
 pub struct State {
     // 启动时记下：运行中包会被发布脚本整个换掉，那时再问"当前可执行文件在哪"会因旧文件已删而出错
     pub from_installed: bool,
-    // 已经提示过的新版本，避免每 30 秒重复弹
+    // 已经弹过通知的新版本，避免每 30 秒重复弹（只管通知和日志，不管 update-ready）
     pub prompted: Mutex<Option<String>>,
 }
 
@@ -32,13 +33,13 @@ pub fn check(app: &tauri::AppHandle) -> Result<(), String> {
     if installed == running {
         return Ok(());
     }
+    app.emit("update-ready", &installed).map_err(|e| format!("发 update-ready：{e}"))?;
     let mut last = state.prompted.lock().unwrap();
     if last.as_deref() == Some(installed.as_str()) {
         return Ok(());
     }
     *last = Some(installed.clone());
     crate::weblog::write(app, &format!("新版已装好 {running} → {installed}，已提示重启"))?;
-    app.emit("update-ready", &installed).map_err(|e| format!("发 update-ready：{e}"))?;
     crate::notify::show_then(
         app,
         "Mojito 新版已装好".into(),

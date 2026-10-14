@@ -3,6 +3,7 @@ import time
 
 import httpx
 
+from mojito_worker import card_watch
 from mojito_worker.auth import AuthReporter
 from mojito_worker.chat import chat_reply
 from mojito_worker.config import HEARTBEAT_INTERVAL_S, POLL_INTERVAL_S, load_config
@@ -33,16 +34,35 @@ HANDLERS = {
 }
 
 
+# Jobs that ran to the end but whose finish the hub refused because its watchdog had already put them back
+# in the queue (running over 30 minutes, e.g. the Mac slept mid-job). The work is done, so when such a job
+# is leased again it is only finished: running it twice would post a second chat reply or weekly summary,
+# push the review digest again, and 409 on drafts, projects and plans the first run created.
+done_but_requeued: set[str] = set()
+
+
 def run_job(hub: Hub, job: dict) -> None:
     log.info("job %s kind=%s record_id=%s", job["id"], job["kind"], job["record_id"])
-    try:
-        HANDLERS[job["kind"]](hub, job, language(hub))  # api.md 界面语言: every job reads settings first
-    except Exception as e:  # any job failure is reported to the hub; the worker keeps running
-        error = f"{type(e).__name__}: {e}"
-        log.exception("job %s failed", job["id"])
-        hub.finish_failed(job["id"], error)
+    if job["id"] in done_but_requeued:
+        log.info("job %s ran to the end before the hub requeued it; finishing without running it again", job["id"])
+    else:
+        try:
+            HANDLERS[job["kind"]](hub, job, language(hub))  # api.md 界面语言: every job reads settings first
+        except Exception as e:  # any job failure is reported to the hub; the worker keeps running
+            error = f"{type(e).__name__}: {e}"
+            log.exception("job %s failed", job["id"])
+            if not hub.finish_failed(job["id"], error):
+                log.warning("job %s kind=%s failed, but the hub had already put it back in the queue (running over"
+                            " 30 minutes, e.g. the Mac slept): this failure is void and the job will run again",
+                            job["id"], job["kind"])
+            return
+    if not hub.finish_done(job["id"]):
+        done_but_requeued.add(job["id"])
+        log.warning("job %s kind=%s ran to the end, but the hub had already put it back in the queue (running over"
+                    " 30 minutes, e.g. the Mac slept): this finish is void; when leased again it is finished"
+                    " without running again", job["id"], job["kind"])
         return
-    hub.finish_done(job["id"])
+    done_but_requeued.discard(job["id"])
     log.info("job %s done", job["id"])
 
 
@@ -54,6 +74,10 @@ def tick(hub: Hub, auth: AuthReporter, watchdog: MaintainerWatchdog) -> bool:
         watchdog.check_if_due()
     except Exception:  # the watchdog must never stop job processing; the traceback goes to the log
         log.exception("maintainer watchdog failed")
+    try:
+        card_watch.WATCH.check_if_due(hub)
+    except Exception:  # same: a failed file check only goes to the log
+        log.exception("card file check failed")
     job = hub.lease()
     if job is None:
         return False

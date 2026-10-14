@@ -23,7 +23,16 @@ PAPER_FIELDS = ("title", "format", "pending", "review", "advice", "note", "pdf_p
 PAPER_PATHS = ("pdf_path", "review_path", "dir_path")
 PAPER_TEXT_FIELDS = ("title", "format", "review", "advice", "note")
 OVERVIEW_FILE = "overview.json"
-FILE_FIELDS = ("updated_at", *OVERVIEW_FIELDS)
+# api.md 研究地图 (2026-10-06): the file holds the research card; kill and the review fields left the file
+# (still in the hub's overview for older apps, sent as null) and are ignored when a file still has them.
+FILE_CONTENT_FIELDS = ("one_liner", "status", "paper")
+FILE_FIELDS = ("updated_at", *FILE_CONTENT_FIELDS, "card")
+RUN_STATES = ("running", "paused", "stopped", "done")
+STAGES = ("question", "discovery", "instrument", "confirm", "write")
+CARD_FIELDS = ("run_state", "stage", "main_exp", "contribution", "comment", "decisions", "development", "history")
+CARD_TEXT_FIELDS = ("main_exp", "contribution", "comment")
+STEP_FIELDS = ("title", "text")
+CHANGE_FIELDS = ("at", "change")
 VALUE_CHARS = 80
 
 KILL_SCHEMA = {
@@ -125,6 +134,13 @@ def check_overview_content(o: dict, where: str) -> None:
         raise ValidationError(f"{where}: " + "；".join(problems))
 
 
+def _is_zoned_time(value: str) -> bool:
+    try:
+        return datetime.fromisoformat(value).tzinfo is not None
+    except ValueError:
+        return False
+
+
 def _updated_at_problems(value, lang: str) -> list[str]:
     try:
         parsed = datetime.fromisoformat(value) if isinstance(value, str) else None
@@ -135,13 +151,65 @@ def _updated_at_problems(value, lang: str) -> list[str]:
     return []
 
 
+def _list_problems(name: str, value, fields: tuple[str, ...], lang: str) -> tuple[list[str], list[str]]:
+    """A list of objects with string values (`at` must also be an ISO-8601 time with a zone)."""
+    if not isinstance(value, list):
+        return [say(lang, "{key} 必须是列表，现在是 {value}", key=name, value=_shown(value))], []
+    problems: list[str] = []
+    ignored: list[str] = []
+    for i, x in enumerate(value):
+        where = f"{name}[{i}]"
+        p, ig = _object_problems(where, x, fields, lang)
+        problems += p
+        ignored += ig
+        if not isinstance(x, dict):
+            continue
+        problems += [say(lang, "{key} 必须是字符串，现在是 {value}", key=f"{where}.{f}", value=_shown(x[f]))
+                     for f in fields if f in x and not isinstance(x[f], str)]
+        if "at" in fields and "at" in x and isinstance(x["at"], str) and not _is_zoned_time(x["at"]):
+            problems.append(say(lang, "{key} 必须是带时区的 ISO-8601 时间，现在是 {value}", key=f"{where}.at", value=_shown(x["at"])))
+    return problems, ignored
+
+
+def _card_problems(card, lang: str) -> tuple[list[str], list[str]]:
+    """api.md 研究地图: the research card, or null for a project that is not research."""
+    if card is None:
+        return [], []
+    problems, ignored = _object_problems("card", card, CARD_FIELDS, lang)
+    if not isinstance(card, dict):
+        return problems, ignored
+    if "run_state" in card and card["run_state"] not in RUN_STATES:
+        problems.append(say(lang, "card.run_state 只能是 {allowed}，现在是 {value}",
+                            allowed=" / ".join(RUN_STATES), value=_shown(card["run_state"])))
+    if "stage" in card and card["stage"] not in STAGES:
+        problems.append(say(lang, "card.stage 只能是 {allowed}，现在是 {value}",
+                            allowed=" / ".join(STAGES), value=_shown(card["stage"])))
+    problems += [say(lang, "{key} 必须是字符串或 null，现在是 {value}", key=f"card.{f}", value=_shown(card[f]))
+                 for f in CARD_TEXT_FIELDS if f in card and card[f] is not None and not isinstance(card[f], str)]
+    if "decisions" in card and not (isinstance(card["decisions"], list) and all(isinstance(x, str) for x in card["decisions"])):
+        problems.append(say(lang, "card.decisions 必须是字符串列表，现在是 {value}", value=_shown(card["decisions"])))
+    for f, fields in (("development", STEP_FIELDS), ("history", CHANGE_FIELDS)):
+        if f in card:
+            p, ig = _list_problems(f"card.{f}", card[f], fields, lang)
+            problems += p
+            ignored += ig
+    if "history" in card and not problems:
+        times = [datetime.fromisoformat(x["at"]) for x in card["history"]]
+        if times != sorted(times, reverse=True):
+            problems.append(say(lang, "card.history 必须新的在前（按 at 从新到旧排）"))
+    return problems, ignored
+
+
 def _known(data: dict) -> dict:
     """The file's content with the ignored keys dropped."""
     known = {f: data[f] for f in FILE_FIELDS}
-    if known["kill"] is not None:
-        known["kill"] = {f: known["kill"][f] for f in KILL_FIELDS}
     if known["paper"] is not None:
         known["paper"] = {f: known["paper"][f] for f in PAPER_FIELDS}
+    if known["card"] is not None:
+        card = {f: known["card"][f] for f in CARD_FIELDS}
+        card["development"] = [{f: x[f] for f in STEP_FIELDS} for x in card["development"]]
+        card["history"] = [{f: x[f] for f in CHANGE_FIELDS} for x in card["history"]]
+        known["card"] = card
     return known
 
 
@@ -157,9 +225,13 @@ def check_file(path: Path, lang: str) -> tuple[dict | None, list[str], list[str]
     problems, ignored = _keys(data, FILE_FIELDS, "", lang)
     if "updated_at" in data:
         problems += _updated_at_problems(data["updated_at"], lang)
-    p, i = content_problems(data, lang)
+    p, i = content_problems({f: data[f] for f in FILE_CONTENT_FIELDS if f in data}, lang)
     problems += p
     ignored += i
+    if "card" in data:
+        p, i = _card_problems(data["card"], lang)
+        problems += p
+        ignored += i
     return (None if problems else _known(data)), problems, ignored
 
 

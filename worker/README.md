@@ -4,7 +4,7 @@ Mac 上的长驻工人：轮询 hub 队列，事实用脚本查、判断交给 `
 
 ## 配置
 
-`worker/.env`（不入库；从 `worker/.env.example` 复制），每项都必填，缺一个启动即退出：
+`worker/.env`（不入库；从 `worker/.env.example` 复制），每项都必填：`MOJITO_RESEARCH_MAP` 缺了每次 `sync_projects` 报错（api.md"研究地图"），其余缺一个启动即退出：
 
 | 变量 | 说明 |
 |---|---|
@@ -16,6 +16,7 @@ Mac 上的长驻工人：轮询 hub 队列，事实用脚本查、判断交给 `
 | `MOJITO_GMAIL_OAUTH_FILE` | Gmail 只读凭据（`hub/deploy/google-auth.py --scope gmail` 生成）；文件不存在时 `gmail-read` 报未授权、邮件相关功能说"还没接上" |
 | `MOJITO_ZOTERO_DB` | `zotero.sqlite` 的路径，或写 `none`（论文口味不参考 Zotero、不做关注作者） |
 | `MOJITO_ARXIV_CATEGORIES` | 每日论文的 arXiv 分类，逗号分隔，如 `cs.AI,cs.HC` |
+| `MOJITO_RESEARCH_MAP` | 研究地图文件 `map.json` 的绝对路径（项目页的地图，见 api.md"研究地图"） |
 
 固定项在 `src/mojito_worker/config.py`：轮询 15 秒、心跳 `expected_interval_s=86400`、`claude -p` 超时 600 秒。`claude -p` 一律不给工具（`--tools "" --strict-mcp-config`），查事实、动作都由脚本执行（报告的网页新闻也是脚本抓）。
 
@@ -39,6 +40,7 @@ uv run mojito-worker
 
 每轮：心跳 `POST /sources/worker/heartbeat` → `POST /worker/lease`（204 就睡 15 秒）→ 按 `kind` 处理 → `finish`。
 任务出错 → `finish failed` 并写明原因，进程继续；hub 连不上只记日志、下轮重试。
+任务跑了超过 30 分钟（多半是 Mac 睡着），hub 看门狗已把它置回 `queued`，`finish` 得到 409「is queued, not running」→ 记一行 warning，进程继续：失败的那次作废、任务会重跑；跑完的那次也作废，但进程记住这个任务号，再领到时直接 `finish done`、不重跑（重跑会再发一条对话回复或周总结、再推一次复盘草稿，并在草稿 / 项目 / 计划上 409）。其他 `finish` 错误照旧抛出。
 
 | kind | 做什么 |
 |---|---|
@@ -56,7 +58,8 @@ uv run mojito-worker
 `feed_brief` / `feed_watch` / `feed_mail` 由 hub 按订阅入队，跑完都 `POST /subscriptions/{id}/result`（`{result, health}`，出错报 error 并让任务失败）；订阅按 `kind` 从 `GET /subscriptions` 找。
 
 其他常驻职责（主循环里顺带做）：
-- 维护会话看门狗（`watchdog.py`）：每 5 分钟看 `maintainer` 心跳，失联 ≥30 分钟且 60 分钟内没拉起过 → `orca terminal create` 在主 checkout 开新的维护会话，并推送。命令非 0 时把退出码、stdout、stderr 记进日志，按 stdout 的 JSON 判断：拿到 handle 照常；`runtime_timeout`（Orca 已收到请求、回复超时，终端几分钟后才出现）也照常写记录和推送（正文说明可能晚几分钟），60 分钟冷却生效；其他错误码或 stdout 不是 JSON 才报错。这是 Mac agent 对 Orca 唯一的写操作。
+- 卡片文件一改就同步（`card_watch.py`）：每 60 秒（墙钟）只 stat 上次 `sync_projects` 查过的各项目目录下的 `overview.json` 和 `MOJITO_RESEARCH_MAP` 地图文件；有新出现、消失或修改时间变了 → `POST /worker/jobs sync_projects`（hub 同 kind 去重），基线更新。基线在每次同步读文件前重建；目录清单存在 `~/.mojito-worker/card_dirs.json`，重启后第一次检查只记基线。出错只写日志。
+- 维护会话看门狗（`watchdog.py`）：每 5 分钟看 `maintainer` 心跳，失联 ≥30 分钟且 60 分钟内没拉起过 → `orca terminal create` 在主 checkout 开新的维护会话，并推送。Mac 刚醒（两轮之间墙钟跳了 >10 分钟）或 worker 刚启动后 5 分钟内不判失联；开终端前先用 `claude -p` 最小调用查登录，认证失败就不开、改推"Mac 上的 Claude 登录过期，请 /login"（60 分钟内不重复），其他失败照旧开。命令非 0 时把退出码、stdout、stderr 记进日志，按 stdout 的 JSON 判断：拿到 handle 照常；`runtime_timeout`，或 `runtime_error` 且消息是"Timed out waiting for terminal handle"（都是 Orca 已收到请求、回复超时，终端几分钟后才出现）也照常写记录和推送（正文说明可能晚几分钟），60 分钟冷却生效；其他错误码或 stdout 不是 JSON 才报错。这是 Mac agent 对 Orca 唯一的写操作。
 - 授权状态：`gmail-read`（每小时）、`claude-mac`（认证失败/恢复时）。
 - hub 重启时（502/503/504、连接失败）退避重试约 30 秒。
 

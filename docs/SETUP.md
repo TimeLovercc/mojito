@@ -330,6 +330,17 @@ The worker runs on your computer and uses your own Claude Code login. It turns n
    | `MOJITO_GMAIL_OAUTH_FILE` | Gmail authorization (below). The file may be absent; mail features then show as not connected. |
    | `MOJITO_ZOTERO_DB` | Path to `zotero.sqlite` (opened read-only) for the paper feed's taste signals, or `none` |
    | `MOJITO_ARXIV_CATEGORIES` | Comma-separated arXiv categories for the paper feed, for example `cs.AI,cs.HC` |
+   | `MOJITO_RESEARCH_MAP` | Absolute path (no `~`) of the research map file behind the **Projects** page (below) |
+
+   The research map is a JSON file you (or the sessions that run your projects) keep: guiding principles, areas, the idea each project started from, and where every project sits. The format is in `docs/api.md` (研究地图). The smallest valid map puts everything under a "life" area:
+
+   ```json
+   {"updated_at": "2026-01-01T00:00:00+00:00", "principles": [],
+    "areas": [{"id": "life", "name": "Life", "children": []}],
+    "projects": [], "hidden": [], "inbox": []}
+   ```
+
+   Every active, paused or done project must be in `projects` (with an `area` and empty `chats` lists) or in `hidden`; until it is, **System** shows project sync failing and names the project. The worker re-reads the file within about a minute of a change.
 
 2. **Run it.** In the foreground: `cd worker && uv sync && uv run mojito-worker`. On macOS, `worker/launchd/install.sh` renders a LaunchAgent for this checkout and loads it (logs in `~/Library/Logs/mojito-worker.log`; see `worker/README.md` to unload it). On Linux, write a `systemd --user` unit that runs the same command in `worker/`.
 3. **Gmail (optional, read-only).** Create a second *Desktop app* OAuth client with the Gmail API enabled, then:

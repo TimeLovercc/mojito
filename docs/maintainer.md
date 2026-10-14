@@ -86,7 +86,7 @@
 - 心跳：每次轮询 `POST /sources/maintainer/heartbeat {"expected_interval_s": 900}`（maintainer 令牌）。你失联 30 分钟后，hub 会推送告警；装了 Orca 时，本机 worker 的看门狗会开一个新的维护会话接班（api.md"维护会话心跳与看门狗"）。
 - 交接：上下文超过约 50% 时主动交接。
   1. 把未完成的事写进 `<REPO_ROOT>/.handoff/maintainer.md`（覆盖写）。`.handoff/` 必须在 `.gitignore` 里，交接记录**不入库**。
-  2. 开一个新会话接班。用 Orca：`orca terminal create --worktree path:<REPO_ROOT> --title "mojito 维护" --command "claude '你是 mojito 的维护会话。完整读 docs/maintainer.md 并照做。'"`；不用 Orca：新开一个终端，`cd <REPO_ROOT>` 后用同一句话启动 `claude`。
+  2. 开一个新会话接班。用 Orca：`orca terminal create --worktree path:<REPO_ROOT> --title "mojito 维护" --command "claude -n maint '你是 mojito 的维护会话。完整读 docs/maintainer.md 并照做。'"`（`-n maint` 只是会话的显示名，和看门狗开的会话一致）；不用 Orca：新开一个终端，`cd <REPO_ROOT>` 后用同一句话启动 `claude`。
   3. 停止自己的 `/loop`。
 - 启动时先读 `<REPO_ROOT>/.handoff/maintainer.md`（如果有）。
 - Mac 睡眠时 `/loop` 的唤醒会被推迟，超过 30 分钟没心跳，看门狗就会开一个新的维护会话。新会话起来后，旧会话停掉自己的 `/loop`、保持空闲，以新会话为准。

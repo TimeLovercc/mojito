@@ -1,21 +1,24 @@
 """Project panel: sync Orca repos/worktrees into hub project snapshots, propose projects for new
-Orca repos, copy each project's own overview.json, and (on refresh) write a one-line summary per
+Orca repos, copy each project's own overview.json and the research map file, and (on refresh) write a one-line summary per
 active project and a Claude overview for the active projects without an overview.json.
 
 Orca and git are read-only here. Worktrees are tied to repos by Orca's repoId, repos to projects
 by repo_path (api.md 项目概况).
 """
+import json
 import logging
+import os
 import re
 import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from mojito_worker import claude, health, orca, overview
+from mojito_worker import card_watch, claude, health, orca, overview
 from mojito_worker.hub import Hub
 from mojito_worker.i18n import say
 from mojito_worker.local_facts import LocalFactError
 from mojito_worker.overview import (
+    FILE_CONTENT_FIELDS,
     KILL_SCHEMA,
     OVERVIEW_FIELDS,
     OVERVIEW_FILE,
@@ -70,16 +73,32 @@ def _read_overview_file(project_id: str, path: Path, lang: str) -> dict:
     return data
 
 
+def _updated_at(path: Path) -> datetime:
+    """A file's updated_at, only to pick the newest copy; any problem is a ValidationError naming the file."""
+    try:
+        data = json.loads(path.read_text())
+        at = datetime.fromisoformat(data["updated_at"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        raise ValidationError(f"{path}: no readable updated_at ({type(e).__name__}: {e})") from e
+    if at.tzinfo is None:
+        raise ValidationError(f"{path}: updated_at has no time zone")
+    return at
+
+
 def _project_overview(project_id: str, files: list[Path], lang: str) -> dict:
-    """The newest (by updated_at) of a project's overview.json files as a source=project overview."""
-    path, data = max(((f, _read_overview_file(project_id, f, lang)) for f in files),
-                     key=lambda fd: datetime.fromisoformat(fd[1]["updated_at"]))
+    """The newest (by updated_at) of a project's overview.json files as a source=project overview. Only that
+    copy is checked in full (api.md 研究地图): stale copies in old worktrees keep older formats."""
+    path = max(files, key=_updated_at)
+    data = _read_overview_file(project_id, path, lang)
     updated_at = datetime.fromisoformat(data["updated_at"])
     status = path.parent / STATUS_FILE
     status_file = status if status.is_file() else None
     return {
         "source": "project",
-        **{f: data[f] for f in OVERVIEW_FIELDS},
+        # api.md 研究地图: kill and the review fields left the file; the hub still has them (older apps) as null
+        **dict.fromkeys(OVERVIEW_FIELDS),
+        **{f: data[f] for f in FILE_CONTENT_FIELDS},
+        "card": data["card"],
         "checked_at": updated_at.isoformat(),
         "status_file": None if status_file is None else str(status_file),
         "status_changed": status_file is not None
@@ -287,9 +306,11 @@ def _sync(hub: Hub, lang: str) -> tuple[int, int, int, list[str]]:
     # The project's own overview.json is the truth: overwrite every time, a source=me edit included.
     overviews, bad_files = 0, []
     targets = [(p["id"], p["repo_path"]) for p in projects] + [(p["id"], p["repo_path"]) for p in proposed]
-    for project_id, repo_path in targets:
-        wts = snapshot_worktrees[project_id] if project_id in snapshot_worktrees else []
-        files = _overview_files(_project_dirs(repo_path, wts))
+    dirs = {project_id: _project_dirs(repo_path, snapshot_worktrees[project_id] if project_id in snapshot_worktrees else [])
+            for project_id, repo_path in targets}
+    card_watch.WATCH.rebuild([d for ds in dirs.values() for d in ds])  # before reading: later edits are caught
+    for project_id, _ in targets:
+        files = _overview_files(dirs[project_id])
         if not files:
             continue
         try:
@@ -299,7 +320,45 @@ def _sync(hub: Hub, lang: str) -> tuple[int, int, int, list[str]]:
             continue
         hub.put_project_overview(project_id, project_overview)
         overviews += 1
+    map_problems = _research_map_problems(_research_map_file(), projects, lang)
+    if map_problems:
+        bad_files.append(say(lang, "研究地图文件有问题：{problems}", problems="；".join(map_problems)))
+    else:
+        hub.put_research_map(json.loads(_research_map_file().read_text()))
     return len(snapshot_worktrees), len(proposed), overviews, bad_files
+
+
+# ---------------------------------------------------------------- research map (api.md 研究地图)
+
+def _research_map_file() -> Path:
+    """worker/.env MOJITO_RESEARCH_MAP (required): read at sync time, so a missing setting fails the sync."""
+    return Path(os.environ["MOJITO_RESEARCH_MAP"])
+
+
+MAPPED_STATUSES = ("active", "paused", "done")  # proposed and declined projects need no place yet
+
+
+def _research_map_problems(path: Path, projects: list[dict], lang: str) -> list[str]:
+    """What the hub cannot check: ids that must match each other and the hub's projects. The shape is the
+    hub's ResearchMap (a bad shape is a 422 on PUT)."""
+    data = json.loads(path.read_text())
+    leaves = [l["id"] for a in data["areas"] for l in a["children"]]
+    origins = [o for a in data["areas"] for l in a["children"] for o in l["origins"]]
+    principles = [x["id"] for x in data["principles"]]
+    ids = principles + [a["id"] for a in data["areas"]] + leaves + [o["id"] for o in origins]
+    places = set(leaves) | {o["id"] for o in origins} | {a["id"] for a in data["areas"] if not a["children"]}
+    known = {p["id"] for p in projects}
+    placed = [p["id"] for p in data["projects"]]
+    problems = [f"{path}: id {i!r} is used twice" for i in sorted({i for i in ids if ids.count(i) > 1})]
+    problems += [f"{path}: origin {o['id']!r} cites unknown principle {r!r}" for o in origins for r in o["principles"] if r not in principles]
+    problems += [f"{path}: area {p['area']!r} of {p['id']} is not an origin, a leaf or a leafless area" for p in data["projects"] if p["area"] not in places]
+    problems += [f"{path}: project {i} is not in the hub" for i in placed + data["hidden"] if i not in known]
+    problems += [f"{path}: project {i} is listed twice" for i in sorted({i for i in placed + data["hidden"] if (placed + data["hidden"]).count(i) > 1})]
+    problems += [f"{path}: hub project {p['id']} ({p['title']}) is neither placed nor hidden"
+                 for p in projects if p["status"] in MAPPED_STATUSES and p["id"] not in placed and p["id"] not in data["hidden"]]
+    problems += [f"{path}: inbox idea {i} suggests unknown area {x['area']!r}" for i, x in enumerate(data["inbox"])
+                 if x["area"] is not None and x["area"] not in places]
+    return problems
 
 
 def sync_projects(hub: Hub, job: dict, lang: str) -> None:
@@ -466,6 +525,7 @@ def write_overviews(hub: Hub, lang: str) -> None:
         hub.put_project_overview(o["project_id"], {
             "source": "claude",
             **{f: o[f] for f in OVERVIEW_FIELDS},
+            "card": None,  # api.md 研究地图: only a project's own overview.json has a research card
             "checked_at": datetime.now(UTC).isoformat(),
             "status_file": None,
             "status_changed": False,

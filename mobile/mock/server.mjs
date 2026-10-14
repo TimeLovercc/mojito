@@ -60,6 +60,10 @@ const items = [...seed.items.map((i) => ({ ...i, project_id: seed.item_projects[
 }))
 // 种子项目没有现状总结；extra.json 的 project_summaries 给个别项目补上演示用的一句话
 const noSummary = { summary: null, summary_evidence: null, summary_at: null }
+function overviewView(o) {
+  const card = o.card === null ? null : { ...o.card, history: o.card.history.map((h) => ({ ...h, at: toUtc(h.at) })) }
+  return { ...o, checked_at: toUtc(o.checked_at), card }
+}
 const projects = [
   ...seed.projects.map((p) => ({
     ...p,
@@ -71,10 +75,14 @@ const projects = [
 ].map((p) => ({
   ...p,
   summary_at: toUtc(p.summary_at),
-  overview: p.id in extra.project_overviews
-    ? { ...extra.project_overviews[p.id], checked_at: toUtc(extra.project_overviews[p.id].checked_at) }
-    : null,
+  overview: p.id in extra.project_overviews ? overviewView(extra.project_overviews[p.id]) : null,
 }))
+// 研究地图（api.md"研究地图"）：extra.json 的 research_map，时间跟着演示日平移
+const researchMap = {
+  ...extra.research_map,
+  updated_at: toUtc(extra.research_map.updated_at),
+  inbox: extra.research_map.inbox.map((x) => ({ ...x, at: toUtc(x.at) })),
+}
 const snapshots = Object.fromEntries(
   Object.entries(extra.snapshots).map(([id, s]) => [
     id,
@@ -1031,6 +1039,11 @@ const routes = [
       })
       return newJob('process_note', 'mac', note.id)
     },
+  ],
+  [
+    'GET',
+    /^\/research-map$/,
+    () => researchMap,
   ],
   [
     'GET',

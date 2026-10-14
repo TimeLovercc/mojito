@@ -56,11 +56,22 @@ class Hub:
             return None
         return resp.json()
 
-    def finish_done(self, job_id: str) -> None:
-        self._request("POST", f"/worker/jobs/{job_id}/finish", json={"status": "done"})
+    def finish_done(self, job_id: str) -> bool:
+        return self._finish(job_id, {"status": "done"})
 
-    def finish_failed(self, job_id: str, error: str) -> None:
-        self._request("POST", f"/worker/jobs/{job_id}/finish", json={"status": "failed", "error": error})
+    def finish_failed(self, job_id: str, error: str) -> bool:
+        return self._finish(job_id, {"status": "failed", "error": error})
+
+    def _finish(self, job_id: str, body: dict) -> bool:
+        """True when finished; False when the hub's watchdog had already put the job back in the queue
+        (api.md: running over 30 minutes → queued, e.g. the Mac slept; finish of a non-running job → 409)."""
+        path = f"/worker/jobs/{job_id}/finish"
+        resp = self._send("POST", path, json=body)
+        if resp.status_code == 409 and resp.json()["detail"] == f"job {job_id} is queued, not running":
+            return False
+        if resp.status_code >= 400:
+            raise HubError(f"POST {path} -> {resp.status_code}: {resp.text}")
+        return True
 
     def create_job(self, kind: str, runner: str, record_id: str | None) -> dict:
         """Enqueue a job; the hub returns the queued/running one of that kind instead of a duplicate."""
@@ -122,6 +133,9 @@ class Hub:
 
     def put_project_overview(self, project_id: str, overview: dict) -> dict:
         return self._request("PUT", f"/projects/{project_id}/overview", json=overview).json()
+
+    def put_research_map(self, research_map: dict) -> dict:
+        return self._request("PUT", "/research-map", json=research_map).json()
 
     def put_project_summary(self, project_id: str, summary: str, evidence: str) -> dict:
         return self._request("PUT", f"/projects/{project_id}/summary",

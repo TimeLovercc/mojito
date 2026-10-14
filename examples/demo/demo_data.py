@@ -520,8 +520,9 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
         "summary_evidence": {"p-loaflog": sha7(loaflog_commits[0][0]), "p-app": "inferred", "p-guitar": "inferred",
                              "p-closet": "inferred"},
         "summary_at": c.at(-1, "23:00"),
-        # project cards (api.md 项目概况), one per source: Loaflog's own session keeps ~/code/loaflog/overview.json,
-        # Claude wrote the app's on refresh, Sam set the guitar one in chat; the closet project has none yet
+        # project cards (api.md 项目概况), one per source: Loaflog's own session keeps ~/code/loaflog/overview.json in
+        # the research-card format (api.md 研究地图), Claude wrote the app's on refresh, Sam set the guitar one in chat;
+        # the closet project has none yet
         "overviews": {
             "p-loaflog": overview_of(
                 "project", c.iso(-1, "22:45"),
@@ -530,28 +531,35 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
                 status=t("新引导只差录走查视频；上传照片闪退的夜间测试跑到 31/40 轮。下一步：**定价**。",
                          "The new onboarding only needs its walkthrough video; the photo-upload crash soak is at "
                          "31/40 runs. Next: **pricing**."),
-                kill={"state": "running",
-                      "setting": t("40 位内测用户用满两周；第二周还在记录的不到 30%，就先不上 1.0，回头改记录流程",
-                                   "40 beta testers for two weeks; if under 30% still log in week two, hold 1.0 and "
-                                   "rework the logging flow"),
-                      "progress": t("第 9 天：40 人里 31 人这周还在记（78%）", "Day 9: 31 of 40 still logging this week (78%)")},
-                score=3.5,
-                abstract=t("把每次烘焙的发面时间、温度和照片记在一处，自动比出哪种配方最稳；离线能用，不注册也能记。",
-                           "Rise times, temperatures and photos of every bake in one place, with a comparison of "
-                           "which recipe holds up; works offline, no account needed."),
-                novelty=t("同类 app 多是食谱合集，只记结果不记过程，见[竞品对比](https://example.com/loaflog-competitors)。",
-                          "Similar apps are recipe collections that keep results, not the process; see the "
-                          "[competitor notes](https://example.com/loaflog-competitors)."),
-                significance=t("内测里最常听到的是“终于知道上次为什么塌了”。下一步：定价，然后公开 1.0。",
-                               "The beta's most common comment: “now I know why the last one collapsed.” Next: "
-                               "pricing, then a public 1.0."),
-                objections=[t("记录太麻烦，新手坚持不了两周？——能回答：第 9 天还有 78% 在记，引导砍到 3 屏后会更好。",
-                              "Too much logging for beginners to last two weeks? Answered: 78% still log on day 9, "
-                              "and onboarding drops to three screens."),
-                            t("和用笔记 app 记有什么区别？——部分回答：自动比配方是笔记做不到的，但还没有数据。",
-                              "Why not just a notes app? Partly answered: notes can't compare recipes, but there is "
-                              "no data on it yet.")],
-                decision=t("继续；内测满两周再定要不要上 1.0。", "Keep going; decide on 1.0 after the two-week beta."),
+                kill=None, score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
+                card={"run_state": "running", "stage": "confirm",
+                      "main_exp": t("40 位内测用户用满两周；第二周还在记录的不到 30%，就先不上 1.0。第 9 天：40 人里 31 人这周还在记（78%）。",
+                                    "40 beta testers for two weeks; if under 30% still log in week two, 1.0 waits. "
+                                    "Day 9: 31 of 40 still logging this week (78%)."),
+                      "contribution": t("把每次烘焙的发面时间、温度和照片记在一处，自动比出哪种配方最稳；同类 app 多是食谱合集，只记结果不记过程。",
+                                        "Rise times, temperatures and photos of every bake in one place, with a "
+                                        "comparison of which recipe holds up; similar apps are recipe collections that "
+                                        "keep results, not the process."),
+                      "comment": t("留存比预想的好；“和笔记 app 有什么区别”还没有数据回答。下一步：**定价**，内测满两周再定要不要上 1.0。",
+                                   "Retention is better than expected; “why not a notes app?” has no data behind its "
+                                   "answer yet. Next: **pricing**, then decide on 1.0 after the two-week beta."),
+                      "decisions": [t("内测哪天截止（给三位核心内测用户的投票已发出）",
+                                      "Which day the beta closes (the poll to the three lead testers is out)")],
+                      "development": [
+                          {"title": t("最初的想法", "First idea"),
+                           "text": t("面包烤塌了总说不清为什么：把每次的过程记下来，而不只记配方。",
+                                     "Nobody can say why a loaf collapsed: log each bake's process, not just the recipe.")},
+                          {"title": t("内测", "Beta"),
+                           "text": t("40 人内测两周，看**第二周还有多少人在记**。",
+                                     "A two-week beta with 40 testers, watching **how many still log in week two**.")},
+                          {"title": t("现在", "Now"),
+                           "text": t("引导砍到 3 屏，上传照片闪退在修；定价排在下一期第一周。",
+                                     "Onboarding is down to three screens and the photo-upload crash is being fixed; "
+                                     "pricing comes first next period.")}],
+                      "history": [
+                          {"at": c.iso(-1, "22:45"), "change": t("第 9 天留存 78%，主实验更新。", "Day 9 retention is 78%; main experiment updated.")},
+                          {"at": c.iso(-3, "20:10"), "change": t("引导从 5 屏砍到 3 屏。", "Onboarding cut from five screens to three.")},
+                          {"at": c.iso(-9, "21:00"), "change": t("内测开始，阶段改为确认。", "The beta started; stage moved to confirm.")}]},
                 status_file="~/code/loaflog/STATUS.md", status_changed=True, evidence="~/code/loaflog/overview.json"),
             "p-app": overview_of(
                 "claude", c.iso(-1, "23:00"),
@@ -562,7 +570,7 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
                 kill={"state": "paused",
                       "setting": t("连用两周，看是不是每天都会打开", "Use it for two weeks and see whether it gets opened every day"),
                       "progress": t("等今天页精简完再接着测", "Resumes once the leaner Today page ships")},
-                score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
+                score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None, card=None,
                 status_file=None, status_changed=False, evidence="inferred"),
             "p-guitar": overview_of(
                 "me", c.iso(-3, "21:30"),
@@ -573,9 +581,10 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
                                    "A week before the open mic, play all three for friends; more than two stalls and "
                                    "an easier song goes in"),
                       "progress": ""},
-                score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None,
+                score=None, abstract=None, novelty=None, significance=None, objections=None, decision=None, card=None,
                 status_file=None, status_changed=False, evidence=None),
         },
+        "research_map": research_map_of(c, t, app),
         "snapshots": {
             "p-app": {"taken_at": c.iso(-1, "23:00"), "worktrees": [
                 {"name": "main", "branch": "main", "path": f"~/code/{slug}", "status": "in-review",
@@ -605,12 +614,51 @@ def extras_of(c: Clock, t: Lang, app: str) -> dict:
 
 def overview_of(source: str, checked_at: str, *, one_liner: str, status: str, kill: dict | None, score: float | None,
                 abstract: str | None, novelty: str | None, significance: str | None, objections: list[str] | None,
-                decision: str | None, status_file: str | None, status_changed: bool, evidence: str | None) -> dict:
+                decision: str | None, card: dict | None, status_file: str | None, status_changed: bool,
+                evidence: str | None) -> dict:
     """A whole project overview as the hub stores it (PUT /projects/{id}/overview); Sam's projects have no paper."""
     return {"source": source, "one_liner": one_liner, "status": status, "kill": kill, "paper": None,
             "abstract": abstract, "novelty": novelty, "significance": significance, "objections": objections,
-            "score": score, "decision": decision, "checked_at": checked_at, "status_file": status_file,
+            "score": score, "decision": decision, "card": card, "checked_at": checked_at, "status_file": status_file,
             "status_changed": status_changed, "evidence": evidence}
+
+
+def research_map_of(c: Clock, t: Lang, app: str) -> dict:
+    """api.md 研究地图: Sam's map file (MOJITO_RESEARCH_MAP), which the worker copies whole on every project sync.
+    Every active / paused / done project is placed; the area with id "life" holds life projects."""
+    no_chats = {"claude": [], "chatgpt": []}
+    return {
+        "updated_at": c.iso(-1, "22:50"),
+        "principles": [
+            {"id": "pr-process", "label": t("记过程，不只记结果", "Log the process, not just the result"),
+             "text": t("想把一件事做好，先把每一次是怎么做的记下来，结果才有得比。",
+                       "To get better at something, record how each attempt went; only then can the results be compared.")},
+            {"id": "pr-small", "label": t("先小、先离线", "Small and offline first"),
+             "text": t("先做一个人离线就能用的小工具，账号和同步以后再说。",
+                       "First build a small tool one person can use offline; accounts and sync can wait.")},
+        ],
+        "areas": [
+            {"id": "apps", "name": t("做 app", "Apps"), "children": [
+                {"id": "apps-baking", "name": t("烘焙", "Baking"), "origins": [
+                    {"id": "o-bake-log", "label": t("烤坏了要知道为什么", "Know why a bake failed"),
+                     "text": t("把每次烘焙的发面时间、温度和照片记在一处，比出哪种配方最稳。",
+                               "Keep every bake's rise time, temperature and photos in one place and compare which "
+                               "recipe holds up."),
+                     "principles": ["pr-process", "pr-small"]}]},
+                {"id": "apps-tools", "name": t("自己用的工具", "Tools for me"), "origins": [
+                    {"id": "o-own-app", "label": t("会自己改的 app", "An app that changes itself"),
+                     "text": t(f"{app} 按我在 app 里提的意见改它自己。", f"{app} changes itself from the feedback I give inside it."),
+                     "principles": ["pr-small"]}]}]},
+            {"id": "life", "name": t("生活", "Life"), "children": []},
+        ],
+        "projects": [{"id": "p-loaflog", "area": "o-bake-log", "chats": no_chats},
+                     {"id": "p-app", "area": "o-own-app", "chats": no_chats},
+                     {"id": "p-guitar", "area": "life", "chats": no_chats},
+                     {"id": "p-closet", "area": "life", "chats": no_chats}],
+        "hidden": [],
+        "inbox": [{"at": c.iso(-2, "08:20"), "text": t("按面粉牌子统计烤成的比例", "Success rate by flour brand"),
+                   "source": t("笔记", "note"), "area": "apps-baking", "note": None}],
+    }
 
 
 def ask_feedback(t: Lang) -> dict:
@@ -742,6 +790,7 @@ def mock_extra_of(c: Clock, t: Lang, app: str, seed: dict) -> dict:
                                     "summary_at": x["summary_at"].isoformat(timespec="seconds")}
                               for pid, s in x["summaries"].items()},
         "project_overviews": x["overviews"],
+        "research_map": x["research_map"],
         "cards": cards,
         "feedback": [{"id": "f-demo-1", "at": c.iso(-1, "19:30"),
                       "body": t("信息流卡片太长了，能不能默认只显示三行？", "Feed cards are too long. Can they show three lines by default?"),
@@ -837,6 +886,7 @@ def cmd_build(a) -> None:
         raise SystemExit(f"--fcm-credentials {fcm} is not a file")
     write_json(out / "seed.json", seed_of(c, t, a.app_name, a.morning_at, a.evening_at))
     (out / "calendar.ics").write_text(ics_of(c, t))
+    write_json(out / "research-map.json", research_map_of(c, t, a.app_name))  # worker.env MOJITO_RESEARCH_MAP
     (out / "attachments").mkdir(mode=0o700)
     (out / "web").mkdir()  # MOJITO_WEB_DIR: put a web build here to serve it at /app
     (out / "ical-extra-urls").write_text("")  # MOJITO_ICAL_EXTRA_FILE: no subscribed calendars
@@ -854,7 +904,8 @@ def cmd_build(a) -> None:
         f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_OWNER_NAME={OWNER_NAME}", f"MOJITO_CONTACT_EMAIL={CONTACT_EMAIL}"]) + "\n")
     clients = out / "clients"
     clients.mkdir(mode=0o700)
-    for name, var, role, extra in (("worker.env", "MOJITO_WORKER_TOKEN", "worker", [f"MOJITO_TIMEZONE={a.timezone}"]),
+    for name, var, role, extra in (("worker.env", "MOJITO_WORKER_TOKEN", "worker",
+                                    [f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_RESEARCH_MAP={out / 'research-map.json'}"]),
                                    ("agent.env", "MOJITO_AGENT_TOKEN", "agent", [f"MOJITO_TIMEZONE={a.timezone}"]),
                                    ("maintainer.env", "MOJITO_MAINTAINER_TOKEN", "maintainer", []),
                                    ("cards.env", "MOJITO_CARDS_TOKEN", "source:cards", [])):
@@ -953,6 +1004,8 @@ def cmd_load(a) -> None:
     for pid, overview in x["overviews"].items():
         hub.call("agent" if overview["source"] == "me" else "worker", "PUT", f"/projects/{pid}/overview", overview)
         new.tag(datetime.fromisoformat(overview["checked_at"]))
+    # the projects page's map (api.md 研究地图): the worker copies the map file whole; stored without a record
+    hub.call("worker", "PUT", "/research-map", x["research_map"])
 
     events = [{"at": c.iso(n, hm), "kind": "view", "name": "app_open", "detail": None} for n, hms in x["opens"].items() for hm in hms]
     hub.call("app", "POST", "/usage", {"events": events})

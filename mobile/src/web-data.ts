@@ -15,3 +15,7 @@ export const fadeTop = data({ fade: 'top' })
 // 悬停才显示的元信息：组（外层）和元信息本身（src/desktop/HoverMeta.tsx）
 export const hoverGroup = data({ hovergroup: 'on' })
 export const hoverMeta = data({ hovermeta: 'on' })
+// 可拖动的竖分隔条（项目页卡片抽屉的左边，design.md 8.13）：光标变成左右箭头，悬停时线变亮
+export const colResize = data({ resize: 'col' })
+// 正文里的链接：手形光标（Mac 原生应用里也只有链接是手形，其余控件保持箭头）
+export const linkCursor = data({ cursor: 'link' })

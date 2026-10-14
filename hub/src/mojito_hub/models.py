@@ -189,6 +189,106 @@ class OverviewPaper(Body):
 # api.md 项目概况 补充 (16:50): the idea review card's fields, in card order.
 OVERVIEW_REVIEW_FIELDS = ("abstract", "novelty", "significance", "objections", "score", "decision")
 
+# api.md 研究地图 (2026-10-06): the research card a project session writes into its overview.json.
+RunState = Literal["running", "paused", "stopped", "done"]
+Stage = Literal["question", "discovery", "instrument", "confirm", "write"]
+
+
+class CardStep(Body):
+    title: str
+    text: str
+
+
+class CardChange(Body):
+    at: AwareDatetime
+    change: str
+
+    @field_validator("at")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return v.astimezone(UTC)
+
+
+class ResearchCard(Body):
+    run_state: RunState
+    stage: Stage
+    main_exp: str | None
+    contribution: str | None
+    comment: str | None
+    decisions: list[str]  # waiting on the user
+    development: list[CardStep]  # first idea → each stage → now
+    history: list[CardChange]  # newest first, one sentence per update
+
+
+class MapPrinciple(Body):
+    id: str
+    label: str  # short label on the node
+    text: str  # the full sentence, shown when the root is clicked
+
+
+class MapOrigin(Body):
+    """The idea a project started from (not its narrowed result); several projects can share one."""
+    id: str
+    label: str
+    text: str
+    principles: list[str]  # MapPrinciple ids
+
+
+class MapLeaf(Body):
+    id: str
+    name: str
+    origins: list[MapOrigin]  # may be empty: projects then hang on the leaf itself
+
+
+class MapArea(Body):
+    id: str
+    name: str
+    children: list[MapLeaf]  # empty: projects hang on the area itself (生活)
+
+
+class ChatLink(Body):
+    title: str
+    url: str
+
+
+class MapChats(Body):
+    claude: list[ChatLink]
+    chatgpt: list[ChatLink]
+
+
+class MapProject(Body):
+    id: str  # hub project id
+    area: str  # an origin id, a leaf id, or an area id when the area has no leaves
+    chats: MapChats
+
+
+class InboxIdea(Body):
+    at: AwareDatetime
+    text: str
+    source: str
+    area: str | None  # suggested place on the map
+    note: str | None
+
+    @field_validator("at")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return v.astimezone(UTC)
+
+
+class ResearchMap(Body):
+    """api.md 研究地图: the map file, copied whole by the worker; the hub only stores it."""
+    updated_at: AwareDatetime
+    principles: list[MapPrinciple]
+    areas: list[MapArea]
+    projects: list[MapProject]
+    hidden: list[str]  # hub project ids left off the map on purpose
+    inbox: list[InboxIdea]
+
+    @field_validator("updated_at")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return v.astimezone(UTC)
+
 
 class ProjectOverview(Body):
     """api.md 项目概况: one line / status / kill test / paper plus the review card, written
@@ -204,6 +304,7 @@ class ProjectOverview(Body):
     objections: list[str] | None
     score: Annotated[float, Field(ge=0, le=5)] | None
     decision: str | None
+    card: ResearchCard | None  # api.md 研究地图: only from a project's overview.json
     checked_at: AwareDatetime
     status_file: str | None
     status_changed: bool

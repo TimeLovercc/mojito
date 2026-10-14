@@ -5,6 +5,7 @@ import { ENUM_NAMES, FIELD_NAMES } from '../labels'
 import { when } from '../time'
 import { colors, desktop, font, overlay, size } from '../theme'
 import { t } from '../i18n'
+import { linkCursor } from '../web-data'
 
 // hub / worker 写的文字里会带内部值，这里统一改成人能读的：
 // - ISO 时间 → 本地短格式
@@ -58,7 +59,7 @@ export function RichText({
       )
     else if (mdText !== undefined)
       parts.push(
-        <Text key={at} style={link} onPress={() => Linking.openURL(mdUrl)}>
+        <Text key={at} style={link} {...linkCursor} onPress={() => Linking.openURL(mdUrl)}>
           {mdText}
         </Text>,
       )
@@ -66,7 +67,7 @@ export function RichText({
     else if (recordId !== undefined) parts.push(<RecordLink key={at} id={recordId} />)
     else if (url !== undefined)
       parts.push(
-        <Text key={at} style={link} onPress={() => Linking.openURL(url)}>
+        <Text key={at} style={link} {...linkCursor} onPress={() => Linking.openURL(url)}>
           {domain(url)}
         </Text>,
       )
@@ -85,7 +86,7 @@ export function RichText({
 function RecordLink({ id }: { id: string }) {
   const router = useRouter()
   return (
-    <Text style={link} onPress={() => router.push({ pathname: '/records/[id]', params: { id } })}>
+    <Text style={link} {...linkCursor} onPress={() => router.push({ pathname: '/records/[id]', params: { id } })}>
       {t('来源笔记')}
     </Text>
   )

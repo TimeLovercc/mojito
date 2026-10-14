@@ -25,7 +25,7 @@ from .models import (
     RecordList, Review, ReviewFinishIn, Snapshot, Card, CardIn, CardList, CardReadIn, CardStatus,
     CardStatusIn, ItemBefore, USAGE_ACTIONS, USAGE_VIEWS, AuthName,
     AuthStatus, AuthStatusIn, AuthStatusList, UsageIn, UsageSummary,
-    ReviewIn, Runner, Settings, Source, SourceList, Today,
+    ResearchMap, ReviewIn, Runner, Settings, Source, SourceList, Today,
 )
 from .push import push
 from .models import (
@@ -1052,6 +1052,25 @@ async def project_overview(project_id: str, body: ProjectOverview, r: str = Depe
     with conn:
         changes.set_overview(project_id, body, at, author="system", source=auth.SOURCE_OF[r])
     return db.project_of(get_or_404("projects", project_id), at)
+
+
+@app.put("/research-map", response_model=ResearchMap, dependencies=[Depends(auth.worker)])
+async def put_research_map(body: ResearchMap):
+    """api.md 研究地图: the worker copies the map file whole on every project sync; stored silently."""
+    with conn:
+        conn.execute("INSERT INTO research_map (id, body, at) VALUES (1, ?, ?)"
+                     " ON CONFLICT (id) DO UPDATE SET body = excluded.body, at = excluded.at",
+                     (body.model_dump_json(), db.ts(db.now())))
+    return body
+
+
+@app.get("/research-map", response_model=ResearchMap, dependencies=[Depends(auth.app_read)])
+async def get_research_map():
+    """api.md 研究地图: 404 until the worker has copied the map file once."""
+    r = db.one("SELECT body FROM research_map WHERE id = 1")
+    if r is None:
+        raise HTTPException(404, "research map not synced yet")
+    return ResearchMap.model_validate_json(r["body"])
 
 
 @app.put("/projects/{project_id}/snapshot", response_model=Snapshot, dependencies=[Depends(auth.worker)])

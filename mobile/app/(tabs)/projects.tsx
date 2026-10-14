@@ -1,159 +1,242 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { ChevronRight } from 'lucide-react-native'
-import type { GoalsList, ItemCategory, ItemsList, ProjectsList } from '../../src/api/types'
-import { ItemRow } from '../../src/components/ItemRow'
-import { ProjectRow } from '../../src/components/ProjectCard'
-import { Screen, StaleBanner } from '../../src/components/Screen'
-import { Btn, Card, Empty, Rows, Section, Seg, Tag } from '../../src/components/ui'
-import { killState } from '../../src/labels'
+import { ChevronDown, ChevronRight } from 'lucide-react-native'
+import type { ProjectsList, ResearchMap } from '../../src/api/types'
+import { RunBox } from '../../src/components/ResearchCard'
+import { Screen } from '../../src/components/Screen'
+import { Card, Filter } from '../../src/components/ui'
+import { ResearchMapWide } from '../../src/desktop/ResearchMapWide'
+import { t } from '../../src/i18n'
+import { LIFE, STAGE, both, branchColor, decisionsOf, originPrinciples, placeProjects, placesOf, runOf, type Placed } from '../../src/research'
+import { colors, desktop, font, overlay, size } from '../../src/theme'
+import { when } from '../../src/time'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
-import { useWide } from '../../src/wide'
-import { TopBar } from '../../src/components/Screen'
-import { colors, desktop, font, size } from '../../src/theme'
-import { ProjectsWide } from '../../src/desktop/ProjectsWide'
-import type { Project } from '../../src/api/types'
-import { ProjectPane } from '../projects/[id]'
 import { hoverRow } from '../../src/web-data'
-import { t } from '../../src/i18n'
+import { useWide } from '../../src/wide'
 export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
-const OPEN = new Set(['active', 'waiting_you', 'scheduled'])
-
-// 项目面板：研究 / 生活两组，不属于任何项目的进行中事项归入"其他"。电脑宽屏见 src/desktop/ProjectsWide.tsx，其他宽屏（iPad）见 WideProjects
+// 项目页 = 研究地图（design.md 8.13）。电脑是横向思维导图（src/desktop/ResearchMapWide.tsx）；手机和其他屏幕是同一棵树的
+// 折叠列表：最上面是总原则（默认收起）；方向 → 叶子 → 起点 → 项目，点方向收起 / 展开，点起点展开它的整句和对应原则，
+// 点项目进全屏卡片（app/projects/[id].tsx）；最下面是灵感收件箱
 export default function ProjectsScreen() {
   const wide = useWide()
-  return wide ? (desktop ? <ProjectsWide /> : <WideProjects />) : <PhoneProjects />
+  return wide && desktop ? <ResearchMapWide /> : <ProjectTree />
 }
 
-function PhoneProjects() {
-  const [area, setArea] = useState<ItemCategory>('research')
-  const projects = useHub<ProjectsList>(`/projects?area=${area}`)
-  const items = useHub<ItemsList>('/items')
-  const goals = useHub<GoalsList>('/goals')
-  const router = useRouter()
+function ProjectTree() {
+  const map = useHub<ResearchMap>('/research-map')
+  const open = useHub<ProjectsList>('/projects')
+  const done = useHub<ProjectsList>('/projects?status=done')
+  const [onlyRunning, setOnlyRunning] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['inbox', 'principles']))
+  // 起点默认只显示短标签，点一下展开整句
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   useViewTracking('projects')
-  const seg = (
-    <Seg<ItemCategory>
-      options={[
-        ['research', t('研究')],
-        ['life', t('生活')],
-      ]}
-      value={area}
-      onChange={setArea}
-    />
-  )
-  const others =
-    items.data === null ? null : items.data.items.filter((i) => i.project_id === null && i.category === area && OPEN.has(i.status))
+  const toggle = (key: string) => {
+    const next = new Set(collapsed)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setCollapsed(next)
+  }
+  const expand = (id: string) => {
+    const next = new Set(expanded)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setExpanded(next)
+  }
   return (
-    <Screen view={projects} head={{ kind: 'title', title: t('项目') }} top={seg} fab>
-      {({ projects: list }) => (
-        <>
-          <Section title={t('项目')} right={String(list.length)}>
-            {list.length === 0 ? (
-              <Empty text={t('这一组还没有项目')} />
-            ) : (
-              <Card>
-                <Rows>
-                  {list.map((p) => (
-                    <ProjectRow key={p.id} project={p} />
+    <Screen view={both(map, both(open, done))} head={{ kind: 'title', title: t('项目') }} fab>
+      {({ a: m, b: lists }) => {
+        const { placed, missing } = placeProjects(m, [...lists.a.projects, ...lists.b.projects])
+        const shown = (x: Placed) => !onlyRunning || runOf(x.project, x.area === LIFE) === 'running'
+        const running = placed.filter((x) => runOf(x.project, x.area === LIFE) === 'running').length
+        return (
+          <View style={styles.col}>
+            <View style={styles.filters}>
+              <Filter label={t('只看进行中的（{n}）', { n: running })} on={onlyRunning} onPress={() => setOnlyRunning(!onlyRunning)} />
+            </View>
+            <Card>
+              <Pressable onPress={() => toggle('principles')} style={styles.areaHead} {...hoverRow}>
+                <View style={[styles.bar, { backgroundColor: colors.tx }]} />
+                <Text style={styles.areaName}>{t('总原则')}</Text>
+                <Text style={styles.count}>{m.principles.length}</Text>
+                <View style={styles.grow} />
+                {collapsed.has('principles') ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
+              </Pressable>
+              {collapsed.has('principles')
+                ? null
+                : m.principles.map((p, i) => (
+                    <View key={p.id} style={styles.idea}>
+                      <Text style={styles.ideaText}>{`${i + 1}. ${p.label}`}</Text>
+                      <Text style={styles.principleText}>{p.text}</Text>
+                    </View>
                   ))}
-                </Rows>
-              </Card>
-            )}
-          </Section>
-          <Section title={t('其他')} right={others === null ? '' : String(others.length)}>
-            <StaleBanner view={items} />
-            {others === null ? null : others.length === 0 ? (
-              <Empty text={t('没有不属于项目的进行中事项')} />
-            ) : (
-              <Card style={{ paddingVertical: 4 }}>
-                <Rows>
-                  {others.map((i) => (
-                    <ItemRow key={i.id} item={i} goals={goals.data === null ? null : goals.data.goals} showStatus />
+            </Card>
+            {m.areas.map((a, i) => {
+              const color = branchColor(i)
+              const places = placesOf(a)
+              const inArea = placed.filter((x) => places.includes(x.area) && shown(x))
+              if (onlyRunning && inArea.length === 0) return null
+              const key = `a:${a.id}`
+              const folded = collapsed.has(key)
+              const pending = inArea.reduce((n, x) => n + decisionsOf(x.project), 0)
+              return (
+                <Card key={a.id}>
+                  <Pressable onPress={() => toggle(key)} style={styles.areaHead} {...hoverRow}>
+                    <View style={[styles.bar, { backgroundColor: color }]} />
+                    <Text style={[styles.areaName, { color }]}>{a.name}</Text>
+                    <Text style={styles.count}>{inArea.length}</Text>
+                    <Badge n={pending} />
+                    <View style={styles.grow} />
+                    {folded ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
+                  </Pressable>
+                  {folded
+                    ? null
+                    : a.children.length === 0
+                      ? inArea.map((x) => <ProjectLine key={x.project.id} item={x} deep={false} />)
+                      : a.children.map((l) => {
+                          const direct = inArea.filter((x) => x.area === l.id)
+                          const origins = l.origins
+                            .map((o) => ({ o, list: inArea.filter((x) => x.area === o.id) }))
+                            .filter((g) => !onlyRunning || g.list.length > 0)
+                          if (onlyRunning && direct.length === 0 && origins.length === 0) return null
+                          return (
+                            <View key={l.id}>
+                              <Text style={[styles.leaf, { borderBottomColor: color }]}>{l.name}</Text>
+                              {direct.length === 0 && origins.length === 0 ? <Text style={styles.empty}>{t('空')}</Text> : null}
+                              {direct.map((x) => <ProjectLine key={x.project.id} item={x} deep={false} />)}
+                              {origins.map(({ o, list }) => {
+                                const open = expanded.has(o.id)
+                                const rests = originPrinciples(m, o)
+                                return (
+                                  <View key={o.id}>
+                                    <Pressable onPress={() => expand(o.id)} style={styles.origin} {...hoverRow}>
+                                      <View style={[styles.originDot, { borderColor: color }]} />
+                                      <Text style={styles.originLabel}>{o.label}</Text>
+                                      <View style={styles.grow} />
+                                      {open ? <ChevronDown size={14} color={colors.tx3} /> : <ChevronRight size={14} color={colors.tx3} />}
+                                    </Pressable>
+                                    {open ? (
+                                      <View style={styles.originBody}>
+                                        <Text style={styles.originText}>{o.text}</Text>
+                                        {rests === null ? null : <Text style={styles.ideaMeta}>{t('对应原则：{list}', { list: rests })}</Text>}
+                                      </View>
+                                    ) : null}
+                                    {list.map((x) => <ProjectLine key={x.project.id} item={x} deep />)}
+                                  </View>
+                                )
+                              })}
+                            </View>
+                          )
+                        })}
+                </Card>
+              )
+            })}
+            <Card>
+              <Pressable onPress={() => toggle('inbox')} style={styles.areaHead} {...hoverRow}>
+                <View style={[styles.bar, { backgroundColor: colors.tx3 }]} />
+                <Text style={styles.areaName}>{t('灵感收件箱')}</Text>
+                <Text style={styles.count}>{m.inbox.length}</Text>
+                <View style={styles.grow} />
+                {collapsed.has('inbox') ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
+              </Pressable>
+              {collapsed.has('inbox')
+                ? null
+                : m.inbox.map((x, i) => (
+                    <View key={i} style={styles.idea}>
+                      <Text style={styles.ideaText}>{x.text}</Text>
+                      {x.note === null ? null : <Text style={styles.ideaMeta}>{x.note}</Text>}
+                      <Text style={styles.ideaMeta}>{`${x.source} · ${when(x.at)}`}</Text>
+                    </View>
                   ))}
-                </Rows>
-              </Card>
+            </Card>
+            {missing.length === 0 ? null : (
+              <Text style={styles.missing}>{t('地图文件里有 {n} 个项目在 hub 里找不到：{ids}', { n: missing.length, ids: missing.join('、') })}</Text>
             )}
-          </Section>
-          <View style={styles.all}>
-            <Btn label={t('全部事项')} icon={ChevronRight} onPress={() => router.push('/items')} />
           </View>
-        </>
-      )}
+        )
+      }}
     </Screen>
   )
 }
 
-// 宽屏（内部界面稿（未公开） 第 3 张）：顶栏横跨；左栏按研究 / 生活分组的项目列表（状态点），右边选中项目的详情
-function WideProjects() {
-  const research = useHub<ProjectsList>('/projects?area=research')
-  const life = useHub<ProjectsList>('/projects?area=life')
+function ProjectLine({ item: x, deep }: { item: Placed; deep: boolean }) {
   const router = useRouter()
-  const [picked, setPicked] = useState<string | null>(null)
-  useViewTracking('projects')
-  const all = [...(research.data === null ? [] : research.data.projects), ...(life.data === null ? [] : life.data.projects)]
-  const selected = picked !== null && all.some((p) => p.id === picked) ? picked : all.length === 0 ? null : all[0].id
-  const group = (title: string, list: Project[] | null) => (
-    <>
-      <Text style={styles.group}>{title}</Text>
-      {list === null ? null : list.length === 0 ? (
-        <Text style={styles.none}>{t('还没有项目')}</Text>
-      ) : (
-        list.map((p) => (
-          <Pressable key={p.id} onPress={() => setPicked(p.id)} style={[styles.pi, p.id === selected && styles.piOn]} {...hoverRow}>
-            <Text style={[styles.piText, p.id === selected && font.medium]} numberOfLines={1}>
-              {p.title}
-            </Text>
-            {p.overview === null || p.overview.kill === null ? null : <Tag {...killState[p.overview.kill.state]} />}
-            <View style={[styles.dot, { backgroundColor: p.stale ? colors.warn : p.status === 'active' ? colors.ok : colors.tx3 }]} />
-          </Pressable>
-        ))
-      )}
-    </>
-  )
+  const run = runOf(x.project, x.area === LIFE)
+  const card = x.project.overview === null ? null : x.project.overview.card
   return (
-    <View style={styles.page}>
-      <TopBar head={{ kind: 'title', title: t('项目') }} sub={null} tools={null} syncing={research.syncing || life.syncing} />
-      <View style={styles.split}>
-        <ScrollView style={styles.plist} contentContainerStyle={styles.plistBody}>
-          <StaleBanner view={research} />
-          {group(t('研究'), research.data === null ? null : research.data.projects)}
-          {group(t('生活'), life.data === null ? null : life.data.projects)}
-          <View style={styles.sep} />
-          <Pressable onPress={() => router.push('/items')} style={styles.pi}>
-            <Text style={styles.piText}>{t('全部事项')}</Text>
-            <ChevronRight size={15} color={colors.tx3} />
-          </Pressable>
-        </ScrollView>
-        <View style={styles.detail}>{selected === null ? null : <ProjectPane key={selected} id={selected} head={{ kind: 'none' }} />}</View>
-      </View>
+    <Pressable
+      style={[styles.proj, deep && styles.projDeep]}
+      onPress={() => router.push({ pathname: '/projects/[id]', params: { id: x.project.id } })}
+      {...hoverRow}
+    >
+      <RunBox run={run} small />
+      <Text style={[styles.projName, run !== 'running' && run !== 'done' && styles.dim]} numberOfLines={1}>
+        {x.project.title}
+      </Text>
+      {card === null ? null : <Text style={styles.stage}>{STAGE[card.stage]}</Text>}
+      <Badge n={decisionsOf(x.project)} />
+      <View style={styles.grow} />
+      <ChevronRight size={15} color={colors.tx3} />
+    </Pressable>
+  )
+}
+
+function Badge({ n }: { n: number }) {
+  if (n === 0) return null
+  return (
+    <View style={styles.badge}>
+      <Text style={styles.badgeText}>{n}</Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1 },
-  split: { flex: 1, flexDirection: 'row' },
-  plist: { width: 260, flexGrow: 0, borderRightWidth: 1, borderRightColor: colors.line },
-  plistBody: { paddingVertical: 14, paddingHorizontal: 12, gap: 4 },
-  group: {
-    ...font.regular,
-    fontSize: size.small,
-    color: colors.tx3,
-    letterSpacing: 0.5,
-    paddingTop: 10,
-    paddingBottom: 4,
-    paddingHorizontal: 10,
+  col: { gap: 12 },
+  filters: { flexDirection: 'row' },
+  areaHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14 },
+  bar: { width: 4, height: 18, borderRadius: 2 },
+  areaName: { ...font.semibold, fontSize: size.title, color: colors.tx },
+  count: { ...font.regular, fontSize: size.small, color: colors.tx3 },
+  grow: { flex: 1 },
+  leaf: {
+    ...font.semibold,
+    alignSelf: 'flex-start',
+    fontSize: size.secondary,
+    color: colors.tx2,
+    marginLeft: 26,
+    marginTop: 4,
+    marginBottom: 2,
+    paddingBottom: 2,
+    borderBottomWidth: 2,
   },
-  none: { ...font.regular, fontSize: size.secondary, color: colors.tx3, paddingHorizontal: 10, paddingVertical: 6 },
-  pi: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 10, borderRadius: 8 },
-  piOn: { backgroundColor: colors.raised },
-  piText: { ...font.regular, fontSize: size.body, color: colors.tx, flex: 1 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  sep: { height: 1, backgroundColor: colors.line, marginVertical: 10, marginHorizontal: 6 },
-  detail: { flex: 1, minWidth: 0 },
-  all: { flexDirection: 'row', justifyContent: 'center' },
+  empty: { ...font.regular, fontSize: size.small, color: colors.tx3, marginLeft: 26, paddingVertical: 6 },
+  proj: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingLeft: 26,
+    paddingRight: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: overlay.rowLine,
+  },
+  projName: { ...font.medium, flexShrink: 1, fontSize: size.body, color: colors.tx },
+  projDeep: { paddingLeft: 42 },
+  dim: { color: colors.tx3 },
+  origin: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 38, paddingLeft: 26, paddingRight: 14 },
+  originDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 2 },
+  originLabel: { ...font.semibold, flexShrink: 1, fontSize: size.secondary, color: colors.tx2 },
+  originBody: { gap: 3, paddingLeft: 42, paddingRight: 14, paddingBottom: 8 },
+  originText: { ...font.regular, fontSize: size.secondary, lineHeight: Math.round(size.secondary * 1.55), color: colors.tx2 },
+  principleText: { ...font.regular, fontSize: size.secondary, lineHeight: Math.round(size.secondary * 1.55), color: colors.tx2 },
+  stage: { ...font.regular, fontSize: size.small, color: colors.tx3 },
+  badge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand },
+  badgeText: { ...font.semibold, fontSize: size.small - 1, color: colors.onBrand },
+  idea: { gap: 3, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: overlay.rowLine },
+  ideaText: { ...font.medium, fontSize: size.body, lineHeight: Math.round(size.body * 1.5), color: colors.tx },
+  ideaMeta: { ...font.regular, fontSize: size.small, lineHeight: 18, color: colors.tx3 },
+  missing: { ...font.regular, fontSize: size.small, color: colors.warn },
 })

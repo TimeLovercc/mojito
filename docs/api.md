@@ -824,7 +824,10 @@ hub 在以下写操作时像事项一样**自动写"从 X 改成 Y"记录并带�
 ## 维护会话心跳与看门狗
 
 - maintainer 令牌可调 `POST /sources/maintainer/heartbeat`（`expected_interval_s=900`）。看门狗对 `maintainer` 用 30 分钟判失联（hub 对该源失联阈值 = 2 × expected），失联写 interrupt 推送。
-- worker 看门狗：每 5 分钟 `GET /sources`，`maintainer` 失联 ≥ 30 分钟且过去 60 分钟内没拉起过 → `orca terminal create --worktree path:<主 checkout> --title "mojito 维护" --command "claude '你是 mojito 的维护会话。完整读 docs/maintainer.md 并照做。'"`，再 `POST /events` 推送"维护会话失联，已开新会话接班"。这是本机 worker 对 Orca 唯一允许的写操作。当前实现需要 Orca；不用 Orca 时维护会话失联只会推送告警，要自己重开。
+- worker 看门狗：每 5 分钟 `GET /sources`，`maintainer` 失联 ≥ 30 分钟且过去 60 分钟内没拉起过 → `orca terminal create --worktree path:<主 checkout> --title "mojito 维护" --command "claude -n maint '你是 mojito 的维护会话。完整读 docs/maintainer.md 并照做。'"`（`-n` 只是给会话起个显示名），再 `POST /events` 推送"维护会话失联，已开新会话接班"。这是本机 worker 对 Orca 唯一允许的写操作。当前实现需要 Orca；不用 Orca 时维护会话失联只会推送告警，要自己重开。
+- **刚醒先等**：看门狗按墙钟时间（不是 monotonic，Mac 睡眠时 monotonic 不走）记上一次检查；这次距上次超过 10 分钟就当 Mac 刚醒，记下醒来时间，醒来后 5 分钟内不判失联。起因：Mac 刚醒时旧维护会话几秒后就会补报心跳，看门狗却可能在同一分钟开了新会话。
+- **worker 启动也算刚醒**：worker 进程启动时就把启动时间记为醒来时间，启动后 5 分钟内同样不判失联（日志写一行"worker 刚启动，按刚醒处理"）。起因：worker 被 launchd 重启后（比如一个跨睡眠的长任务交结果时出错），新进程没有上一轮的墙钟记录，认不出 Mac 刚醒，同一分钟就可能判维护会话失联、开新会话。
+- **先查 Claude 登录**：要开新会话前，先用 worker 现有的 `claude -p` 调用方式跑一次最小调用（让它只回"ok"），按 worker 已有的认证错误判断。认证失败就**不开终端**，改写一条 `kind=alert`、`tier=digest` 的记录推送"Mac 上的 Claude 登录过期，请 /login"（正文写：维护会话多久没心跳；在 Mac 任一终端运行 `claude`，按提示 /login；登录好后看门狗会自动开新会话）。这条推送 60 分钟内不重复（按它自己标题的记录算）；登录恢复后，开新会话只看原来"已开新会话接班"记录的 60 分钟冷却，不受这条推送影响。起因：登录过期时新开的会话一启动就报"Login expired"，什么也没做，用户却收到"已开新会话接班"。
 
 ## 数据源结果健康
 
@@ -1391,6 +1394,79 @@ hub 先部署（`overview` 字段出现在响应里）→ worker → agent → a
 
 `paused` / `stopped` 两个值反过来：app 空中更新 + Mac 新版本先上（认识 8 个值、换颜色）→ hub + agent 部署、worker 重启（接受新值）→ 各项目会话按实际情况改卡片。
 
+# 研究地图（design.md 8.13）
+
+项目页换成研究地图：卡片内容由各项目会话写在 `overview.json`，地图由一份 `map.json` 给出（worker/.env 的 `MOJITO_RESEARCH_MAP` 指向它）。
+
+## overview.json 新格式
+
+全部键必填、可 null 的照旧写 null：`{"updated_at", "one_liner", "status", "paper", "card"}`。
+
+- `one_liner` 在卡片上叫**核心想法**，`status` 叫**状态**（一段话：核心实验、论文进度），`paper` 结构不变。
+- `kill`、`score`、`abstract`、`novelty`、`significance`、`objections`、`decision` 不再从文件读；文件里还有时按"多出的键忽略"处理。hub 的 ProjectOverview 保留这些字段（旧 app 还在读），`source=project` 时一律为 null。
+- `card`（研究卡片；不是研究项目写 null）：
+
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `run_state` | `running` \| `paused` \| `stopped` \| `done` | 运行状态方块，由项目会话设，不从阶段推 |
+| `stage` | `question` \| `discovery` \| `instrument` \| `confirm` \| `write` | 立题 / 看现象 / 造仪器 / 确认 / 成文 |
+| `main_exp` | str \| null | 主实验：设置和现在的结果 |
+| `contribution` | str \| null | 贡献 |
+| `comment` | str \| null | 评论：项目好不好、下一步该做什么 |
+| `decisions` | list[str] | 待你决定，每条一件事（可为空列表） |
+| `development` | list[{title, text}] | 项目发展：最初的想法 → 各阶段 → 现在（text 可含 **加粗**） |
+| `history` | list[{at, change}] | 状态历史，**新的在前**；`at` 带时区 ISO-8601，`change` 一句话说这次变了什么 |
+
+- 每次更新卡片：改 `updated_at`，在 `history` 最前面加一条。
+- `mojito-overview-check` 按新格式检查。
+- **worker 只完整检查最新的那份**：一个项目在仓库和各 Orca worktree 里可能有多份 `overview.json`，按 `updated_at` 取最新的一份再检查；旧副本不再拖累整个项目（只要能读出带时区的 `updated_at`）。
+- ProjectOverview 新增 `card: ResearchCard | null`（结构同上，`at` 存成 UTC）；`PUT /projects/{id}/overview` 必须带 `card`。worker 的 Claude 整理和对话里改概况都写 `card: null`。hub 启动时给旧数据（含撤销记录里的 before）补 `card: null`。
+
+## 地图文件 map.json
+
+worker/.env 新增必填 `MOJITO_RESEARCH_MAP`：地图文件的绝对路径。放在哪由你定，比如放进管研究项目的那个仓库，让那里的会话维护它。
+
+```
+{"updated_at": "<带时区 ISO-8601>",
+ "principles": [{"id", "label": "<节点上的短标签>", "text": "<完整的一句话>"}],   // 总原则，点根节点显示
+ "areas": [{"id", "name", "children": [{"id", "name",
+            "origins": [{"id", "label", "text", "principles": ["<总原则 id>"]}]}]}],   // children 为空：项目直接挂在方向上（比如生活）；origins 是叶子下的起点节点，可以为空
+ "projects": [{"id": "<hub 项目 id>", "area": "<起点 id，或叶子 id，或没有叶子的方向 id>",
+               "chats": {"claude": [{"title", "url"}], "chatgpt": [{"title", "url"}]}}],   // 对话新的在前
+ "hidden": ["<故意不上地图的 hub 项目 id>"],
+ "inbox": [{"at", "text", "source", "area": "<建议位置> | null", "note": "<说明> | null"}]}
+```
+
+- id 为 `life` 的方向放生活项目：卡片只有状态，运行状态方块按 hub 的项目状态（不是研究卡片）。
+- worker 每次 `sync_projects` 读它，检查 id 对得上：位置存在（起点、叶子、没有叶子的方向）、起点引用的总原则存在、所有 id 不重名、项目在 hub 里、不重复、状态为 active / paused / done 的 hub 项目要么在 `projects` 要么在 `hidden`、收件箱建议的位置存在。有问题按项目概况文件出错同样处理（`sync-projects` 健康 error，写明问题），不上传；没问题就 `PUT /research-map` 整份覆盖。
+
+## 接口
+
+| 方法 | 路径 | 令牌 | 作用 |
+|---|---|---|---|
+| PUT | `/research-map` | worker | 整份覆盖写，请求体同上（hub 只存，不写记录）→ ResearchMap |
+| GET | `/research-map` | app 等 | 地图；worker 还没上传过 → 404 |
+
+## app
+
+- 项目页：Mac 是导图 + 右侧抽屉，手机是折叠树 + 全屏卡片（design.md 8.13）。数据：`GET /research-map`、`GET /projects`、`GET /projects?status=done`。地图里的 id 在 hub 里找不到时，页面底部列出来，不悄悄丢掉。
+- 原来的项目列表、概况各块（含分数徽章、生死实验胶囊）、事项、会话、最近记录从项目页拿掉。
+- Mac 外壳的 `open_external` 放行 `claude` 协议（Claude 按钮）；新命令 `open_chat_tab {url}`（只收 https）：用 AppleScript 在 Chrome 各窗口里找网址以 url 开头的标签页，找到就切过去，否则在最前面的窗口新开，返回 `reused` / `opened`；没有自动化权限（-1743）时报错并说明去 系统设置 › 隐私与安全性 › 自动化 打开。Info.plist 加了 `NSAppleEventsUsageDescription`。
+
+## 上线顺序
+
+hub + agent 部署 → 在 hub 建好地图要用、还不在 hub 里的项目 → 写好各项目新格式的 `overview.json` 和 `map.json` → worker 加 `MOJITO_RESEARCH_MAP` 并重启、跑一次同步 → Mac 新版本 + 手机空中更新 → 把新格式告诉维护各项目卡片的会话。
+
+## 卡片文件一改就同步
+
+起因：项目会话改了 `overview.json` 后，app 要等下一次 30 分钟定时同步才显示。
+
+- **只看修改时间**：worker 每 60 秒（墙钟）检查一次同步文件：上一次 `sync_projects` 查过的每个项目目录下的 `overview.json`（在不在、修改时间）和 `MOJITO_RESEARCH_MAP` 指向的地图文件。只 stat，不读内容、不联网。
+- **有变化就排同步**：和基线相比有文件新出现、消失或修改时间变了 → `POST /worker/jobs {kind: "sync_projects", runner: "mac", record_id: null}`（已有 queued / running 的同类任务时 hub 返回那一个，不重复入队），并把基线更新成这次看到的修改时间。
+- **基线**：每次 `sync_projects` 开始读文件之前，用这次要查的目录清单和各文件当时的修改时间重建基线（同步途中又改的文件下一分钟会被发现）。worker 启动后还没跑过同步时，第一次检查只记基线，不入队。
+- hub 每 30 分钟入队一次 `sync_projects` 照旧（新 worktree、Orca 快照靠它）。
+- 不新增接口、数据源、健康项。检查出错只写日志，不能挡住任务处理（同看门狗）。worker 正在跑长任务时检查顺延到任务结束后。
+
 ---
 
 # 附：环境变量汇总
@@ -1430,5 +1506,6 @@ hub 先部署（`overview` 字段出现在响应里）→ worker → agent → a
 | `MOJITO_GMAIL_OAUTH_FILE` | Gmail 只读授权文件 |
 | `MOJITO_ZOTERO_DB` | `zotero.sqlite` 路径，或 `none` |
 | `MOJITO_ARXIV_CATEGORIES` | 论文订阅的 arXiv 分类，逗号分隔 |
+| `MOJITO_RESEARCH_MAP` | 研究地图文件 `map.json` 的绝对路径（见"研究地图"） |
 
 **本机其他**（`~/.config/mojito/secrets/`）：`maintainer.env`（`MOJITO_HUB_URL`、`MOJITO_MAINTAINER_TOKEN`，维护会话用）、`cards.env`（`MOJITO_HUB_URL`、`MOJITO_CARDS_TOKEN`，`mojito-card` 和发布脚本用）。

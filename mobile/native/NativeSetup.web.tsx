@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text } from 'react-native'
 import { usePathname, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { hubRequest, HubError } from '../src/api/client'
@@ -7,19 +7,22 @@ import type { HubRecord, NotifyKind, Settings } from '../src/api/types'
 import { useConfig } from '../src/config/context'
 import type { HubConfig } from '../src/config/store'
 import { pwa, type Pwa } from '../src/pwa'
+import { tauri } from '../src/tauri'
+import { UpdateBanner } from '../src/desktop/UpdateBanner'
+import { bannerStyles, TopBanner, TopBanners } from '../src/components/TopBanner'
 import { routeOf } from '../src/push-route'
 import { useRefresh } from '../src/refresh'
-import { colors, font, size } from '../src/theme'
 import { useErrorToast } from '../src/toast'
 import { pushSupported, registerSubscription, sameKey, SW_SCOPE, vapidKey } from '../src/webpush'
 import { t } from '../src/i18n'
 
-// 网页端挂在根 _layout 里。Mac app 和开发网页（pwa === null）什么都不做，和 NativeSetup.tsx 一样。
+// 网页端挂在根 _layout 里。Mac app 只显示新版提示横幅（src/desktop/UpdateBanner.tsx）；开发网页（pwa === null）什么都不做，和 NativeSetup.tsx 一样。
 // 网页版（PWA，design.md 8.8、docs/api.md "app 端约定"）：
 // 每次启动重新登记推送订阅（Service Worker 在 PwaGate.web.tsx 加载时就注册，引导页的"开启推送"要用）、按 SW 消息跳转或刷新、设角标；
 // 回到前台比对 version.json 提示刷新、可见期间每 30 秒取 /pulse 并提示"刚收到"、10 分钟内冷启动回到原页面。
 export function NativeSetup() {
   const { config } = useConfig()
+  if (tauri !== null) return <UpdateBanner bridge={tauri} />
   if (pwa === null || config.hub === null) return null
   return <PwaSetup app={pwa} hub={config.hub} />
 }
@@ -178,45 +181,27 @@ function PwaSetup({ app, hub }: { app: Pwa; hub: HubConfig }) {
 
   if (!newVersion && received === null) return null
   return (
-    <View style={[styles.banners, { top: insets.top + 6 }]} pointerEvents="box-none">
+    <TopBanners top={insets.top + 6}>
       {newVersion ? (
-        <Pressable style={styles.banner} onPress={() => window.location.reload()}>
-          <Text style={styles.bannerText}>{t('有新版本 · 点此刷新')}</Text>
-        </Pressable>
+        <TopBanner onPress={() => window.location.reload()}>
+          <Text style={bannerStyles.text}>{t('有新版本 · 点此刷新')}</Text>
+        </TopBanner>
       ) : null}
       {received === null ? null : (
-        <Pressable
-          style={styles.banner}
+        <TopBanner
           onPress={() => {
             setReceived(null)
             router.push(routeOf({ record_id: received.id, kind: received.kind, item_id: received.item_id, card_id: received.card_id }))
           }}
         >
-          <Text style={styles.bannerText} numberOfLines={1}>
+          <Text style={bannerStyles.text} numberOfLines={1}>
             {t('刚收到：{title}', { title: received.title })}
           </Text>
           <Pressable onPress={() => setReceived(null)} hitSlop={8}>
-            <Text style={styles.close}>×</Text>
+            <Text style={bannerStyles.close}>×</Text>
           </Pressable>
-        </Pressable>
+        </TopBanner>
       )}
-    </View>
+    </TopBanners>
   )
 }
-
-const styles = StyleSheet.create({
-  banners: { position: 'absolute', left: 12, right: 12, zIndex: 100, gap: 6, alignItems: 'center' },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    maxWidth: 420,
-    width: '100%',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: colors.brand,
-  },
-  bannerText: { ...font.semibold, fontSize: size.secondary, color: colors.onBrand, flex: 1 },
-  close: { ...font.semibold, fontSize: size.title, color: colors.onBrand },
-})

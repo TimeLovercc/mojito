@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS reviews (
     plan_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, summary TEXT NOT NULL,
     completed_item_ids TEXT NOT NULL, missed_item_ids TEXT NOT NULL, patterns TEXT NOT NULL,
     user_note TEXT, status TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_map (id INTEGER PRIMARY KEY CHECK (id = 1), body TEXT NOT NULL, at TEXT NOT NULL);
 """
 
 conn = sqlite3.connect(config.DB_PATH)
@@ -193,6 +194,18 @@ def migrate() -> None:
             conn.execute("ALTER TABLE calendar_events ADD COLUMN read_only INTEGER")
             conn.execute("ALTER TABLE calendar_events ADD COLUMN feed TEXT")
             conn.execute("UPDATE calendar_events SET read_only = 0, feed = ?", (config.token_ref(config.ICAL_URL),))
+    # api.md 研究地图: overviews stored before the research card, in projects and in the `before` of
+    # overview undos, get card = null (first, so the review-field step below validates against the new model).
+    with conn:
+        for r in conn.execute("SELECT id, overview FROM projects WHERE overview IS NOT NULL").fetchall():
+            ov = json.loads(r["overview"])
+            if "card" not in ov:
+                conn.execute("UPDATE projects SET overview = ? WHERE id = ?", (json.dumps(ov | {"card": None}), r["id"]))
+        for r in conn.execute("SELECT id, undo FROM records WHERE undo LIKE '%\"project_overview\"%'").fetchall():
+            undo = json.loads(r["undo"])
+            if undo["type"] == "project_overview" and undo["before"] is not None and "card" not in undo["before"]:
+                undo["before"]["card"] = None
+                conn.execute("UPDATE records SET undo = ? WHERE id = ?", (json.dumps(undo), r["id"]))
     # api.md 项目概况 补充 (16:50): overviews stored before the review-card fields, in projects
     # and in the `before` of overview undos, get them as null.
     with conn:

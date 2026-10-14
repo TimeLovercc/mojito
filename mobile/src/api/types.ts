@@ -218,10 +218,42 @@ export type ProjectOverview = {
   significance: string | null
   objections: string[] | null
   decision: string | null
+  // 研究卡片（api.md"研究地图"）：只有项目自己的 overview.json 有；其余为 null
+  card: ResearchCard | null
   checked_at: string
   status_file: string | null
   status_changed: boolean
   evidence: string | null
+}
+
+// 研究卡片（api.md"研究地图"）：核心想法、状态、论文用 overview 的 one_liner / status / paper，其余在这里。
+// history 新的在前，每条一句话说这次变了什么
+export type RunState = 'running' | 'paused' | 'stopped' | 'done'
+export type Stage = 'question' | 'discovery' | 'instrument' | 'confirm' | 'write'
+export type ResearchCard = {
+  run_state: RunState
+  stage: Stage
+  main_exp: string | null
+  contribution: string | null
+  comment: string | null
+  decisions: string[]
+  development: { title: string; text: string }[]
+  history: { at: string; change: string }[]
+}
+
+// 研究地图（api.md"研究地图"）：方向 → 叶子 → 起点 → 项目；项目也可以直接挂在叶子上，没有叶子的方向（生活）项目直接挂在方向上。
+// principles 是点根节点看到的总原则；起点是项目当初开始做时的想法，principles 列它对应的总原则 id。
+// projects 的 id 是 hub 项目 id；hidden 是故意不上地图的项目；inbox 是还没立项的想法
+export type ChatLink = { title: string; url: string }
+export type MapPrinciple = { id: string; label: string; text: string }
+export type MapOrigin = { id: string; label: string; text: string; principles: string[] }
+export type ResearchMap = {
+  updated_at: string
+  principles: MapPrinciple[]
+  areas: { id: string; name: string; children: { id: string; name: string; origins: MapOrigin[] }[] }[]
+  projects: { id: string; area: string; chats: { claude: ChatLink[]; chatgpt: ChatLink[] } }[]
+  hidden: string[]
+  inbox: { at: string; text: string; source: string; area: string | null; note: string | null }[]
 }
 
 // worker 从 Orca 只读采集的快照，每个项目只存最新一份

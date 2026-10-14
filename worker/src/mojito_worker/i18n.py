@@ -66,7 +66,14 @@ EN = {
     "缺少键 {key}": "missing key {key}",
     "{key} 必须是对象或 null，现在是 {value}": "{key} must be an object or null, got {value}",
     "kill.state 只能是 {allowed}，现在是 {value}": "kill.state must be one of {allowed}, got {value}",
+    "{key} 必须是列表，现在是 {value}": "{key} must be a list, got {value}",
     "{key} 必须是字符串，现在是 {value}": "{key} must be a string, got {value}",
+    "{key} 必须是带时区的 ISO-8601 时间，现在是 {value}": "{key} must be an ISO-8601 time with a time zone, got {value}",
+    "card.run_state 只能是 {allowed}，现在是 {value}": "card.run_state must be one of {allowed}, got {value}",
+    "card.stage 只能是 {allowed}，现在是 {value}": "card.stage must be one of {allowed}, got {value}",
+    "card.decisions 必须是字符串列表，现在是 {value}": "card.decisions must be a list of strings, got {value}",
+    "card.history 必须新的在前（按 at 从新到旧排）": "card.history must be newest first (sorted by at, newest to oldest)",
+    "研究地图文件有问题：{problems}": "The research map file has problems: {problems}",
     "paper.pending 必须是整数或 null，现在是 {value}": "paper.pending must be an integer or null, got {value}",
     "{key} 必须是字符串或 null，现在是 {value}": "{key} must be a string or null, got {value}",
     "{key} 必须是绝对路径或 null（不许空串），现在是 {value}":
@@ -93,6 +100,10 @@ EN = {
     "维护会话失联，已开新会话接班": "Maintainer session lost; a new one took over",
     "维护会话超过 30 分钟没有心跳（上次 {at}），": "The maintainer session sent no heartbeat for over 30 minutes (last {at}); ",
     "维护会话一直没有心跳，": "The maintainer session has never sent a heartbeat; ",
+    "Mac 上的 Claude 登录过期，请 /login": "Claude on the Mac is logged out; please /login",
+    "新会话没有开：在 Mac 任一终端运行 claude，按提示 /login；登录好后看门狗会自动开新会话。":
+        "no new session was opened: run claude in any terminal on the Mac and /login as prompted; "
+        "once logged in, the watchdog opens the new session by itself.",
     "已在 mojito 主 worktree 开了新的维护会话接班，它会先读交接文档再继续。":
         "opened a new maintainer session in the main mojito worktree; it reads the handover doc first.",
     "已请 Orca 在 mojito 主 worktree 开新的维护会话接班；Orca 回复超时，新会话可能几分钟后才出现。":

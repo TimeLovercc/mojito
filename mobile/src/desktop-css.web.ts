@@ -25,6 +25,11 @@ export function installDesktopCss() {
     [data-hovermeta="on"] { opacity: 0; transition: opacity 120ms cubic-bezier(.32,.72,0,1) 0ms; }
     [data-hovergroup="on"]:hover [data-hovermeta="on"],
     [data-hovergroup="on"]:focus-within [data-hovermeta="on"] { opacity: 1; transition-delay: 100ms; }
+    /* 正文里的链接用手形（比上面 div[tabindex="0"] 的箭头规则更具体） */
+    [data-cursor="link"], [data-cursor="link"][tabindex] { cursor: pointer; }
+    /* 可拖动的竖分隔条（项目页卡片抽屉宽度） */
+    [data-resize="col"] { cursor: col-resize; }
+    [data-resize="col"]:hover > div, [data-resize="col"]:active > div { background-color: ${colors.brand}; }
     /* 对话输入卡上方的渐变遮罩 */
     [data-fade="top"] { background: linear-gradient(to bottom, ${colors.bg}00, ${colors.bg}); pointer-events: none; }
     /* 滚动不回弹；图片不能拖出窗口 */
