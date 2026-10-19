@@ -4,7 +4,7 @@
 // 1) expo export -p web with that base path; 2) bundle the mock with Node shims into demo-sw.js;
 // 3) swap the app <script> for demo-boot.js, which sets the hub URL and token and waits for the worker.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
@@ -90,10 +90,21 @@ html = fill(
   '</style>',
   '</style>\n    <style id="mojito-demo">#mojito-demo-tag{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
     'pointer-events:none;padding:3px 10px;border-radius:999px;font:500 11px/16px -apple-system,BlinkMacSystemFont,sans-serif;' +
-    'color:#fff;background:rgba(31,143,95,.9)}</style>',
+    'color:#fff;background:rgba(31,143,95,.9)}' +
+    // wide layout: the page toolbars sit at the top, so the tag moves to the bottom of the 220 px sidebar
+    '@media (min-width:900px) and (min-height:600px){#mojito-demo-tag{top:auto;bottom:12px;left:110px}}</style>',
   'index.html',
 )
 writeFileSync(htmlPath, html)
+// Pages (docs/api.md 页面): the app shows a page in a sandboxed iframe without allow-same-origin, and the browser
+// sends that navigation past the service worker; so each demo page's latest version is also a static file there
+// (GitHub Pages answers /hub/p/<path> with <path>/index.html). "Open in browser" still goes through the worker.
+const extra = JSON.parse(readFileSync(join(root, 'mock', 'extra.json'), 'utf8'))
+for (const page of extra.pages) {
+  const dir = join(out, 'hub', 'p', ...page.path.split('/'))
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'index.html'), page.versions[page.versions.length - 1].html)
+}
 // GitHub Pages answers unknown paths with 404.html: serve the app there too so deep links load
 copyFileSync(htmlPath, join(out, '404.html'))
 writeFileSync(join(out, '.nojekyll'), '')
