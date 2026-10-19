@@ -148,7 +148,7 @@ MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></
  "area": "llm", "note": "想知道低秩够不够学新知识"}</code></pre></div>
 <code>kind</code> 可以是 idea、paper、author、blog。同一批加好几条时，每条的 <code>at</code> 错开一秒。</li>
 
-<li><b>在 app 里发起一轮：</b>项目页 → Idea Lab → 新建运行。要填：
+<li><b>在 app 里发起一轮：</b>项目页 → Idea Lab → 开始研究。要填：
 <ul>
   <li>运行名称（英文）、重要方向与研究偏好、本轮目标；</li>
   <li>模式选「探索问题」；</li>
@@ -157,12 +157,12 @@ MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></
 </ul>
 找想法只需要读网页，「允许 CPU 数据分析」「允许写研究产物」可以先不勾。agent 会读你的研究技能、规则文件、地图上的总原则和收件箱材料，结果写成 Idea Lab 卡片：问题、为什么重要、竞争假设、带出处的证据、下一步。没有新发现时，它会直说没有。</li>
 
-<li><b>让它自己持续找：</b>勾「启用有界持续探索」，二选一：
+<li><b>让它自己持续找：</b>勾「启用有界持续探索」，填间隔（5 分钟到 30 天）和「授权总轮数」（最多 100），再二选一：
 <ul>
-  <li><b>按间隔运行</b>：至少 5 分钟一次；</li>
-  <li><b>新材料触发</b>：收件箱一加新条目就跑一轮。</li>
+  <li><b>按间隔运行</b>：每到间隔跑一轮；</li>
+  <li><b>新材料触发</b>：到了间隔、收件箱里又有新条目时才跑，新条目自动加进这一轮的材料。</li>
 </ul>
-两种都要写「授权总轮数」（最多 100），跑满就停，也可以随时停用。</li>
+每轮的模式和预算都和第一轮一样，并接着前几轮产出的想法往下做。上一轮还在排队或运行时不会开下一轮，所以电脑睡着时不会攒下一串任务。跑满总轮数就停，也可以随时停用。</li>
 
 <li><b>在终端里一起想：</b>开一个 Claude Code 会话，直接说「用 Research Ideas 技能，围绕 X 方向做一轮 Explore，材料用收件箱里的 Y」。它每轮结束会用 <code>research-idea-funnel/scripts/idea_lab.py</code> 把结果同步进 Idea Lab。</li>
 
@@ -171,7 +171,7 @@ MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></
 
 <h2 id="experiments">第三步：让 agent 跑实验</h2>
 <ol class="steps">
-<li><b>先立项目。</b>想法要真做时，给它建一个项目仓库，在 hub 里建项目（在 app 的对话里说一句「新建研究项目 X」就行），再在 <code>map.json</code> 的 <code>projects</code> 里给它一个位置。项目会话在仓库里维护一份 <code>overview.json</code>，app 里这个项目的卡片就显示它：核心想法、主实验、贡献、状态、待你决定的事、状态历史。格式见 <code>docs/api.md</code>「研究地图」，每次改完跑一次 <code>mojito-overview-check &lt;overview.json 路径&gt;</code>。</li>
+<li><b>先立项目。</b>想法要真做时，给它建一个项目仓库，在 hub 里建项目（在 app 的对话里说一句「新建研究项目 X，仓库在 /绝对路径」就行；要给仓库路径，worker 才找得到它的 <code>overview.json</code>），再在 <code>map.json</code> 的 <code>projects</code> 里给它一个位置。项目会话在仓库里维护一份 <code>overview.json</code>，app 里这个项目的卡片就显示它：核心想法、主实验、贡献、状态、待你决定的事、状态历史。格式见 <code>docs/api.md</code>「研究地图」，每次改完跑一次 <code>mojito-overview-check &lt;overview.json 路径&gt;</code>。</li>
 
 <li><b>小实验交给 Idea Lab：</b>只用 CPU、只用公开数据的分析，可以在 Idea Lab 选「实验验证」模式，勾「允许 CPU 数据分析」和「允许写研究产物」，在「实验范围与限制」里写清边界。它不碰 GPU，产物留在 worker 的暂存区。</li>
 
@@ -193,7 +193,7 @@ MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></
 
 <h2 id="papers">第四步：让 agent 写完论文</h2>
 <ol class="steps">
-<li><b>先复核：</b>一个结论要写进论文之前，用 Research Review 技能，或 Idea Lab 的「独立核查」模式，做一次独立检查：想法评审、主张和证据逐条对账，或者整篇审稿。核查不确定或没通过时，结论不会被标成有证据支持。</li>
+<li><b>先复核：</b>一个结论要写进论文之前，在终端里另开一个没参与这项研究的会话，用 Research Review 技能做独立检查：想法评审、主张和证据逐条对账，或者整篇审稿。Idea Lab 的「独立核查」模式按同样的方法检查，但它就是一轮普通的研究运行，不算独立审稿人。</li>
 <li><b>再写：</b>论点够具体时，在项目会话里加载 Paper Writing 技能。它围绕一个中心主张，按提纲 → 初稿 → 图表 → 独立复核 → 修改的顺序写，正文放在项目仓库里（比如 LaTeX）。还没跑出来的结果留成显眼的占位，不编数字。Idea Lab 的「论文写作」模式可以先出一份提纲。
 <div class="code"><pre><code>用 Paper Writing 技能，把 Idea Lab 里「&lt;想法标题&gt;」写成一篇短论文。
 中心主张：&lt;一句话&gt;。证据只用已经同步到 Idea Lab 的实验和文献。
@@ -202,7 +202,7 @@ MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></
 </ol>
 
 <h2 id="cycle">一键跑完整一轮</h2>
-<p>Idea Lab 的「完整研究循环」模式把上面几步串成一轮：根据已有证据自己选「探索」还是「发展」，做一次最小的诊断，再做独立核查，最后给出论文提纲。负面结果也算完成了一轮。核查共用这轮的时间和调用轮数。</p>
+<p>Idea Lab 的「完整研究循环」模式把上面几步串成一轮：先探索或发展想法；勾了「允许 CPU 数据分析」时再做一次最小的诊断；维护论文提纲；最后另起一个只读的复核，检查来源、实验记录和归因。复核占这轮调用轮数的三分之一（最多 10 轮），和研究共用时间预算。复核认为证据不足或有问题时，这轮停在「需要补充条件」，新结论不会被标成「有证据支持」；最大调用轮数少于 3 时复核做不了，结果也一样。负面结果也算完成了一轮。</p>
 
 <h2 id="limits">做不到的和要花的</h2>
 <ul>
@@ -212,7 +212,7 @@ MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></
 </ul>
 
 <h2 id="templates">附录：研究正文模板</h2>
-<p>在 Notion 或任何文档工具里建一个研究文档库，字段建议：Name（标题）、Type（Idea / Experiment / Review / Paper / Note）、Status（和 Idea Lab 的状态对应）、Idea Lab（卡片链接，卡片的 notion_url 反过来指向这一页）、Project、Sources（arXiv 或 DOI）、Date。</p>
+<p>在 Notion 或任何文档工具里建一个研究文档库，字段建议：Name（标题）、Type（Idea / Experiment / Review / Paper / Note）、Status（和 Idea Lab 的状态对应）、Idea Lab ID（卡片的 id，终端会话用 <code>idea_lab.py</code> 同步后会返回；卡片的 <code>notion_url</code> 反过来指向这一页）、Project、Sources（arXiv 或 DOI）、Date。</p>
 <details><summary>Idea 模板</summary><ul>
   <li><b>问题</b>：想知道什么？答案会改变什么？</li>
   <li><b>为什么重要</b>：谁需要这个答案，得到以后能做什么之前做不了的事。</li>
