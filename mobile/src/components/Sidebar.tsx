@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { usePathname, useRouter, type Href } from 'expo-router'
-import { Activity, Bell, FolderKanban, MessageCircle, Newspaper, NotebookPen, Sun, Target, type LucideIcon } from 'lucide-react-native'
+import { Activity, Bell, FileText, FolderKanban, MessageCircle, Newspaper, NotebookPen, Sun, Target, type LucideIcon } from 'lucide-react-native'
 import { problemsOf } from '../problems'
-import type { AuthList, CardsPage, ProjectsList, SourcesList, Today } from '../api/types'
+import type { AuthList, CardsPage, PagesList, ProjectsList, SourcesList, Today } from '../api/types'
 import { useConfig } from '../config/context'
 import { daysBetween, todayYmd } from '../time'
 import { t } from '../i18n'
@@ -24,7 +24,8 @@ const TABS: Tab[] = [
   { href: '/notes', label: t('笔记'), icon: NotebookPen, prefixes: ['/notes', '/records'] },
 ]
 
-// 宽屏左侧边栏（docs/desktop-v2.md 侧栏 220）：顶部 52 留给红黄绿（兼拖动区）；五个页签；空 16；对话 / 系统 / 通知。
+// 宽屏左侧边栏（docs/desktop-v2.md 侧栏 220）：顶部 52 留给红黄绿（兼拖动区）；五个页签 + 页面（docs/api.md「页面」，手机从项目页进）；
+// 空 16；对话 / 系统 / 通知。
 // 贴边 + 右侧细线；浅色 Mac app 里透出毛玻璃，深色不透明（theme.sideBg）；选中是中性叠加 + 品牌色图标
 export function Sidebar() {
   const router = useRouter()
@@ -36,11 +37,13 @@ export function Sidebar() {
   const sources = useHub<SourcesList>('/sources')
   const auth = useHub<AuthList>('/auth-status')
   const projects = useHub<ProjectsList>('/projects')
+  const pages = useHub<PagesList>('/pages')
 
   const needs = today.data === null ? null : Object.values(today.data.needs_you).reduce((n, list) => n + list.length, 0)
   const fresh = cards.data === null ? null : freshCount(cards.data)
   const plan = today.data === null ? null : planDay(today.data.plan)
   const projectCount = projects.data === null ? null : projects.data.projects.length
+  const pageCount = pages.data === null ? null : pages.data.pages.length
   // 系统三态点，和系统页、菜单栏同一套判断：正常 ok / 只有需要留意 warn / 有问题 bad
   const problems = problemsOf(config.hub !== null, sources.error !== null, sources.data, auth.data)
   const tone = problems === null ? null : problems.length === 0 ? colors.ok : problems.some((p) => p.bad) ? colors.bad : colors.warn
@@ -73,6 +76,13 @@ export function Sidebar() {
           }
         />
       ))}
+      <Nav
+        icon={FileText}
+        label={t('页面')}
+        on={path.startsWith('/pages')}
+        onPress={() => router.navigate('/pages')}
+        right={pageCount === null ? null : count(String(pageCount))}
+      />
       <View style={styles.gap} />
       <Nav icon={MessageCircle} label={t('对话')} on={path === '/chat'} onPress={toggleChat} right={count('⌘J')} />
       <Nav

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from . import config, labels
 from .models import (
-    Attachment, Card, Draft, Event, Feedback, FeedbackMessage, Goal, Item, ItemIn, Job, OVERVIEW_REVIEW_FIELDS, Plan, Project, ProjectCreateIn, ProjectOverview, Record, Review,
+    Attachment, Card, Page, PageMeta, PageVersion, PageVersionMeta, Draft, Event, Feedback, FeedbackMessage, Goal, Item, ItemIn, Job, OVERVIEW_REVIEW_FIELDS, Plan, Project, ProjectCreateIn, ProjectOverview, Record, Review,
     SeedSettings, Settings, Snapshot, Source, Subscription, TasteNote,
 )
 
@@ -116,6 +116,21 @@ CREATE TABLE IF NOT EXISTS reviews (
     completed_item_ids TEXT NOT NULL, missed_item_ids TEXT NOT NULL, patterns TEXT NOT NULL,
     user_note TEXT, status TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS research_map (id INTEGER PRIMARY KEY CHECK (id = 1), body TEXT NOT NULL, at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS idea_seeds (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_ideas (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS idea_sync_receipts (
+    operation_id TEXT PRIMARY KEY, request TEXT NOT NULL, receipt TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_runs (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_automations (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_skills (id INTEGER PRIMARY KEY CHECK (id = 1), body TEXT NOT NULL, at TEXT NOT NULL);
+-- api.md 页面: every write of a page; the page is its highest version.
+CREATE TABLE IF NOT EXISTS page_versions (
+    path TEXT NOT NULL, version INTEGER NOT NULL, html TEXT NOT NULL, title TEXT NOT NULL,
+    summary TEXT NOT NULL, project_id TEXT, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL,
+    note TEXT NOT NULL, PRIMARY KEY (path, version));
+-- api.md 删除页面: soft delete; the page's versions stay and the path is never written again.
+CREATE TABLE IF NOT EXISTS page_deletions (
+    path TEXT PRIMARY KEY, deleted_at TEXT NOT NULL, deleted_by TEXT NOT NULL, delete_note TEXT NOT NULL);
 """
 
 conn = sqlite3.connect(config.DB_PATH)
@@ -409,6 +424,42 @@ def subscription_of(row: sqlite3.Row) -> Subscription:
         config=json.loads(row["config"]), last_run_at=parse(row["last_run_at"]), last_result=row["last_result"],
         health=row["health"],
     )
+
+
+# Columns of page_versions without html, for lists.
+PAGE_META_COLS = "path, version, title, summary, project_id, updated_at, updated_by, note"
+# Joined onto page_versions (USING (path)): NULLs for a page that is not deleted.
+PAGE_DELETION_COLS = "deleted_at, deleted_by, delete_note"
+
+
+def page_head_fields(row: sqlite3.Row) -> dict:
+    return dict(path=row["path"], title=row["title"], summary=row["summary"], project_id=row["project_id"],
+                version=row["version"], updated_at=parse(row["updated_at"]), updated_by=row["updated_by"])
+
+
+def page_meta_of(row: sqlite3.Row) -> PageMeta:
+    """From a page_versions row joined with page_deletions."""
+    return PageMeta(**page_head_fields(row), deleted_at=parse(row["deleted_at"]), deleted_by=row["deleted_by"],
+                    delete_note=row["delete_note"])
+
+
+def page_of(row: sqlite3.Row) -> Page:
+    return Page(**page_meta_of(row).model_dump(), html=row["html"])
+
+
+def page_version_meta_of(row: sqlite3.Row) -> PageVersionMeta:
+    return PageVersionMeta(**page_head_fields(row), note=row["note"])
+
+
+def page_version_of(row: sqlite3.Row) -> PageVersion:
+    return PageVersion(**page_version_meta_of(row).model_dump(), html=row["html"])
+
+
+def page_head(path: str) -> sqlite3.Row | None:
+    """The current (highest) version of a page, html and deletion (NULLs if live) included; None
+    when the page was never written."""
+    return one("SELECT * FROM page_versions LEFT JOIN page_deletions USING (path)"
+               " WHERE path = ? ORDER BY version DESC LIMIT 1", path)
 
 
 def attachment_of(row: sqlite3.Row) -> Attachment:

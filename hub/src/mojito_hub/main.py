@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import attachments, auth, changes, config, db, health, ical, labels, pages, watchdog, webapp
+from . import attachments, auth, changes, config, db, health, ical, labels, page_store, pages, watchdog, webapp
 from .db import conn
 from .models import (
     Attachment, ChatIn, ChatList, ChatOut, DecisionIn, DeviceIn, Draft, DraftIn, DraftList, DraftResolveIn,
@@ -25,16 +25,18 @@ from .models import (
     RecordList, Review, ReviewFinishIn, Snapshot, Card, CardIn, CardList, CardReadIn, CardStatus,
     CardStatusIn, ItemBefore, USAGE_ACTIONS, USAGE_VIEWS, AuthName,
     AuthStatus, AuthStatusIn, AuthStatusList, UsageIn, UsageSummary,
-    ResearchMap, ReviewIn, Runner, Settings, Source, SourceList, Today,
+    ResearchMap, ResearchSkills, ReviewIn, Runner, Settings, Source, SourceList, Today,
 )
 from .push import push
+from . import idea_lab
 from .models import (
     Author, Feedback, FeedbackDecisionIn, FeedbackIn, FeedbackList, FeedbackPutIn, FeedbackStatus, RecordKind,
     TasteNote, TasteNoteIn, TasteNoteList, request_path, GoalPutIn, PlanPutIn, NoteLinkIn, Goal,
     FeedbackMessage, FeedbackMessageIn, FeedbackMessageList, FocusItem, Metrics, MetricsDay, MetricsTotals,
     SourceHealthIn, Pulse, PulseCounts, Subscription, SubscriptionEnabledIn, SubscriptionList, SubscriptionPutIn,
     SubscriptionResultIn, CalendarDeleteIn, SettingsPutIn, VapidPublicKey, WebPushEndpointIn, WebPushSubscriptionIn,
-    SUBSCRIPTION_CONFIG,
+    SUBSCRIPTION_CONFIG, Page, PageDeleteIn, PageLink, PageLinkIn, PageList, PageMeta, PagePutIn, PageVersion,
+    PageVersionList,
 )
 
 FOCUS_STATUSES = ("active", "waiting_you", "scheduled")
@@ -65,6 +67,7 @@ async def lifespan(app: FastAPI):
 # No public /docs, /redoc; the schema is served below to the app token only (api.md §7e).
 app = FastAPI(title="mojito hub", version="0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
+app.include_router(idea_lab.router)
 
 @app.middleware("http")
 async def remember_path(request: Request, call_next):
@@ -421,6 +424,7 @@ async def worker_lease(r: str = Depends(auth.runners)):
     """worker leases runner=mac, agent leases runner=server; chat_reply first."""
     row = db.one(
         "SELECT * FROM jobs WHERE status = 'queued' AND runner = ?"
+        " AND (kind != 'research_run' OR NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind = 'research_run' AND j.status = 'running'))"
         " ORDER BY kind = 'chat_reply' DESC, requested_at, seq LIMIT 1",
         auth.RUNNER_OF[r],
     )
@@ -1056,11 +1060,14 @@ async def project_overview(project_id: str, body: ProjectOverview, r: str = Depe
 
 @app.put("/research-map", response_model=ResearchMap, dependencies=[Depends(auth.worker)])
 async def put_research_map(body: ResearchMap):
-    """api.md 研究地图: the worker copies the map file whole on every project sync; stored silently."""
+    """api.md 研究地图: the worker copies the map file whole on every project sync; stored silently.
+    422 (not stored) when two inbox entries share a seed identity (api.md Idea Lab 收件箱身份唯一)."""
+    stored = body.model_dump_json()
+    idea_lab.check_inbox(json.loads(stored)["inbox"])
     with conn:
         conn.execute("INSERT INTO research_map (id, body, at) VALUES (1, ?, ?)"
                      " ON CONFLICT (id) DO UPDATE SET body = excluded.body, at = excluded.at",
-                     (body.model_dump_json(), db.ts(db.now())))
+                     (stored, db.ts(db.now())))
     return body
 
 
@@ -1071,6 +1078,24 @@ async def get_research_map():
     if r is None:
         raise HTTPException(404, "research map not synced yet")
     return ResearchMap.model_validate_json(r["body"])
+
+
+@app.put("/research-skills", response_model=ResearchSkills, dependencies=[Depends(auth.worker)])
+async def put_research_skills(body: ResearchSkills):
+    """Replace the worker's read-only skill snapshot without records, usage or notifications."""
+    with conn:
+        conn.execute("INSERT INTO research_skills (id, body, at) VALUES (1, ?, ?)"
+                     " ON CONFLICT (id) DO UPDATE SET body = excluded.body, at = excluded.at",
+                     (body.model_dump_json(), db.ts(db.now())))
+    return body
+
+
+@app.get("/research-skills", response_model=ResearchSkills, dependencies=[Depends(auth.app_read)])
+async def get_research_skills():
+    r = db.one("SELECT body FROM research_skills WHERE id = 1")
+    if r is None:
+        raise HTTPException(404, "research skills not synced yet")
+    return ResearchSkills.model_validate_json(r["body"])
 
 
 @app.put("/projects/{project_id}/snapshot", response_model=Snapshot, dependencies=[Depends(auth.worker)])
@@ -1700,3 +1725,128 @@ async def webpush_unsubscribe(body: WebPushEndpointIn):
     with conn:
         conn.execute("DELETE FROM webpush_subscriptions WHERE endpoint = ?", (body.endpoint,))
     return Response(status_code=204)
+
+
+# ---- pages (api.md 页面) ----
+
+def page_or_404(path: str):
+    """The current version's row (html included); a deleted page is 404 like a missing one."""
+    page_store.check_path(path)
+    row = db.page_head(path)
+    if row is None:
+        raise HTTPException(404, f"page {path} not found")
+    if row["deleted_at"] is not None:
+        raise HTTPException(404, f"page {path} was deleted at {row['deleted_at']} by {row['deleted_by']}")
+    return row
+
+
+def page_version_or_404(path: str, version: int):
+    page_or_404(path)
+    row = db.one("SELECT * FROM page_versions WHERE path = ? AND version = ?", path, version)
+    if row is None:
+        raise HTTPException(404, f"page {path} has no version {version}")
+    return row
+
+
+@app.get("/pages", response_model=PageList, dependencies=[Depends(auth.page_readers)])
+async def pages_list():
+    """Every page's current version without html, by path; deleted and `_smoke/` pages are left out."""
+    rows = db.all_(f"SELECT {db.PAGE_META_COLS}, {db.PAGE_DELETION_COLS} FROM page_versions p"
+                   " LEFT JOIN page_deletions USING (path)"
+                   " WHERE version = (SELECT MAX(version) FROM page_versions WHERE path = p.path)"
+                   " AND deleted_at IS NULL ORDER BY path")
+    return PageList(pages=[db.page_meta_of(r) for r in rows if not page_store.is_smoke(r["path"])])
+
+
+# Suffix routes first: `{path:path}` would also match `<path>/versions`.
+@app.get("/pages/{path:path}/versions/{version}", response_model=PageVersion,
+         dependencies=[Depends(auth.page_readers)])
+async def page_version_get(path: str, version: int):
+    return db.page_version_of(page_version_or_404(path, version))
+
+
+@app.get("/pages/{path:path}/versions", response_model=PageVersionList, dependencies=[Depends(auth.page_readers)])
+async def page_versions(path: str):
+    page_or_404(path)
+    rows = db.all_(f"SELECT {db.PAGE_META_COLS} FROM page_versions WHERE path = ? ORDER BY version DESC", path)
+    return PageVersionList(versions=[db.page_version_meta_of(r) for r in rows])
+
+
+@app.post("/pages/{path:path}/link", response_model=PageLink, dependencies=[Depends(auth.page_readers)])
+async def page_link(path: str, body: PageLinkIn):
+    """A 10-minute signed /p/ link; version null shows whatever is latest when it is opened."""
+    if body.version is None:
+        page_or_404(path)
+    else:
+        page_version_or_404(path, body.version)
+    return PageLink(url=page_store.link(path, body.version, body.theme))
+
+
+@app.get("/pages/{path:path}", response_model=Page, dependencies=[Depends(auth.page_readers)])
+async def page_get(path: str):
+    return db.page_of(page_or_404(path))
+
+
+@app.put("/pages/{path:path}", response_model=PageMeta)
+async def page_put(path: str, body: PagePutIn, r: str = Depends(auth.page_writers)):
+    """Writes version base_version + 1. base_version must be the current version (0 for a new
+    page), otherwise 409 with the current version and who wrote it. A deleted path is 409 whatever
+    the base_version: deleted paths are not reused."""
+    page_store.check_path(path)
+    size = len(body.html.encode())
+    if size > page_store.MAX_HTML_BYTES:
+        raise HTTPException(422, f"page html is {size} bytes, over the {page_store.MAX_HTML_BYTES} byte limit")
+    parsed = page_store.parse(body.html)
+    if parsed.project_id is not None:
+        require_ref("projects", parsed.project_id)
+    head = db.page_head(path)
+    current = 0 if head is None else head["version"]
+    if head is not None and head["deleted_at"] is not None:
+        raise HTTPException(409, {"message": f"page {path} 已删除 (deleted at version {current} by "
+                                             f"{head['deleted_by']}); a deleted path is not reused, write under a new path",
+                                  "version": current, "updated_by": head["updated_by"]})
+    if body.base_version != current:
+        raise HTTPException(409, {"message": f"page {path} is at version {current}, not {body.base_version}",
+                                  "version": current, "updated_by": None if head is None else head["updated_by"]})
+    updated_by = r if body.by is None else f"session:{body.by}"
+    with conn:
+        conn.execute(
+            "INSERT INTO page_versions (path, version, html, title, summary, project_id, updated_at, updated_by, note)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (path, current + 1, body.html, parsed.title, parsed.summary, parsed.project_id, db.ts(db.now()),
+             updated_by, body.note),
+        )
+    return db.page_meta_of(db.page_head(path))
+
+
+@app.delete("/pages/{path:path}", response_model=PageMeta)
+async def page_delete(path: str, body: PageDeleteIn, r: str = Depends(auth.page_writers)):
+    """Soft delete (api.md 删除页面): 404 when missing or already deleted, 409 like PUT when
+    base_version is not the current version. Versions stay; the page is gone from every read."""
+    head = page_or_404(path)
+    if body.base_version != head["version"]:
+        raise HTTPException(409, {"message": f"page {path} is at version {head['version']}, not {body.base_version}",
+                                  "version": head["version"], "updated_by": head["updated_by"]})
+    deleted_by = r if body.by is None else f"session:{body.by}"
+    with conn:
+        conn.execute("INSERT INTO page_deletions (path, deleted_at, deleted_by, delete_note) VALUES (?, ?, ?, ?)",
+                     (path, db.ts(db.now()), deleted_by, body.note))
+    return db.page_meta_of(db.page_head(path))
+
+
+@app.get("/p/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+async def page_view(path: str, v: str, theme: str, exp: str, sig: str):
+    """No token: the signature is the credential (403 when wrong or expired). Sandboxed without
+    allow-same-origin, so the page's scripts reach nothing of the hub."""
+    version = page_store.verify(path, v, theme, exp, sig)
+    row = page_or_404(path) if version is None else page_version_or_404(path, version)
+    return HTMLResponse(page_store.themed(row["html"], theme), headers={
+        "Content-Security-Policy": page_store.SANDBOX_CSP, "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer"})
+
+
+@app.get("/pages-assets/base.css", include_in_schema=False)
+async def pages_base_css():
+    """The shared page stylesheet; no data. Pages are sandboxed (opaque origin), hence the CORS header."""
+    return Response(page_store.BASE_CSS, media_type="text/css", headers={
+        "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*"})

@@ -109,6 +109,24 @@ EN = {
     "已请 Orca 在 mojito 主 worktree 开新的维护会话接班；Orca 回复超时，新会话可能几分钟后才出现。":
         "asked Orca to open a new maintainer session in the main mojito worktree; Orca's reply timed out, "
         "so the new session may take a few minutes to appear.",
+    # Idea Lab research runs (research_runner.py)
+    "研究结果已保留，但想法在运行中被修改；需合并后再写回。":
+        "The research result is saved, but the idea was edited during the run; merge them before writing it back.",
+    "研究候选结果已暂存；后续证据复核与文档同步尚未完成。":
+        "Candidate result saved; the evidence review and the document sync are not done yet.",
+    "本轮候选判断：{status}": "This round's candidate judgment: {status}",
+    "本轮新主张尚未确认；保留已有判断，当前状态：{status}":
+        "This round's new claim is not confirmed; the earlier judgment stays. Current status: {status}",
+    "处理独立复核中的证据缺项：{findings}": "Close the evidence gaps the independent review found: {findings}",
+    "独立证据复核：{summary}": "Independent evidence review: {summary}",
+    "本轮turn预算不足以进行独立复核，该环节尚未完成。":
+        "This round's turn budget left no room for the independent review; that step is not done.",
+    "独立复核尚未执行：本轮turn预算不足。": "Independent review not run: the turn budget ran out.",
+    "需运行独立证据复核。": "Run the independent evidence review.",
+    "研究文本已暂存，尚未同步到研究文档（例如 Notion）。":
+        "The research text is saved locally and not yet synced to your research documents (e.g. Notion).",
+    "研究执行失败；已保存的暂存结果可检查后重新发起。":
+        "The research run failed; check the saved partial results, then start a new run.",
 }
 
 

@@ -61,9 +61,22 @@ self.addEventListener('message', (event) => {
   if (event.data === 'claim') event.waitUntil(self.clients.claim())
 })
 
+// Pages (docs/api.md 页面): the mock signs links for http://localhost:<PORT>/p/...; in the browser the page is served
+// from the demo hub path, so the link is rewritten and the iframe's (or new tab's) navigation to it is answered here.
+const PAGE_LINK = /^\/pages\/.+\/link$/
+const MOCK_ORIGIN = 'http://localhost:1/'
+
+async function pageLink(res) {
+  if (!res.ok) return res
+  const link = await res.json()
+  if (!link.url.startsWith(MOCK_ORIGIN)) throw new Error(`unexpected page link ${link.url}`)
+  return Response.json({ url: `${self.location.origin}${HUB}/${link.url.slice(MOCK_ORIGIN.length)}` })
+}
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
-  if (event.request.mode === 'navigate') {
+  const page = url.origin === self.location.origin && url.pathname.startsWith(HUB + '/p/')
+  if (event.request.mode === 'navigate' && !page) {
     ready = restart()
     return
   }
@@ -78,7 +91,9 @@ self.addEventListener('fetch', (event) => {
         if (value !== null) headers[name] = value
       }
       const body = await event.request.arrayBuffer()
-      return call(event.request.method, url.pathname.slice(HUB.length) + url.search, headers, body)
+      const path = url.pathname.slice(HUB.length)
+      const res = await call(event.request.method, path + url.search, headers, body)
+      return PAGE_LINK.test(path) ? pageLink(res) : res
     })(),
   )
 })

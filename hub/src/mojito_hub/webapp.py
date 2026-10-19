@@ -17,8 +17,9 @@ from . import config
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/javascript", ".js")
 
+# frame-src 'self': pages (api.md 页面) are shown in a sandboxed iframe from /p/ on this host.
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; "
-       "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; "
+       "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'self'; base-uri 'none'; "
        "form-action 'none'; frame-ancestors 'none'; object-src 'none'")
 IMMUTABLE_PREFIX = "_expo/static/"
 GZIP_MIN_BYTES = 1024

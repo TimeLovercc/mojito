@@ -1,0 +1,365 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Read and write mojito pages: persistent HTML pages under a topic path (docs/api.md "页面")."""
+
+import argparse
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime
+from html.parser import HTMLParser
+from pathlib import Path
+
+# MOJITO_SECRETS_DIR: the folder outside any repo that holds pages.env (same as sources/cards).
+ENV_PATH = Path(os.environ["MOJITO_SECRETS_DIR"]).expanduser() / "pages.env"
+ENV_KEYS = ("MOJITO_HUB_URL", "MOJITO_PAGES_TOKEN")
+# Same rule as the hub (page_store.PATH_PATTERN): `_smoke/…` is for smoke tests, hidden from `pages ls`.
+PAGE_PATH = re.compile(r"_smoke(/[a-z0-9-]+){1,3}|[a-z0-9-]+(/[a-z0-9-]+){0,3}")
+RESERVED_SEGMENTS = ("versions", "link")
+# Session names: lowercase words joined by dashes, as given by `claude -n` / `/rename` (maint, mobile-2, ui-review).
+SESSION_NAME = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
+
+
+def fail(message: str) -> None:
+    print(f"pages: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+class HubError(Exception):
+    def __init__(self, code: int, detail):
+        super().__init__(f"hub {code}: {detail if isinstance(detail, str) else json.dumps(detail, ensure_ascii=False)}")
+        self.code = code
+        self.detail = detail
+
+
+def read_env() -> dict[str, str]:
+    if not ENV_PATH.is_file():
+        fail(f"missing {ENV_PATH} (needs {', '.join(ENV_KEYS)})")
+    if ENV_PATH.stat().st_mode & 0o077:
+        fail(f"{ENV_PATH} is readable by others; chmod 600 it")
+    env = {}
+    for line in ENV_PATH.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        if not sep:
+            fail(f"bad line in {ENV_PATH}: {line!r}")
+        env[key.strip()] = value.strip().strip("\"'")
+    missing = [k for k in ENV_KEYS if k not in env or not env[k]]
+    if missing:
+        fail(f"{ENV_PATH} is missing {', '.join(missing)}")
+    return env
+
+
+def hub(method: str, route: str, body: dict | None = None) -> dict:
+    env = read_env()
+    req = urllib.request.Request(
+        env["MOJITO_HUB_URL"].rstrip("/") + route,
+        data=None if body is None else json.dumps(body).encode(),
+        method=method,
+        headers={"Authorization": f"Bearer {env['MOJITO_PAGES_TOKEN']}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode()
+        # FastAPI errors are {"detail": ...}; a proxy in front of the hub may answer with plain text.
+        raise HubError(e.code, json.loads(raw)["detail"] if e.headers.get_content_type() == "application/json" else raw)
+
+
+def page_route(path: str) -> str:
+    if not PAGE_PATH.fullmatch(path):
+        fail(f"bad path {path!r}: 1-4 segments of a-z, 0-9, '-', joined by '/' (e.g. life/opt)")
+    reserved = [s for s in path.split("/") if s in RESERVED_SEGMENTS]
+    if reserved:
+        fail(f"bad path {path!r}: no segment may be {' or '.join(RESERVED_SEGMENTS)}")
+    return f"/pages/{path}"
+
+
+def et(iso: str) -> str:
+    return datetime.fromisoformat(iso).astimezone().strftime("%m-%d %H:%M")  # this machine's time zone
+
+
+# --- session name (the name given by `claude -n` / `/rename`, Codex `/rename`) ---
+
+
+def claude_session_name(session_id: str) -> str | None:
+    """Last custom-title in the session transcript; `claude -n` and /rename both write one."""
+    home = Path(os.environ["CLAUDE_CONFIG_DIR"]) if "CLAUDE_CONFIG_DIR" in os.environ else Path.home() / ".claude"
+    found = list((home / "projects").glob(f"*/{session_id}.jsonl"))
+    if len(found) != 1:
+        fail(f"expected one transcript {home}/projects/*/{session_id}.jsonl, found {len(found)}; pass --by")
+    name = None
+    with found[0].open("rb") as f:
+        for line in f:
+            if b'"type":"custom-title"' in line:
+                name = json.loads(line)["customTitle"]
+    return name
+
+
+def codex_session_name(thread_id: str) -> str | None:
+    """Last thread_name for this thread in session_index.jsonl (Codex `/rename` appends one)."""
+    home = Path(os.environ["CODEX_HOME"]) if "CODEX_HOME" in os.environ else Path.home() / ".codex"
+    index = home / "session_index.jsonl"
+    if not index.is_file():
+        fail(f"missing {index}; pass --by")
+    name = None
+    for line in index.read_text().splitlines():
+        entry = json.loads(line)
+        if entry["id"] == thread_id:
+            name = entry["thread_name"]
+    return name
+
+
+def session_name() -> str:
+    claude, codex = "CLAUDE_CODE_SESSION_ID" in os.environ, "CODEX_THREAD_ID" in os.environ
+    if claude and codex:
+        fail("both CLAUDE_CODE_SESSION_ID and CODEX_THREAD_ID are set (one agent runs inside the other); pass --by")
+    if not claude and not codex:
+        fail("not inside a Claude Code or Codex session; pass --by <session name>")
+    if claude:
+        name = claude_session_name(os.environ["CLAUDE_CODE_SESSION_ID"])
+    else:
+        name = codex_session_name(os.environ["CODEX_THREAD_ID"])
+    if name is None:
+        fail("this session has no name (start it with `claude -n <name>`, or /rename it); pass --by")
+    if not SESSION_NAME.fullmatch(name):
+        fail(f"session name {name!r} is not lowercase words joined by dashes (/rename it); pass --by")
+    return name
+
+
+# --- html to text for `cat --text` ---
+
+
+class TextOnly(HTMLParser):
+    SKIP = {"script", "style", "template", "noscript"}
+    # BLOCK gets a paragraph break around it; LINE (rows, list items) only starts a new line.
+    BLOCK = {
+        "address", "article", "aside", "blockquote", "details", "div", "dl", "figcaption", "figure", "footer",
+        "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "main", "nav", "ol", "p", "pre", "section",
+        "summary", "table", "title", "ul",
+    }
+    LINE = {"br", "dd", "dt", "li", "tr"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.skipping = 0
+        self.pre = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "pre":
+            self.pre += 1
+        if tag in self.SKIP:
+            self.skipping += 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n\n")
+        elif tag in self.LINE:
+            self.parts.append("\n")
+        elif tag in ("td", "th"):
+            self.parts.append(" | ")
+
+    def handle_endtag(self, tag):
+        if tag == "pre":
+            self.pre -= 1
+        if tag in self.SKIP:
+            self.skipping -= 1
+        elif tag in self.BLOCK:
+            self.parts.append("\n\n")
+
+    def handle_data(self, data):
+        # Source line breaks are only whitespace in HTML, except inside <pre>.
+        if not self.skipping:
+            self.parts.append(data if self.pre else re.sub(r"\s+", " ", data))
+
+    def text(self) -> str:
+        lines = [re.sub(r"\s+", " ", line).strip().removeprefix("| ") for line in "".join(self.parts).split("\n")]
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
+
+
+def html_text(html: str) -> str:
+    parser = TextOnly()
+    parser.feed(html)
+    parser.close()
+    return parser.text()
+
+
+# --- commands ---
+
+
+def version_file(file: Path) -> Path:
+    return file.with_name(file.name + ".version")
+
+
+def cmd_ls(args):
+    pages = hub("GET", "/pages")["pages"]
+    if args.prefix:
+        prefix = args.prefix.rstrip("/")
+        pages = [p for p in pages if p["path"] == prefix or p["path"].startswith(prefix + "/")]
+    if not pages:
+        print("没有页面")
+    for p in pages:
+        print(f"{p['path']}  v{p['version']}  {et(p['updated_at'])}  {p['updated_by']}  {p['title']}")
+        print(f"    {p['summary']}")
+
+
+def cmd_cat(args):
+    route = page_route(args.path)
+    page = hub("GET", route if args.version is None else f"{route}/versions/{args.version}")
+    sys.stdout.write(html_text(page["html"]) if args.text else page["html"])
+
+
+def cmd_pull(args):
+    file = Path(args.file)
+    try:
+        page = hub("GET", page_route(args.path))
+    except HubError as e:
+        if e.code != 404:
+            raise
+        # api.md 删除页面: a deleted path 404s with "was deleted at …" and cannot be written again.
+        if "was deleted" in e.detail:
+            fail(f"{e.detail}; a deleted path is not reused, pick a new path")
+        file.write_text("", encoding="utf-8")
+        version_file(file).write_text("0\n")
+        print(f"{args.path} 还没有，写了空文件 {file}（version 0，新建用）")
+        return
+    file.write_text(page["html"], encoding="utf-8")
+    version_file(file).write_text(f"{page['version']}\n")
+    print(f"{args.path} v{page['version']} → {file}（{page['updated_by']} {et(page['updated_at'])}）")
+
+
+def writer(args) -> str:
+    by = args.by if args.by else session_name()
+    if not SESSION_NAME.fullmatch(by):
+        fail(f"--by {by!r} is not a session name (lowercase words joined by dashes)")
+    return by
+
+
+def cmd_put(args):
+    file = Path(args.file)
+    if not args.note.strip():
+        fail("--note is empty")
+    if args.base is not None:
+        base = args.base
+    elif version_file(file).is_file():
+        base = int(version_file(file).read_text())
+    else:
+        fail(f"no --base and no {version_file(file)}; run `pages pull {args.path} {file}` first")
+    body = {"html": file.read_text(encoding="utf-8"), "base_version": base, "note": args.note, "by": writer(args)}
+    try:
+        page = hub("PUT", page_route(args.path), body)
+    except HubError as e:
+        if e.code != 409:
+            raise
+        # api.md 删除页面: a deleted path is 409 whatever the base, and detail.message says 已删除.
+        if "已删除" in e.detail["message"]:
+            fail(e.detail["message"])
+        # updated_by is null when the page does not exist yet but base_version was not 0.
+        if e.detail["updated_by"] is None:
+            fail(f"{args.path} 还不存在（当前 v0），新建用 --base 0 或先 pull")
+        fail(f"{e.detail['updated_by']} 在你之后改过（当前 v{e.detail['version']}），先 pull 合并再 put")
+    version_file(file).write_text(f"{page['version']}\n")
+    print(f"已保存 {page['path']} v{page['version']}  {page['updated_by']}  {page['title']}")
+
+
+def cmd_rm(args):
+    if not args.note.strip():
+        fail("--note is empty")
+    body = {"base_version": args.base, "note": args.note, "by": writer(args)}
+    try:
+        page = hub("DELETE", page_route(args.path), body)
+    except HubError as e:
+        if e.code != 409:
+            raise
+        fail(f"{e.detail['updated_by']} 在你之后改过（当前 v{e.detail['version']}），先 pages cat 看过再决定删不删")
+    print(f"已删除 {page['path']}（v{page['version']}）")
+
+
+def cmd_log(args):
+    for v in hub("GET", f"{page_route(args.path)}/versions")["versions"]:
+        print(f"v{v['version']}  {et(v['updated_at'])}  {v['updated_by']}  {v['note']}")
+
+
+def system_theme() -> str:
+    if sys.platform != "darwin":
+        fail(f"no system theme on {sys.platform}; pass --theme dark|light")
+    r = subprocess.run(["defaults", "read", "-g", "AppleInterfaceStyle"], capture_output=True, text=True)
+    if r.returncode == 0 and r.stdout.strip() == "Dark":
+        return "dark"
+    if r.returncode == 1 and "does not exist" in r.stderr:
+        return "light"
+    fail(f"cannot read macOS appearance (exit {r.returncode}: {r.stderr.strip()}); pass --theme")
+
+
+def cmd_link(args):
+    theme = args.theme if args.theme else system_theme()
+    print(hub("POST", f"{page_route(args.path)}/link", {"theme": theme, "version": None})["url"])
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(prog="pages", description=__doc__)
+    sub = p.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("ls", help="list pages: path, version, updated (local time), by, title, summary")
+    s.add_argument("prefix", nargs="?", help="only pages at or under this path, e.g. life")
+    s.set_defaults(func=cmd_ls)
+
+    s = sub.add_parser("cat", help="print a page's html")
+    s.add_argument("path")
+    s.add_argument("--text", action="store_true", help="text only, no tags or scripts")
+    s.add_argument("--version", type=int, help="an older version (see `pages log`)")
+    s.set_defaults(func=cmd_cat)
+
+    s = sub.add_parser("pull", help="write html to FILE and its version to FILE.version (missing page: empty, 0)")
+    s.add_argument("path")
+    s.add_argument("file")
+    s.set_defaults(func=cmd_pull)
+
+    s = sub.add_parser("put", help="write FILE as the new version; base from --base or FILE.version")
+    s.add_argument("path")
+    s.add_argument("file")
+    s.add_argument("--note", required=True, help="what changed, one sentence")
+    s.add_argument("--base", type=int, help="version you edited (default: FILE.version)")
+    s.add_argument("--by", help="session name (default: this Claude Code / Codex session's name)")
+    s.set_defaults(func=cmd_put)
+
+    s = sub.add_parser("rm", help="delete a page (soft: versions stay, the path is never reused)")
+    s.add_argument("path")
+    s.add_argument("--base", type=int, required=True, help="current version, from `pages ls` or `pages log`")
+    s.add_argument("--note", required=True, help="why it goes, one sentence")
+    s.add_argument("--by", help="session name (default: this Claude Code / Codex session's name)")
+    s.set_defaults(func=cmd_rm)
+
+    s = sub.add_parser("log", help="version history, newest first")
+    s.add_argument("path")
+    s.set_defaults(func=cmd_log)
+
+    s = sub.add_parser("link", help="print a 10-minute browser link")
+    s.add_argument("path")
+    s.add_argument("--theme", choices=["dark", "light"], help="default: macOS appearance")
+    s.set_defaults(func=cmd_link)
+    return p.parse_args()
+
+
+def main() -> None:
+    # `pages ls | head` closes the pipe early: exit quietly like other CLIs instead of a traceback.
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    args = parse_args()
+    try:
+        args.func(args)
+    except HubError as e:
+        fail(str(e))
+
+
+if __name__ == "__main__":
+    main()

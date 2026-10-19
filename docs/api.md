@@ -1438,6 +1438,8 @@ worker/.env 新增必填 `MOJITO_RESEARCH_MAP`：地图文件的绝对路径。�
 ```
 
 - id 为 `life` 的方向放生活项目：卡片只有状态，运行状态方块按 hub 的项目状态（不是研究卡片）。
+- 收件箱接受两种明确格式：上面的旧格式为想法，保留原样；分类格式在同样的五个字段之外必填 `kind`，值只能是 `idea / paper / author / blog`。有 `kind` 时按分类格式校验，未知值和 null 均拒绝，不退回旧格式。GET 保留类别，旧记录不补字段，不通过来源文字猜类别。`text` 仍保存完整内容，界面按首个中文冒号或英文冒号加空白分为标题与说明；无分隔符时仅显示标题。其余内容点击展开，来源可继续保存原始链接。添加分类记录前须先部署支持分类格式的 hub，旧 hub 的未知字段兼容会忽略 `kind`。
+- 收件箱身份唯一（见"Idea Lab"）：两条收件箱的（kind，at 换成 UTC 精确到秒，source）相同时 `PUT /research-map` 返回 422，hub 不存这份地图。同一批加多条同来源的条目时，给每条不同的 `at`（例如相差一秒）或写清各自的 source。
 - worker 每次 `sync_projects` 读它，检查 id 对得上：位置存在（起点、叶子、没有叶子的方向）、起点引用的总原则存在、所有 id 不重名、项目在 hub 里、不重复、状态为 active / paused / done 的 hub 项目要么在 `projects` 要么在 `hidden`、收件箱建议的位置存在。有问题按项目概况文件出错同样处理（`sync-projects` 健康 error，写明问题），不上传；没问题就 `PUT /research-map` 整份覆盖。
 
 ## 接口
@@ -1466,6 +1468,141 @@ hub + agent 部署 → 在 hub 建好地图要用、还不在 hub 里的项目 �
 - **基线**：每次 `sync_projects` 开始读文件之前，用这次要查的目录清单和各文件当时的修改时间重建基线（同步途中又改的文件下一分钟会被发现）。worker 启动后还没跑过同步时，第一次检查只记基线，不入队。
 - hub 每 30 分钟入队一次 `sync_projects` 照旧（新 worktree、Orca 快照靠它）。
 - 不新增接口、数据源、健康项。检查出错只写日志，不能挡住任务处理（同看门狗）。worker 正在跑长任务时检查顺延到任务结束后。
+- 研究技能目录也在监视范围里：`MOJITO_SKILLS_DIR` 下四个研究技能的目录和其中的 Markdown 新增、删除、修改，同样排 `sync_projects`（见"研究技能"）。
+
+---
+
+# 研究技能（design.md 8.14）
+
+研究技能就是你的 Claude Code / Codex 会话实际读取的技能文件（一个目录：`SKILL.md` 加同目录的 Markdown 模板和参考）。app 只读展示同一份原文，不另存展示副本；worker 随 `sync_projects` 同步只读快照，hub 只存储和提供读取，不执行技能。
+
+- **技能从哪来**：worker/.env 新增必填 `MOJITO_SKILLS_DIR`：技能根目录的绝对路径（不展开 `~`）。worker 读其中固定的四个技能：`research-idea-funnel`（Research Ideas）、`research-experiments`（Research Experiments）、`research-review`（Research Review）、`paper-writing`（Paper Writing），名字和一句话用途在 `worker/src/mojito_worker/research_skills.py` 的 `CURATED_SKILLS`。四个里缺任何一个的 `SKILL.md`，`sync_projects` 报错。仓库自带四个通用示例 `examples/skills/`：可以直接指向它，也可以复制进你自己的技能目录（如 `~/.claude/skills/`）再改。
+- `PUT /research-skills`：worker 令牌，整份替换快照，不产生用户通知或用量事件。
+- `GET /research-skills`：`app_read`，返回同结构；首次同步前返回 404。
+- 全部字段必填：`{updated_at, skills: [{id, title, summary, source_path, updated_at, files: [{path, content}], changes: [{revision, at, summary}]}]}`。
+- `source_path` 是实际 SKILL.md 绝对路径。`files.path` 是相对技能目录的 POSIX 路径，含 SKILL.md 和目录内 Markdown 模板/参考文件；`content` 是完整 UTF-8 原文。只读取这四个目录内的 Markdown，不读取外部链接、脚本、凭据或指向目录外的符号链接；主文件缺失报错。
+- 技能 `updated_at` 是实际文件修改时间，快照 `updated_at` 是同步时刻。`changes` 为技能目录最近五次 Git 提交，`revision` 为 hash，`at` 为带时区提交时间，`summary` 为提交说明。目录不在 Git 仓库里或没有历史时为空列表，不编造原因。未提交修改仍同步磁盘原文，文件时间与提交记录分别展示。
+- 现有 60 秒文件监视包括这四个技能目录和其中的 Markdown 文件，新增、删除、修改均排队同一个 `sync_projects` 作业，不新增调度器；30 分钟同步仍保留。
+- 上线顺序：hub → worker（首次同步）→ 客户端。app 内只读；方法的改进写回技能原文件。
+
+# Idea Lab（design.md 8.15）
+
+hub 保存研究摘要、来源关联和有界运行请求，不判断研究价值；worker 使用现有队列执行研究。所有写入校验身份，ideas 使用 revision 防止并发覆盖，run 使用 idempotency_key 防止重复启动。原 research-map.inbox 保持兼容；seed 使用 kind、at、source 的稳定摘要作 id，保存原始快照，不随标题修改变动，也不删除已经被想法引用的历史来源。
+
+- **收件箱身份唯一**：seed 身份 = （kind，没有 kind 记 idea；at 换成 UTC 精确到秒；source）。`PUT /research-map` 里两条收件箱身份相同就 422，detail 写出冲突的身份和两条的 text 开头，hub 不存这份地图。原因：hub 每分钟巡检里同步 seed，身份冲突会让巡检抛错、hub 反复重启。
+- `GET /idea-lab`（app_read）：`{seeds, ideas, runs, automations}`。seed 包含 `id, kind, text, source, at, snapshot, reason, idea_ids, present, last_explored_at`，snapshot 是原始 `{kind,text,source,area,note,at}`。`PUT /idea-lab/seeds/{id}` 更新 `{reason}`（你为什么收这条）。
+- `POST /idea-lab/ideas`，`PUT /idea-lab/ideas/{id}`：想法字段 `title, question, importance, status, seed_ids, hypotheses, evidence, changes, next_step, artifacts, notion_url, notion_sync`；更新带 `revision`，冲突 409。`GET /idea-lab/ideas/{id}` 读取单个想法；读取另有 `id, revision, created_at, updated_at`。状态 `developing|ready|experimenting|supported|contradicted|archived`；证据 `{id,claim,source,kind,at}`；判断变化 `{at,before,after,reason}`；产物 `{kind,title,url}`；研究正文同步状态 `notion_sync` 为 `pending|synced`（`synced` 必须有核实过的 https 链接）。摘要不替代你自己文档里的研究正文。
+- `POST /idea-lab/runs`：`{idempotency_key,title,goal,direction,mode,seed_ids,idea_ids,budget:{wall_minutes,max_turns,allow_cpu,allow_write},experiment_policy}`。模式 `explore|develop|experiment|write|review|cycle`；任务记录保存请求与 `id,job_id,status,created_at,started_at,finished_at,error,summary`。`GET /idea-lab/runs/{id}` 读取；`POST /idea-lab/runs/{id}/cancel {}` 取消。预算上限：`wall_minutes` 1–120，`max_turns` 1–100；`allow_cpu` 必须同时 `allow_write`（CPU 分析要保存可复现产物）。
+- `POST /idea-lab/automations`：`{idempotency_key,title,enabled,trigger:interval|new_seed,interval_minutes,max_runs,run}`，run 是不带 idempotency_key 的运行请求。读取含 `runs_started,next_at,last_seed_ids,state:active|disabled|exhausted`。`PUT /idea-lab/automations/{id} {enabled}` 启停。有限 max_runs，已排队/运行不重入，不补跑一串睡眠期间错过的任务。后续轮次继续本计划产出及所选材料关联的非归档想法；new_seed 纳入新增来源，方向和预算保持不变。
+- 执行复用 `research_run` Mac job，payload 关联 run。长运行作为受控子进程执行，worker 心跳/其他任务继续；取消和超时停止自己的进程组。执行器强制墙钟与 CLI 轮数，GPU/新增付费 API/对外消息/投稿不因启动而获授权。停止与错误如实回写，执行完成须有可验证结果，不能以成功排队代替完成。进程重启恢复必须避免重复实验。
+- 每次运行的提示词带上：worker/.env 新增必填 `MOJITO_RESEARCH_RULES` 指向的规则文件（Markdown 绝对路径，比如你的全局 `CLAUDE.md`，或仓库的 `examples/research-rules.md`）、四个研究技能的快照、地图的总原则、口味（taste）、选中的材料和已有问题。用户可见的文字按界面语言（settings.language）写。
+- worker 专用 `/worker/research-runs/{id}/{claim,heartbeat,checkpoint,finish}` 管理租约和结果；app 读取隐藏 lease_token。checkpoint 在独立复核前保存作者阶段产物。cycle 的独立证据复核共用本轮墙钟与总轮数；复核不确定或未通过时保留具体意见，不把本轮新结论标为 supported。已有研究正文链接保留，新修改仅标 pending。
+- 上线顺序：hub、worker 与首轮同步、客户端；正式使用前用隔离的 hub（独立数据库）检查状态与取消，不把模拟研究混进自己的数据。
+
+## 普通研究会话同步
+
+Claude Code / Codex 的普通研究会话用专用 `source:ideas` 令牌同步摘要，不需启动 app 内研究任务。该角色只新增以下权限：`GET /idea-lab`、`GET /idea-lab/ideas/{id}`、`POST /idea-lab/sync`、`GET /idea-lab/sync/{operation_id}`。原有 app/worker/agent/maintainer 读取权限不变；该令牌不能调用原想法创建/修改接口、修改地图、启动或取消运行、创建或启停自动计划，也不继承通用 source 的事件、心跳及健康上报权限。`hub/deploy/gen-tokens.sh` 默认生成这个令牌；`hub/deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN "$MOJITO_SECRETS_DIR/idea-lab.env"` 把它连同 `MOJITO_HUB_URL` 写到调用机器（600 权限）。客户端是示例技能里的 `examples/skills/research-idea-funnel/scripts/idea_lab.py`（用法见同目录的 `references/idea-lab.md`），不回退到全权限 app 或 worker 凭据。
+
+- `POST /idea-lab/sync`（app 或 source:ideas）：全部字段必填 `{operation_id, existing_id, revision, content}`。`operation_id` 是 1–200 字符的 `[A-Za-z0-9._:-]+`；`content` 是上文完整 `IdeaInput`。创建时 `existing_id=null, revision=null`；更新时 `existing_id` 为非空想法 id，`revision` 为当前正整数版本。配对错误或字段错误为 422。成功返回 200 `{operation_id, idea}`，idea 是提交后的完整 `Idea`。
+- 每个 operation_id 持久保存请求和原始 receipt。相同 operation_id 与相同解析后请求重试，返回原 receipt，不重复创建或增加 revision；相同 key、不同请求返回 409。即使该想法后来被更新，重放仍返回此操作原来的 idea/revision，客户端另读想法接口取得最新版。JSON 对象键序不影响请求相等，带时区时间按解析后的时间值比较。
+- `GET /idea-lab/sync/{operation_id}`（原 app_read 角色或 source:ideas）：返回已提交的 `{operation_id, idea}`；不存在返回 404。客户端可在响应丢失或重启后查 receipt，或原样重发原请求。revision 冲突为 409，未知想法或 seed 为 404；所有失败均不留下 receipt。
+- 同步更新保留旧历史：evidence.id 在请求内必须唯一，原有 evidence 必须按原 id 完整保留且内容不变；原 changes 必须完整保留并维持相对次序。可追加新证据、反驳或纠正记录，但不能修改或删除旧记录。违反返回 422。该约束只作用于同步入口，不改变原 app 编辑接口。seed_ids 仍检查存在性和重复引用。
+- 想法内容、revision、seed 关联及幂等账本在一个事务内提交；任何一步失败全部回滚。同步不产生新 run、通知或用量事件，也不替代你文档里的研究正文。
+
+---
+
+# 页面
+
+页面 = 一个固定路径、反复修改的自包含 HTML 页：要反复回来看、会持续更新的内容（一件在办的事的进度、一个项目的总览、一台机器的配置），任何 Claude / Codex 会话都能用 `pages` 命令读写，在 Mac app、网页版和安卓上看。一次性的报告仍放信息流。
+
+## 格式：自包含 HTML
+
+每个页面是一个完整 HTML 文档，标题、摘要、所属项目都写在文档里，hub 从中取：
+- `<title>` → `title`（必须有，否则 422）
+- `<meta name="description" content="…">` → `summary`（必须有，≤ 200 字，否则 422）
+- `<meta name="mojito-project" content="<project_id>">` → `project_id`；没有这个 meta 则为 null；有但 hub 里没有这个项目 → 422
+- 共享样式 `<link rel="stylesheet" href="https://<你的 hub>/pages-assets/base.css">`：颜色变量用 app 的深色 B「冷静蓝」和浅色 C「浅色纸面」（取值同 app），默认跟随 `prefers-color-scheme`，`:root[data-theme="dark"]` / `:root[data-theme="light"]` 强制；字号五级 26/18/16/14/12；提供正文、标题、表格、卡片、标签、时间线这几类基础样式，手机宽度可读（左右 16px，不横向滚动）。页面只用这些变量配色，所有页面看起来是一个系统。
+- 脚本库只从 `cdnjs.cloudflare.com` 或 `cdn.jsdelivr.net` 加载。
+- `html` ≤ 1 MB。
+
+## Page / PageVersion
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `path` | str | 主题分层，小写字母、数字、`-`，用 `/` 分隔，1–4 段，如 `life/move`、`research/scaling-notes`、`infra/home-server`。顶层先用 `life`、`research`、`infra`、`notes`，不限死。`_smoke/` 开头的是部署冒烟专用，不出现在 `GET /pages` 里 |
+| `title` / `summary` / `project_id` | | 从 html 取，见上 |
+| `html` | str | |
+| `version` | int | 第一次写为 1，每次写 +1 |
+| `updated_at` | datetime | |
+| `updated_by` | str | 写入者：`session:<会话名>`（CLI 自动取），或令牌角色 |
+| `note` | str | 这次改了什么，一句话，必填（只在 PageVersion 上） |
+
+PageVersion：每次写都留一份（`path`、`version`、`html`、`title`、`summary`、`project_id`、`updated_at`、`updated_by`、`note`）。
+
+## 接口
+
+| 方法 | 路径 | 令牌 | 作用 |
+|---|---|---|---|
+| GET | `/pages` | app / agent / worker / `source:pages` | 全部页面元数据（不含 html），按 path 排序：`{pages: [{path, title, summary, project_id, version, updated_at, updated_by}]}` |
+| GET | `/pages/{path}` | 同上 | 含 html 的 Page；不存在 404 |
+| PUT | `/pages/{path}` | worker / `source:pages` | `{html, base_version, note, by}`（`by` = 会话名，写成 `updated_by = session:<by>`）。`base_version` 不等于当前 version → 409，响应体带当前 version 和 updated_by（新页面 `base_version = 0`；已存在时传 0 也是 409）。返回 Page 元数据 |
+| GET | `/pages/{path}/versions` | app / agent / worker / `source:pages` | 版本列表（不含 html），倒序 |
+| GET | `/pages/{path}/versions/{v}` | 同上 | 某一版全文 |
+| POST | `/pages/{path}/link` | app / agent / worker / `source:pages` | `{theme: "dark" \| "light", version: int \| null}` → `{url}`：10 分钟有效的签名链接（HMAC，密钥在 hub 的环境里，部署时生成）；`version` 为 null 表示最新版 |
+| GET | `/p/...` | 无（签名即凭据） | 返回该页 html：在 `<html` 上加 `data-theme`；响应头 `Content-Security-Policy: sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox`（不给 allow-same-origin，页面脚本拿不到 hub 的任何东西）、`Cache-Control: no-store`。签名过期或不对 → 403 |
+| GET | `/pages-assets/base.css` | 无 | 共享样式，不含任何数据 |
+
+- path 在 URL 里按原样带 `/`（`/pages/life/move`），路由按最长匹配区分 `/versions`、`/link` 后缀；path 的**任何一段**都不能叫 `versions` 或 `link`（否则 `x/versions/3` 这页会被版本接口挡住），422。
+- PUT 的 `by` 可以是 null，这时 `updated_by` 记令牌角色（冒烟用）；409 响应体是 `{"detail": {"message", "version", "updated_by"}}`；版本列表是 `{"versions": [{path, version, title, summary, project_id, updated_at, updated_by, note}]}`，新的在前；签名链接是 `/p/{path}?v=<版本|latest>&theme=&exp=&sig=`（HMAC-SHA256，密钥文件 `MOJITO_PAGES_KEY_FILE`，由 `hub/deploy/gen-pages-key.sh` 生成，hub 启动时读不到就起不来）；`/p/` 另带 `Referrer-Policy: no-referrer`；`/app` 的 CSP 加 `frame-src 'self'`。
+- 改名不做；删除见下一节。
+- hub 现有的 `pages.py` 是 OAuth 要求的公开页，页面的代码在 `page_store.py`，别混。
+- 部署冒烟加上：用 `source:pages` 令牌 PUT `_smoke/page`（读当前 version 当 base）→ GET 读回 → POST link → GET 链接得 200 且带 CSP 头 → GET `/pages` 里没有 `_smoke/`。
+- 使用记录的 view 加 `pages`、`page_detail`；action 加 `page_history`。
+
+## 显示
+
+- **Mac app 和网页版**：侧栏加「页面」（英文 Pages），列表按 path 第一段分组，每行标题 + 摘要 + 本地短时间；顶部有搜索框，⌘F / Ctrl+F 跳到搜索框。点开：调 `POST /pages/{path}/link`（theme 用 app 当前深浅色），用 `<iframe sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" src=链接>` 占满内容区。页头一行：更新于 · 谁改的 ·「历史」（版本列表，每条 note + 时间 + 谁，点开用 `version` 取那一版的链接）· 「在浏览器打开」。页面里的链接在系统浏览器打开。
+- **安卓**：项目页顶部加「页面」入口进列表（同上分组）；点开调 link，用系统浏览器打开（`Linking.openURL`，不加原生模块、不重装 APK，空中更新即可）。
+- **项目**：项目详情里列出 `project_id` 等于该项目的页面，点开同上。
+- 界面文字按「界面语言」一节中英两套。
+
+## CLI `pages`
+
+`sources/pages/pages`，`sources/pages/install.sh` 装到 `~/.local/bin/pages`。每台要读写页面的机器都装。读 `$MOJITO_SECRETS_DIR/pages.env`（`MOJITO_HUB_URL`、`MOJITO_PAGES_TOKEN`，令牌角色 `source:pages`，文件权限 600；`hub/deploy/mac-env.sh source:pages MOJITO_PAGES_TOKEN "$MOJITO_SECRETS_DIR/pages.env"` 生成）。会话名：Claude Code 会话取当前会话名（`claude -n <名字>` 或 `/rename` 起的名字），Codex 取 `/rename` 的名字；名字要是小写单词加短横（如 `maint`、`ui-review`），取不到就报错要求 `--by <名字>`。
+
+- `pages ls [前缀]`：path、title、summary、version、更新时间（本机时区）、谁改的
+- `pages cat <path> [--text] [--version N]`：输出 html；`--text` 去掉标签和脚本只给文字
+- `pages pull <path> <文件>`：写 html 到文件，并把 version 写进同目录 `<文件>.version`；页面不存在时写空文件、version 0（新建用）
+- `pages put <path> <文件> --note "<改了什么>" [--base N]`：不给 `--base` 就读 `<文件>.version`，两者都没有则报错；成功后更新 `.version`；409 时打印"<谁> 在你之后改过（当前 vN），先 pull 合并再 put"并非 0 退出
+- `pages log <path>`：版本列表
+- `pages link <path>`：打印一个浏览器能打开的 10 分钟链接（theme 按系统深浅色）
+
+给会话的约定（写进你的 `CLAUDE.md` / `AGENTS.md`）：做某个主题的事之前先 `pages ls` / `pages cat --text`；事实变了就改那一页（pull → 改 → put 带 note），不要新开一页；409 就重新 pull、合并、再 put。页面最上面放一块"现在的状态"，时间写你的时区。
+
+## 上线顺序
+
+hub（`gen-pages-key.sh` 生成签名密钥、`gen-tokens.sh` 生成 `source:pages` 令牌、部署、冒烟）→ 在要用的机器上装 CLI、写 `pages.env` → 客户端（网页版、Mac 版、手机空中更新）。
+
+---
+
+# 删除页面
+
+## 数据
+
+- 软删除：Page 加 `deleted_at: datetime | null`、`deleted_by: str | null`（写法同 `updated_by`）、`delete_note: str | null`。PageVersion 全部保留，不动。
+
+## 接口
+
+| 方法 | 路径 | 令牌 | 作用 |
+|---|---|---|---|
+| DELETE | `/pages/{path}` | worker / `source:pages` | `{base_version, note, by}`：`base_version` 不等于当前 version → 409（响应体同 PUT 的 409）；不存在或已删除 → 404；`note` 必填。成功返回被删页面的元数据，带 `deleted_at`、`deleted_by`、`delete_note` |
+
+- 已删除的页面：`GET /pages` 和项目详情里的页面列表都不再返回它；`GET /pages/{path}`、`/versions`、`/versions/{v}`、`POST /link` 返回 404；已经发出去的 `/p/` 签名链接返回 404。
+- 已删除的 path 不再复用：对它 PUT（任何 `base_version`）→ 409，`detail.message` 写明"已删除"，`detail.version` 为删除时的版本。同一主题要重新写就换一个 path。
+- 404 的 `detail` 分两种，已删除的是 `page <path> was deleted at <时间> by <谁>`，从没写过的是 `page <path> not found`，CLI 直接打印 `detail`；对已删除 path 的 PUT 返回 409 时，`updated_by` 仍是最后一版的作者，删除人写在 `message` 里；PUT 先检查 html，html 不合格先返回 422；DELETE 的 `base_version` 至少是 1，传 0 返回 422。
+- 部署冒烟加上：PUT 一个带时间戳的 `_smoke/delete-<时间戳>`（base 0）→ DELETE（base 1）→ GET 得 404 → `GET /pages` 里没有它 → 再 PUT 得 409。
+- app 不加删除按钮：列表的数据来自 hub，hub 不返回就不显示。
+- CLI：`pages rm <path> --base N --note "<为什么删>" [--by <会话名>]`：`--base` 必填，取 `pages ls` 或 `pages log` 里看到的当前版本；409、404 打印原因并非 0 退出；成功打印"已删除 <path>（vN）"。删错或重复的页用它删；删了的 path 不能再用，起 path 前想清楚。
 
 ---
 
@@ -1491,6 +1628,7 @@ hub + agent 部署 → 在 hub 建好地图要用、还不在 hub 里的项目 �
 | `MOJITO_WEB_DIR` | 网页构建目录（软链接） |
 | `MOJITO_OWNER_NAME` | 公开页面上写的运行者名字 |
 | `MOJITO_CONTACT_EMAIL` | 公开页面上的联系邮箱 |
+| `MOJITO_PAGES_KEY_FILE` | 页面签名链接（`/p/…`）的 HMAC 密钥文件（`gen-pages-key.sh` 生成，见"页面"） |
 
 **agent**（服务器，`agent.env`）：`MOJITO_HUB_URL`、`MOJITO_AGENT_TOKEN`、`MOJITO_CLAUDE_BIN`、`MOJITO_GOOGLE_OAUTH`、`MOJITO_TIMEZONE`；Claude 凭据 `ANTHROPIC_API_KEY` 或 `CLAUDE_CODE_OAUTH_TOKEN` 二选一。
 
@@ -1507,5 +1645,7 @@ hub + agent 部署 → 在 hub 建好地图要用、还不在 hub 里的项目 �
 | `MOJITO_ZOTERO_DB` | `zotero.sqlite` 路径，或 `none` |
 | `MOJITO_ARXIV_CATEGORIES` | 论文订阅的 arXiv 分类，逗号分隔 |
 | `MOJITO_RESEARCH_MAP` | 研究地图文件 `map.json` 的绝对路径（见"研究地图"） |
+| `MOJITO_SKILLS_DIR` | 研究技能根目录的绝对路径（见"研究技能"；仓库自带 `examples/skills`） |
+| `MOJITO_RESEARCH_RULES` | Idea Lab 研究运行读的规则文件绝对路径（见"Idea Lab"；示例 `examples/research-rules.md`） |
 
-**本机其他**（`~/.config/mojito/secrets/`）：`maintainer.env`（`MOJITO_HUB_URL`、`MOJITO_MAINTAINER_TOKEN`，维护会话用）、`cards.env`（`MOJITO_HUB_URL`、`MOJITO_CARDS_TOKEN`，`mojito-card` 和发布脚本用）。
+**本机其他**（`~/.config/mojito/secrets/`）：`maintainer.env`（`MOJITO_HUB_URL`、`MOJITO_MAINTAINER_TOKEN`，维护会话用）、`cards.env`（`MOJITO_HUB_URL`、`MOJITO_CARDS_TOKEN`，`mojito-card` 和发布脚本用）、`pages.env`（`MOJITO_HUB_URL`、`MOJITO_PAGES_TOKEN`，`pages` 命令用）、`idea-lab.env`（`MOJITO_HUB_URL`、`MOJITO_IDEA_LAB_TOKEN`，研究会话同步 Idea Lab 用）。

@@ -178,7 +178,8 @@ export function Composer({ target, placeholder, chips }: { target: ComposerTarge
   const { bump } = useRefresh()
   const [text, setText] = useDraft(draftKey(target))
   const [busy, setBusy] = useState(false)
-  const attach = useImageAttach(busy)
+  const inputRef = useRef<TextInput>(null)
+  const attach = useImageAttach(busy, inputRef)
   // 先逐张 POST /attachments，再 POST /chat 带 attachment_ids；只发图时正文可以为空
   const send = async () => {
     if (config.hub === null) {
@@ -214,7 +215,6 @@ export function Composer({ target, placeholder, chips }: { target: ComposerTarge
     }
   }
   const canSend = !busy && (text.trim() !== '' || attach.count > 0)
-  const inputRef = useRef<TextInput>(null)
   const desk = useDesktopInput(text, () => (canSend ? send() : undefined), inputRef)
   const input = (
     <TextInput

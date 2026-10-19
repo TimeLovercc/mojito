@@ -10,7 +10,8 @@ DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 test -f "$WORKER_DIR/.env" || { echo "missing $WORKER_DIR/.env (copy worker/.env.example and fill it in)" >&2; exit 1; }
 for key in MOJITO_HUB_URL MOJITO_WORKER_TOKEN MOJITO_CLAUDE_BIN MOJITO_TIMEZONE MOJITO_PROJECTS_ROOT \
-           MOJITO_GMAIL_OAUTH_FILE MOJITO_ZOTERO_DB MOJITO_ARXIV_CATEGORIES MOJITO_RESEARCH_MAP; do
+           MOJITO_GMAIL_OAUTH_FILE MOJITO_ZOTERO_DB MOJITO_ARXIV_CATEGORIES MOJITO_RESEARCH_MAP \
+           MOJITO_SKILLS_DIR MOJITO_RESEARCH_RULES; do
   grep -q "^$key=." "$WORKER_DIR/.env" || { echo "$key not set in $WORKER_DIR/.env" >&2; exit 1; }
 done
 

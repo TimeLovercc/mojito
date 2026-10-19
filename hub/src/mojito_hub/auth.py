@@ -33,6 +33,8 @@ def allow(*roles: str):
 # GETs of the app group; maintainer (feedback triage) reads everything the app can.
 app_read = allow("app", "worker", "agent", "maintainer")
 app_write = allow("app")
+idea_readers = allow("app", "worker", "agent", "maintainer", "source:ideas")
+idea_sync_writers = allow("app", "source:ideas")
 worker = allow("worker")
 app_get = allow("app", "maintainer")
 app_or_agent = allow("app", "agent")
@@ -52,6 +54,8 @@ uploaders = allow("app", "worker")
 subscription_togglers = allow("app", "agent", "worker")
 subscription_runners = allow("app", "agent", "worker")
 feedback_talkers = allow("app", "maintainer", "agent")
+page_readers = allow("app", "agent", "worker", "source:pages")
+page_writers = allow("worker", "source:pages")
 
 
 def actor(r: str) -> tuple[str, str]:
@@ -82,6 +86,8 @@ async def source(r: str = Depends(role)) -> str:
     agent → `server-agent`."""
     if r in SOURCE_OF:
         return SOURCE_OF[r]
+    if r == "source:ideas":
+        raise HTTPException(403, "role source:ideas is restricted to Idea Lab synchronization")
     if r.startswith("source:"):
         return r.removeprefix("source:")
     raise HTTPException(403, f"role {r} not allowed")

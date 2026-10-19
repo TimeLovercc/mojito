@@ -1,7 +1,8 @@
 """Sync project cards within a minute of a file change (api.md 研究地图 → 卡片文件一改就同步).
 
 Every CHECK_INTERVAL (wall clock) the main loop stats the files sync_projects reads: overview.json in each
-project directory the last sync looked at, and the MOJITO_RESEARCH_MAP file. Nothing is read or fetched.
+project directory the last sync looked at, the MOJITO_RESEARCH_MAP file, and curated research skill
+directories and Markdown files. No contents are read or fetched.
 A file that appeared, disappeared or has a new mtime enqueues sync_projects (the hub returns the queued /
 running one instead of a duplicate) and becomes the new baseline. sync_projects rebuilds the baseline
 before it reads the files. The directory list is also kept in STATE_DIR, so a restarted worker watches the
@@ -16,6 +17,7 @@ from pathlib import Path
 from mojito_worker.config import STATE_DIR
 from mojito_worker.hub import Hub
 from mojito_worker.overview import OVERVIEW_FILE
+from mojito_worker.research_skills import watch_paths
 
 CHECK_INTERVAL = timedelta(seconds=60)
 DIRS_FILE = STATE_DIR / "card_dirs.json"
@@ -39,7 +41,7 @@ class CardFileWatch:
         self.checked_at: datetime | None = None
 
     def _paths(self) -> list[Path]:
-        return [Path(d) / OVERVIEW_FILE for d in self.dirs] + [_research_map_file()]
+        return [Path(d) / OVERVIEW_FILE for d in self.dirs] + [_research_map_file()] + watch_paths()
 
     def rebuild(self, dirs: list[str]) -> None:
         """Called by sync_projects before it reads the files: these directories, mtimes as of now."""
@@ -57,7 +59,8 @@ class CardFileWatch:
         if self.baseline is None:  # first check since the worker started: baseline only
             self.baseline = seen
             return
-        changed = [p for p in seen if seen[p] != self.baseline[p]]
+        changed = sorted(set(seen) ^ set(self.baseline))
+        changed += [p for p in seen.keys() & self.baseline.keys() if seen[p] != self.baseline[p]]
         if not changed:
             return
         job = hub.create_job("sync_projects", "mac", None)

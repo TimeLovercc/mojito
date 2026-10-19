@@ -3,7 +3,7 @@ import time
 
 import httpx
 
-from mojito_worker import card_watch
+from mojito_worker import card_watch, research_runner
 from mojito_worker.auth import AuthReporter
 from mojito_worker.chat import chat_reply
 from mojito_worker.config import HEARTBEAT_INTERVAL_S, POLL_INTERVAL_S, load_config
@@ -68,6 +68,7 @@ def run_job(hub: Hub, job: dict) -> None:
 
 def tick(hub: Hub, auth: AuthReporter, watchdog: MaintainerWatchdog) -> bool:
     """One loop iteration. Returns True if a job was processed."""
+    research_runner.reap()
     hub.heartbeat(HEARTBEAT_INTERVAL_S)
     auth.check_gmail_if_due()
     try:
@@ -81,7 +82,10 @@ def tick(hub: Hub, auth: AuthReporter, watchdog: MaintainerWatchdog) -> bool:
     job = hub.lease()
     if job is None:
         return False
-    run_job(hub, job)
+    if job["kind"] == "research_run":
+        research_runner.launch(hub, job)
+    else:
+        run_job(hub, job)
     auth.report_claude_if_changed()
     return True
 

@@ -31,6 +31,8 @@ export type ViewName =
   | 'widget_today'
   | 'widget_note'
   | 'push_open'
+  | 'pages' // 页面列表
+  | 'page_detail'
 
 export type ActionName =
   | 'note'
@@ -55,6 +57,7 @@ export type ActionName =
   | 'feedback_decision'
   | 'push_enable' // 网页版开启推送（design.md 8.8）
   | 'push_disable'
+  | 'page_history' // 页面详情打开历史版本列表
 
 const KEY = 'mojito.usage.pending'
 const BATCH = 20

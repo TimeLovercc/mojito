@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { HubError } from '../../src/api/client'
 import type { Plan, PlanDetail, PlansList } from '../../src/api/types'
-import { Patterns } from '../../src/components/Review'
+import { Patterns, doneAfterPeriod } from '../../src/components/Review'
 import { PlanBody, periodName, periodNumber } from '../../src/components/PlanBody'
 import { Screen, StaleBanner } from '../../src/components/Screen'
 import { Card, Empty, Rows, Section, Seg, Tag } from '../../src/components/ui'
@@ -111,7 +111,10 @@ function ReviewLine({ planId }: { planId: string }) {
   return (
     <>
       <Text style={styles.reviewCount}>
-        {t('完成 {done} / {total}', { done: r.completed_item_ids.length, total: r.completed_item_ids.length + r.missed_item_ids.length })}
+        {t('完成 {done} / {total}', {
+          done: r.completed_item_ids.length + doneAfterPeriod(r, view.data.items).size,
+          total: r.completed_item_ids.length + r.missed_item_ids.length,
+        })}
       </Text>
       {r.user_note === null || r.user_note === '' ? null : (
         <Text style={styles.reviewNote} numberOfLines={2}>

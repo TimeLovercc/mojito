@@ -87,8 +87,11 @@ sudo -u mojito git clone <URL of your private repository> /opt/mojito
 ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/setup-server.sh   # user, directories, env files, bare repo, uv, Claude Code
 ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/gen-tokens.sh     # tokens.json; prints new app and worker tokens once
 ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/gen-vapid.sh      # the Web Push key
+ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/gen-pages-key.sh  # the key that signs page links (Pages)
 hub/deploy/install-secrets.sh                                         # secrets and settings into the server's env files, never printed
 hub/deploy/mac-env.sh source:cards MOJITO_CARDS_TOKEN "$MOJITO_SECRETS_DIR/cards.env"
+hub/deploy/mac-env.sh source:pages MOJITO_PAGES_TOKEN "$MOJITO_SECRETS_DIR/pages.env"          # the pages command (section 11)
+hub/deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN "$MOJITO_SECRETS_DIR/idea-lab.env"  # research sessions -> Idea Lab (section 6)
 hub/deploy/deploy.sh main "First deploy"                              # push, back up, sync, install the units, restart
 ```
 
@@ -227,6 +230,7 @@ Start from [`hub/deploy/server.env.example`](../hub/deploy/server.env.example) a
 | `MOJITO_ATTACHMENTS_DIR` | Directory for images attached to chat, notes and feedback. It must already exist and be writable by the hub. |
 | `MOJITO_VAPID_KEY_FILE` | The key from section 3.1 |
 | `MOJITO_VAPID_SUBJECT` | Contact for push services: `https://<your hub>` or `mailto:<address>` |
+| `MOJITO_PAGES_KEY_FILE` | The key that signs the 10-minute links pages open with. `hub/deploy/gen-pages-key.sh` creates it and adds this line; by hand: `python3 -c 'import secrets; print(secrets.token_hex(32))' > /var/lib/mojito/pages-link.key`, owned by the hub's user, mode 600. The hub won't start without it. |
 | `MOJITO_PUBLIC_URL` | The hub's HTTPS address, `https://<host>` with no path and no trailing slash. It's only used to build links in notifications, so you can fill it in after section 4. |
 | `MOJITO_WEB_DIR` | The `current` symlink from section 1. The hub resolves it on every request, so switching releases needs no restart. |
 | `MOJITO_TIMEZONE` | Your IANA timezone, for example `Europe/Lisbon`. Day boundaries, schedules and times in messages use it. The agent and the worker must use the same value. |
@@ -331,6 +335,8 @@ The worker runs on your computer and uses your own Claude Code login. It turns n
    | `MOJITO_ZOTERO_DB` | Path to `zotero.sqlite` (opened read-only) for the paper feed's taste signals, or `none` |
    | `MOJITO_ARXIV_CATEGORIES` | Comma-separated arXiv categories for the paper feed, for example `cs.AI,cs.HC` |
    | `MOJITO_RESEARCH_MAP` | Absolute path (no `~`) of the research map file behind the **Projects** page (below) |
+   | `MOJITO_SKILLS_DIR` | Absolute path of the folder holding the four research skills the app shows (step 6). `examples/skills` in this repository works as is. |
+   | `MOJITO_RESEARCH_RULES` | Absolute path of a Markdown rules file every Idea Lab research run reads: your global `CLAUDE.md`, or `examples/research-rules.md` |
 
    The research map is a JSON file you (or the sessions that run your projects) keep: guiding principles, areas, the idea each project started from, and where every project sits. The format is in `docs/api.md` (研究地图). The smallest valid map puts everything under a "life" area:
 
@@ -353,6 +359,11 @@ The worker runs on your computer and uses your own Claude Code login. It turns n
    This grant stays on your computer: never copy it to the server. `gmail.readonly` is a restricted scope, so an unverified app shows a warning. Email bodies are never sent to the hub; the daily mail card carries sender, subject and one line per message.
 4. **Feeds.** New instances start with three subscriptions. The daily AI brief: papers from arXiv and Hugging Face daily papers, picked with your taste notes, the cards you asked about and optionally your Zotero library, plus web news (Google News search, no account needed). The lab watch: news about a list of AI labs every 8 hours; edit the list by telling chat ("also watch Mistral"). And the daily mail digest. Turn off what you don't use in **Feed → Subscriptions**, otherwise **System** will show it failing.
 5. **Orca (optional).** Project snapshots and the maintainer watchdog use the `orca` CLI. Without Orca, **System** shows project sync as failing; everything else works.
+6. **Research: inbox, Idea Lab and skills.** The top of the **Projects** page has three panels.
+   - **Inspiration inbox**: the `inbox` list of your research map, sorted into ideas, papers, authors and blogs (add `"kind": "paper"` and so on to an entry; entries without `kind` are ideas). Two entries with the same kind, time (to the second) and source are rejected, so give each entry of one batch its own `at`.
+   - **Research skills**: the four skills in `MOJITO_SKILLS_DIR`, shown read-only with their files and recent Git commits. Point it at `examples/skills`, or copy those four folders into the skills folder your sessions read (for Claude Code `~/.claude/skills/`) and edit them there; the app shows a change within about a minute.
+   - **Idea Lab**: ideas with their sources, competing hypotheses, evidence and judgment changes. From the app you can start a bounded research run (Explore, Develop, experiment, write, review or a full cycle) with an explicit time and turn budget, or a repeating plan with a fixed number of runs. The worker runs each one as a `claude -p` process on your computer with only the tools the run allows (Bash only when you allow CPU work), never on a GPU and without sending anything out. Results stay pending until you move them into your own documents.
+   - **Research sessions write to Idea Lab too.** An ordinary Claude Code or Codex session can save a new question or an evidence update after each round with `examples/skills/research-idea-funnel/scripts/idea_lab.py` and a sync-only `source:ideas` token (`gen-tokens.sh` makes one; `hub/deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN "$MOJITO_SECRETS_DIR/idea-lab.env"` writes it). The token can read Idea Lab and sync ideas, nothing else. How the session uses it is in `examples/skills/research-idea-funnel/references/idea-lab.md`.
 
 Before restarting the worker, check that no job is mid-flight: `GET /jobs?status=running` with an app token should return an empty list. An interrupted job goes back to the queue after 30 minutes.
 
@@ -430,7 +441,7 @@ npm run build      # a local build
 
 The details, including permissions, cost and what to expect, are in [self-rebuild-loop.md](self-rebuild-loop.md).
 
-## 11. Cards from any Claude Code session
+## 11. Cards and pages from any Claude Code session
 
 `mojito-card` lets any session post a result to your feed: a finished experiment report, a relevant paper, an idea worth reading on your phone.
 
@@ -443,6 +454,17 @@ mojito-card --project none --kind report --title "Benchmark finished" \
 ```
 
 The release scripts use the same `cards.env` to post "updated" notifications. See [`sources/cards/README.md`](../sources/cards/README.md).
+
+Cards are one-off. For something you come back to and keep current (a move you're in the middle of, a project overview, a server's setup), use a **page**: a self-contained HTML page at a fixed path that any session can read and rewrite, shown under **Pages** in the Mac and web app (Android opens it in the browser). Every write keeps a version.
+
+```sh
+sources/pages/install.sh      # symlinks ~/.local/bin/pages; reads $MOJITO_SECRETS_DIR/pages.env (the source:pages token)
+pages ls                                          # what exists
+pages pull life/move move.html                    # edit move.html, then:
+pages put life/move move.html --note "Booked the movers"
+```
+
+A page needs a `<title>` and a `<meta name="description">`, and should use the hub's shared stylesheet `https://<your hub>/pages-assets/base.css` so every page matches the app's colors. See [`sources/pages/README.md`](../sources/pages/README.md) and `docs/api.md` (页面).
 
 ## 12. Running it day to day
 

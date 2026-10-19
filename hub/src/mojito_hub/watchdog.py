@@ -8,7 +8,7 @@ import logging
 import os
 from datetime import date, datetime, time, timedelta
 
-from . import db, labels
+from . import db, labels, idea_lab
 from .push import push
 
 INTERVAL_S = 60
@@ -33,7 +33,7 @@ def run_once() -> None:
         db.close_active_plans(at, expired_only=True)
         db.conn.execute(
             "UPDATE jobs SET status = 'queued', started_at = NULL"
-            " WHERE status = 'running' AND started_at < ?",
+            " WHERE status = 'running' AND kind != 'research_run' AND started_at < ?",
             (db.ts(at - JOB_TIMEOUT),),
         )
         for row in db.all_("SELECT * FROM sources WHERE alarmed = 0"):
@@ -50,6 +50,7 @@ def run_once() -> None:
             ))
     for r in alerts:
         push(r)
+    idea_lab.scheduled_tick()
     enqueue_scheduled(at)
 
 

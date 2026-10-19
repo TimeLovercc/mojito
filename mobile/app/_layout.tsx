@@ -72,6 +72,8 @@ export default function RootLayout() {
                   <Stack.Screen name="records/[id]" />
                   <Stack.Screen name="plans/[id]" />
                   <Stack.Screen name="note" />
+                  <Stack.Screen name="pages/index" />
+                  <Stack.Screen name="pages/[...path]" />
                 </Stack>
               </Shell>
             </WideProvider>

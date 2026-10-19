@@ -14,7 +14,7 @@ hub/deploy/deploy.sh main "<用户能感知的变化，没有就写：无可见�
 
 它会把这个 ref 推到 `<服务器>:/srv/mojito.git`（分支 `deploy`），先把 `hub.db` 在线备份到 `/var/lib/mojito/backups/hub-<时间>-<旧提交>.db`，再把 `/opt/mojito` 重置到该提交，给 hub 和 agent 各做一次 `uv sync --frozen`，安装 `mojito-hub.service` 和 `agent/deploy/mojito-agent.service`，然后重启两个服务。最后确认无令牌访问 `/today` 返回 401，并且 agent 15 秒内没有重启过。可以传任何已提交的 ref 或 SHA。
 
-然后在服务器上跑冒烟检查 `hub/deploy/smoke.py`（约定见 `docs/api.md` 末节"部署冒烟检查"）：用 `tokens.json` 里的真实 app 令牌对 `http://127.0.0.1:8787` 依次走一行笔记 → 对话并等服务器 agent 回复（最多 180 秒）→ `GET /today` → `GET /cards` → 确认冒烟记录不出现在默认列表里、冒烟笔记没有产生 `process_note` 任务。请求都带 `smoke=true`，这些记录不推送、不整理、不计入统计。任何一步失败就打印步骤名、状态码和 `detail`（不打印令牌），以 exit 1 结束，不发"服务器已更新"推送；全部通过才推送，输出末尾逐步列出通过的步骤。只查 systemd 不够：服务一直显示"正常运行"时，核心路径也可能每次都失败（比如每条一行笔记都 422、每条对话回复都 403），而且要等用户自己发现。
+然后在服务器上跑冒烟检查 `hub/deploy/smoke.py`（约定见 `docs/api.md` 末节"部署冒烟检查"）：用 `tokens.json` 里的真实 app 令牌对 `http://127.0.0.1:8787` 依次走一行笔记 → 对话并等服务器 agent 回复（最多 180 秒）→ `GET /today` → `GET /cards` → 确认冒烟记录不出现在默认列表里、冒烟笔记没有产生 `process_note` 任务。再用 `source:pages` 令牌写页面 `_smoke/page`（读当前版本当 `base_version`）→ 读回比对 → 取签名链接并打开，要 200、沙箱 CSP、`Cache-Control: no-store`、`<html>` 上有 `data-theme`，`/pages-assets/base.css` 200 → `GET /pages` 里没有 `_smoke/`（约定见 `docs/api.md`"页面"）→ 新写一页 `_smoke/delete-<时间>`（base 0），先取它的签名链接，再 DELETE（base 1），要求 `GET` 该页、`/versions` 和那条签名链接都 404，`GET /pages` 里没有它，再 PUT 得 409 且 message 含"已删除"（约定见 `docs/api.md`"删除页面"）。请求都带 `smoke=true`，这些记录不推送、不整理、不计入统计。任何一步失败就打印步骤名、状态码和 `detail`（不打印令牌），以 exit 1 结束，不发"服务器已更新"推送；全部通过才推送，输出末尾逐步列出通过的步骤。只查 systemd 不够：服务一直显示"正常运行"时，核心路径也可能每次都失败（比如每条一行笔记都 422、每条对话回复都 403），而且要等用户自己发现。
 
 重启会打断正在跑的任务：被打断的任务停在 `running`，看门狗 30 分钟后才会放回队列，用户的对话就要等这么久。hub 重启的那几秒里，服务器上的 agent 和 Mac worker 调 hub 都会失败，所以 `deploy.sh` 会先等到任何 runner 上都没有 `running` 任务（最多等 2 分钟），然后停掉 agent，重启 hub，再启动 agent。等超时的话照样重启，并在输出里给出 WARNING；这时要去看 `GET /jobs?status=running`。
 
@@ -51,6 +51,7 @@ curl -s -H "Authorization: Bearer $APP_TOKEN" "$MOJITO_HUB_URL/jobs?status=runni
 | `/var/lib/mojito/google-oauth.json` | Google 日历授权（你自己的桌面 OAuth 客户端，只有 calendar.events），agent 用，mojito 600。Gmail 授权永不上服务器 |
 | `/var/lib/mojito/ical-extra-urls` | 订阅日历 ICS 链接（每行一个，可为空），hub 每次拉日历都重读，mojito 600；源文件 `$MOJITO_SECRETS_DIR/ical-extra-urls` |
 | `/var/lib/mojito/fcm.json` | Firebase 服务账号，hub 用，mojito 600 |
+| `/var/lib/mojito/pages-link.key` | 页面签名链接的 HMAC 密钥（`gen-pages-key.sh`），hub 用，mojito 600；删掉重跑再重启 hub 即轮换，已发出的链接失效 |
 | `/var/lib/mojito/.local/bin/claude` | Claude Code（原生安装，mojito 用户） |
 | `/var/lib/mojito/hub.db` | SQLite |
 | `/var/lib/mojito/attachments/` | 对话图片附件（永久保留），mojito 700 |
@@ -68,6 +69,7 @@ ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/gen-tokens.sh                
 uv run hub/deploy/google-auth.py --client "$MOJITO_SECRETS_DIR/google-client.json" --scope calendar --out "$MOJITO_SECRETS_DIR/google-oauth-calendar.json"   # 日历授权（上服务器）
 uv run hub/deploy/google-auth.py --client "$MOJITO_SECRETS_DIR/google-client.json" --scope gmail --out "$MOJITO_SECRETS_DIR/google-oauth-gmail.json"      # Gmail 只读授权（只留在本机，永不上服务器）
 hub/deploy/install-secrets.sh                                          # $MOJITO_SECRETS_DIR 下的秘密、时区、联系邮箱 → 服务器 env / 文件（不打印）
+ssh "$MOJITO_SSH_HOST" 'sudo bash -s' < hub/deploy/gen-pages-key.sh               # 页面签名链接的 HMAC 密钥（不离开服务器，不打印），写 MOJITO_PAGES_KEY_FILE
 hub/deploy/deploy.sh main "首次部署"
 ssh "$MOJITO_SSH_HOST" 'sudo tailscale serve --bg 8787'                 # 或 funnel / Cloudflare Tunnel / Caddy
 ```
@@ -77,6 +79,8 @@ Google 日历授权失效（半年没用或手动撤销）：重跑 calendar 那
 Mac 上需要令牌的工具（信息流卡片、maintainer）：`hub/deploy/mac-env.sh <角色> <变量名> <文件>`，从服务器取出该角色的令牌，连同 `MOJITO_HUB_URL` 写成 600 权限的 env 文件，令牌不会打印出来：
 ```sh
 hub/deploy/mac-env.sh source:cards MOJITO_CARDS_TOKEN "$MOJITO_SECRETS_DIR/cards.env"
+hub/deploy/mac-env.sh source:pages MOJITO_PAGES_TOKEN "$MOJITO_SECRETS_DIR/pages.env"          # pages CLI（sources/pages 读这个文件）
+hub/deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN "$MOJITO_SECRETS_DIR/idea-lab.env"  # 研究会话同步 Idea Lab（examples/skills/research-idea-funnel/scripts/idea_lab.py）
 ```
 外部数据源（比如一个往 hub 报心跳的脚本）用 `source:<名字>` 角色：`ssh "$MOJITO_SSH_HOST" 'sudo bash -s source:<名字>' < hub/deploy/gen-tokens.sh`，然后重启 `mojito-hub`，新令牌才会生效。
 

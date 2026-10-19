@@ -2,6 +2,8 @@
 
 FastAPI + SQLite。接口约定见 `../docs/api.md`（唯一权威）。
 
+研究技能只读快照存入 `research_skills` 表：worker 用 `PUT /research-skills` 整份覆盖，客户端用 `GET /research-skills` 阅读，首次同步前返回 404。上传不产生通知或用量事件；字段与文件路径校验见 `models.py`。发布时先更新 hub，再更新 worker 并完成首次同步，最后发布客户端。
+
 ## 启动
 
 ```sh
@@ -30,6 +32,7 @@ uv run uvicorn mojito_hub.main:app --host 127.0.0.1 --port 8787
 | `MOJITO_TIMEZONE` | 你所在的 IANA 时区（如 `Europe/Berlin`）；按天的判断、早晚提醒、订阅时间、通知里的短时间都按它算；agent、worker、app 必须用同一个 |
 | `MOJITO_OWNER_NAME` | 公开页 `/`、`/privacy` 上写的运行者名字（一个词，不含空格） |
 | `MOJITO_CONTACT_EMAIL` | 公开页 `/`、`/privacy` 上的联系邮箱 |
+| `MOJITO_PAGES_KEY_FILE` | 页面签名链接（`/p/…`）的 HMAC 密钥文件：≥32 字节随机数的十六进制，一行（`deploy/gen-pages-key.sh` 生成）；不存在不会自动生成，直接启动失败 |
 
 服务器上的完整示例见 `deploy/server.env.example`。
 
@@ -62,6 +65,8 @@ uv run uvicorn mojito_hub.main:app --host 127.0.0.1 --port 8787
 - 网页版 `/app/`（无令牌）：文件存在原样返回；无扩展名的缺失路径回 `index.html`；有扩展名缺失或跑出目录 → 404；`_expo/static/**` 永久缓存，其余 `no-cache` + ETag；所有 `/app` 响应带 CSP 和 `Referrer-Policy: no-referrer`，只在这里 gzip；hub 所有响应带 `X-Content-Type-Options: nosniff`。
 - Web Push：`/webpush/vapid-public-key`、`/webpush/subscriptions`（登记，记 token_ref 与 UA，最多 20 条）、`/webpush/subscriptions/delete`；启动时删掉已不存在的 app 令牌的订阅。推送与 FCM 同过滤、各自独立的任务；Web Push 在单线程执行器里发（aes128gcm + VAPID，10 秒超时，不跟随重定向），404/410 删订阅。
 - 422 会写一条 warning 日志：方法、路径、出错字段位置和错误类型/说明，不记提交的字段值（hub 自己抛的 422 记 detail）。
+- 页面（api.md 页面，代码在 `page_store.py`；`pages.py` 是另一回事：OAuth 要求的公开页）：表 `page_versions` 每次写一行，页面 = 该 path 的最高版本。`PUT /pages/{path}`（worker / `source:pages`）的 `base_version` 必须等于当前版本（新页面 0），否则 409，`detail` 为 `{message, version, updated_by}`；`by` 为 null 时 `updated_by` 记令牌角色。标题、摘要、项目从 html 里取：恰好一个 `<title>`（`<svg>`/`<math>` 里的不算）、恰好一个 `<meta name="description">`（1–200 字）、至多一个 `<meta name="mojito-project">`（项目须存在）、恰好一个 `<html>` 起始标签，html ≤ 1 MiB，否则 422。path 是 1–4 段 `a-z0-9-`（`_smoke/` 开头的冒烟页只在 `GET /pages` 里隐藏），任何一段都不能叫 `versions` 或 `link`（比 api.md 的"最后一段"更严：否则 `x/versions/3` 这一页会被版本路由挡住）。`POST …/link` 给 10 分钟的 `/p/{path}?v=&theme=&exp=&sig=` 链接（HMAC-SHA256，`v=latest` 表示打开时的最新版）；`/p/` 不要令牌，签名不对或过期 403，返回的 html 在 `<html` 后面加 `data-theme`（排在页面自带属性之前），带 `Content-Security-Policy: sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox`、`Cache-Control: no-store`、`Referrer-Policy: no-referrer`。`/pages-assets/base.css`（`page_assets/base.css`）无令牌，缓存 5 分钟，带 `Access-Control-Allow-Origin: *`。`/app` 的 CSP 加了 `frame-src 'self'`，网页版才能用 iframe 显示页面。
+- 删除页面（api.md 删除页面）：软删除，表 `page_deletions(path, deleted_at, deleted_by, delete_note)` 每个被删的 path 一行，`page_versions` 一行不动。`DELETE /pages/{path}`（worker / `source:pages`）带 `{base_version, note, by}`：页面不存在或已删除 404，`base_version` 不是当前版本 409（`detail` 同 PUT），成功返回页面元数据并带 `deleted_at`、`deleted_by`（写法同 `updated_by`）、`delete_note`；这三个字段在 `GET /pages`、`GET /pages/{path}` 里总是 null，版本列表不带。删除后 `GET /pages` 不再列出（项目详情的页面列表就是 app 从这里按 `project_id` 过滤的），`GET /pages/{path}`、`/versions`、`/versions/{v}`、`POST …/link` 和已发出的 `/p/` 链接都 404；对这个 path 再 PUT，无论 `base_version` 都是 409，`detail.message` 含"已删除"，`detail.version` 是删除时的版本：删掉的 path 不再复用。
 - 今日重点 v3：`focus` = 进行中（active/waiting_you/scheduled）且 `next_at` 在本地今天的全部，另加今天之后最近的一件，每条带 `days_until`。进行中事项：`next_at` 早于本地今天 00:00 且 7 天内动过 → `overdue`；`next_at` 为空，或过期且 7 天没动 → `forgotten`（Item.forgotten 同）。
 - 数据源结果健康：`POST /sources/{name}/health`（该源令牌；worker 另可为 `feed-papers`、`sync-projects` 心跳和报健康；源须先心跳登记）；ok → warn/error 写 digest 并推送，恢复写 log；日历拉取由 hub 自己报。`maintainer` 令牌可发 `maintainer` 心跳，失联阈值 = 2 × expected。
 - 指标 `GET /metrics?from=&to=`：每天 app_open 次数、是否发了晚间提问（标题"今天推进了什么？"）、是否在次日 04:00 前回了对话或笔记。
@@ -70,3 +75,15 @@ uv run uvicorn mojito_hub.main:app --host 127.0.0.1 --port 8787
 - 数据库快照：`MOJITO_DB=<库> uv run python -m mojito_hub.snapshot <输出路径>`（只读 `MOJITO_DB`，sqlite backup API 在线生成、完整性检查、600 权限、单文件；失败非 0 退出）。
 - 公开页面（不需要令牌，不进 OpenAPI）：`/` 主页、`/privacy` 隐私说明，供 Google OAuth 发布用；运行者和联系邮箱取 `MOJITO_OWNER_NAME`、`MOJITO_CONTACT_EMAIL`。
 - 部署与运维（systemd、env、令牌、备份、iPhone 网页版的发布/令牌/VAPID/应急）见 `deploy/README.md`。
+
+## Idea Lab
+
+`idea_lab.py` 与 `idea_models.py` 提供持久种子关联、想法、研究运行和有限自动探索。`GET /idea-lab` 从既有研究地图生成稳定种子标识（类型、规范化时间、来源的 SHA-256），不改地图或删除旧种子的关联。想法写入必须带 revision；并发编辑返回 409。
+
+普通 Claude Code/Codex 会话通过示例技能里的 `examples/skills/research-idea-funnel/scripts/idea_lab.py` 同步卡片，使用本机 `$MOJITO_SECRETS_DIR/idea-lab.env` 中的 `MOJITO_HUB_URL` 和 `MOJITO_IDEA_LAB_TOKEN`（600 权限）。`deploy/gen-tokens.sh` 默认生成 `source:ideas` 令牌，用 `deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN "$MOJITO_SECRETS_DIR/idea-lab.env"` 写到本机：只允许读取 Idea Lab 和通过 `POST /idea-lab/sync` 提交想法，不授予运行、计划或其它 app 写权限。提交带持久 `operation_id`；`idea_sync_receipts` 与想法变更在同一事务保存，相同请求重试返回原回执，不同内容复用同一个编号返回 409。客户端随后读取当前卡片确认内容；并发冲突须合并，历史证据和判断记录不得静默丢弃。部署先更新 hub，再配置会话凭证；完整命令和恢复步骤见 `examples/skills/research-idea-funnel/references/idea-lab.md`。同步不会发通知或新增使用事件，Notion 正文状态单独记录。
+
+`POST /idea-lab/runs` 只接受 app 授权，必填目标、方向、模式、选中材料、wall/turn 预算与执行权限；相同幂等键同请求返回原运行，不同请求返回 409。任务复用 jobs 表的 `research_run`，runner 为 mac，同一时刻只领用一个研究任务。worker claim 后持有独立租约；结果及想法更新在一个事务中提交，失去租约或用户已修改想法时不覆盖。
+
+现有看门狗同时检查研究运行的 120 秒租约、授权 wall 时限和有限 automation。研究任务不参与旧的 30 分钟自动重排，避免执行过的实验被重复启动。automation 仅按用户明确设置的 interval/new_seed 条件、间隔、max_runs 排队，运行次数耗尽后显示 exhausted；停用只阻止未来排队，已排队或运行中的任务需单独取消。它不创建新的调度器。调度次数预算与每次 wall/turn 预算是硬限制，GPU资源与额外付费API不在此执行器授权范围。
+
+`/worker/research-runs/{id}/{claim,heartbeat,finish}` 仅 worker 可写，app 读不到租约令牌；运行取消即时落库，执行器下一轮检查杀掉自己的进程组。worker 产生的研究文本以 pending 标明尚待同步 Notion，暂存路径随 artifacts 可查，不能把它当作已发布文档。

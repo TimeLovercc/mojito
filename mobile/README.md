@@ -9,6 +9,9 @@ Expo（SDK 57）+ expo-router + reanimated + lucide-react-native，Geist 字体�
   - 对话不选项目、不分反馈；图片一个按钮（拍照 / 相册）。
 - "系统"页：顶部"一切正常 / 有 N 个问题"点开看细节（运行、数据源、授权），7 天指标、刷新全部、现在复盘、去 Orca；设置、反馈、全部动态、版本在"更多"里。
 - 时间：hub 给 UTC，app 一律按 `EXPO_PUBLIC_MOJITO_TIMEZONE`（和 hub 的 `MOJITO_TIMEZONE` 相同）显示。
+- 项目页标题旁的“灵感收件箱 N”“Idea Lab”和“研究技能”共用右侧抽屉；手机在顶部切换内容并可返回地图。收件箱不再挂在地图或手机列表底部。灵感收件箱按想法、论文、作者、博客分区，显示各类数量。电脑和手机共用紧凑卡片：点击标题展开完整内容，再次点击收起；收起不改写原文。材料由地图文件 `map.json` 同步，分类格式见 `../docs/api.md`“研究地图”，上线顺序为 hub 后客户端。
+- “研究技能”通过 `GET /research-skills` 读取技能文件的快照，列出 Research Ideas、Research Experiments、Research Review、Paper Writing 四个入口，点开阅读完整正文、元数据及参考文件，可切换原文。显示源文件路径（可复制）、修改时间与折叠的 Git 最近改动；无编辑或执行操作。相对链接仅打开快照中的参考文件，HTTPS 链接沿用系统打开方式。未同步/加载失败可重试。上线顺序：hub → worker 首次同步 → 客户端。
+- 每个 GET 的上次结果缓存在本机，拿不到新数据时显示缓存并标注"数据来自 <时间>"。
 
 ## 配置
 
@@ -22,7 +25,6 @@ Expo（SDK 57）+ expo-router + reanimated + lucide-react-native，Geist 字体�
 | `MOJITO_SIGNING_PROPERTIES` | 打 APK | release 签名配置 `signing.properties`（仓库外） |
 | `MOJITO_APK_DIR` | 打 APK、空中更新 | APK 和它的 runtime 指纹放在哪（仓库外） |
 | `MOJITO_SECRETS_DIR` | 打 APK、空中更新 | 放 `cards.env` 的目录，用来推送"新安装包 / app 已更新" |
-- 每个 GET 的上次结果缓存在本机，拿不到新数据时显示缓存并标注"数据来自 <时间>"。
 
 ## 开发
 
@@ -139,3 +141,11 @@ npm run update -- --message "<一句话>" --notes "改了什么1;改了什么2"
 - 要求 `mobile/.env` 里 `MOJITO_OTA=eas`。发布前比对指纹（`npm run fingerprint`）和 `$MOJITO_APK_DIR/mojito-release.runtime`，不同就拒绝：原生部分变了只能打新 APK。
 - 发布成功后推送一条"app 已更新"通知（`scripts/notify.mjs`，令牌取 `$MOJITO_SECRETS_DIR/cards.env`）。`--message`、`--notes` 缺一个就报错。
 - 注意：`eas update` 导出时会清空 `dist/`，所以 APK 不放那里；`mobile/.gitignore` 也算进指纹，改它会让指纹变。
+
+## Idea Lab
+
+项目页的顶部入口为灵感收件箱、Idea Lab 和研究技能。收件箱保留原材料，展开后可写收集原因、查看关联问题或开始探索。Idea Lab 默认显示短卡片；详情展开来源、假设、证据、判断变化及实际产物。研究正文是否已同步到你的研究文档（例如 Notion）单独显示。
+
+“开始研究”要求明确方向、目标、时间和调用轮数；可选 Explore、Develop、实验、写作、核查或完整循环。持续探索还需要总轮数与间隔，在授权范围内延续本计划产生的想法。停用计划阻止后续调度；已开始的任务在运行记录里单独取消。预算字段不得以界面预填值代替授权。
+
+接口见 `../docs/api.md` 的 Idea Lab，真实执行说明见 `../worker/README.md`。开发预览的 mock 不执行研究；端到端验收使用独立数据库的 Hub 和明确的有限任务。技能列表展示四个入口，引用可跳转到同一快照中的依赖技能；查看原文始终显示完整源文件。

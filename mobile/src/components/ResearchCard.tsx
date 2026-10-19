@@ -2,7 +2,7 @@ import { Children, useState, type ReactNode } from 'react'
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import type { ChatLink, Project } from '../api/types'
+import type { ChatLink, PagesList, Project } from '../api/types'
 import { t } from '../i18n'
 import { openPath } from '../overview'
 import { RUN, STAGE, STAGES, cardText, chatHref, end, runOf, type RunShown } from '../research'
@@ -11,10 +11,12 @@ import { colors, desktop, font, isDark, overlay, size, txAlpha } from '../theme'
 import { when } from '../time'
 import { useErrorToast, useToast } from '../toast'
 import { useHover } from '../hover'
+import { useHub } from '../use-hub'
+import { PageRow } from './PageRow'
 import { Markdown } from './RichText'
 
 // 研究卡片（design.md 8.13，照研究地图演示页）：Mac 抽屉和手机全屏页共用。顶上位置、名字、三个按钮（复制全部 / Claude / ChatGPT）；
-// 研究项目依次是进展（运行状态 + 五步）、最新状态（核心想法、主实验、贡献、状态、论文、评论，待你决定折在评论下）、项目发展、状态历史；
+// 有相关页面（docs/api.md「页面」，project_id 是这个项目）时紧接在按钮下面；研究项目依次是进展（运行状态 + 五步）、最新状态（核心想法、主实验、贡献、状态、论文、评论，待你决定折在评论下）、项目发展、状态历史；
 // 生活项目只有状态
 export function ResearchCard({
   project: p,
@@ -37,6 +39,7 @@ export function ResearchCard({
         {p.repo_path === null ? null : <Text style={styles.path}>{p.repo_path}</Text>}
         <Buttons project={p} place={place} life={life} chats={chats} />
       </View>
+      <RelatedPages projectId={p.id} />
       {life ? (
         <Rows>
           <Row label={t('状态')}>{o === null || o.status === null ? <None /> : <Para text={end(o.status)} />}</Row>
@@ -115,6 +118,26 @@ export function ResearchCard({
         </>
       )}
     </View>
+  )
+}
+
+// 相关页面：点开同页面列表（网页进页面显示页，安卓开系统浏览器）；没有就不占地方
+function RelatedPages({ projectId }: { projectId: string }) {
+  const pages = useHub<PagesList>('/pages')
+  if (pages.data === null) return null
+  const mine = pages.data.pages.filter((x) => x.project_id === projectId)
+  if (mine.length === 0) return null
+  return (
+    <>
+      <SecHead title={t('相关页面')} sub={null} />
+      <View style={styles.pages}>
+        {mine.map((x, i) => (
+          <View key={x.path} style={i === 0 ? null : styles.rowLine}>
+            <PageRow page={x} />
+          </View>
+        ))}
+      </View>
+    </>
   )
 }
 
@@ -293,6 +316,7 @@ const styles = StyleSheet.create({
   // 电脑上标签在左列；手机窄，标签在正文上面
   row: desktop ? { flexDirection: 'row', gap: 12, paddingVertical: 10 } : { gap: 4, paddingVertical: 10 },
   rowLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: overlay.rowLine },
+  pages: { borderRadius: 12, backgroundColor: colors.card, paddingVertical: 2, overflow: 'hidden' },
   label: { ...font.regular, width: desktop ? 72 : undefined, fontSize: size.small, lineHeight: 20, color: colors.tx3 },
   cell: { flex: 1, minWidth: 0, gap: 6 },
   para: { ...font.regular, fontSize: size.body, lineHeight: Math.round(size.body * 1.6), color: colors.tx },

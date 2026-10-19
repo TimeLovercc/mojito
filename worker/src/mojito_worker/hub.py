@@ -137,6 +137,9 @@ class Hub:
     def put_research_map(self, research_map: dict) -> dict:
         return self._request("PUT", "/research-map", json=research_map).json()
 
+    def put_research_skills(self, research_skills: dict) -> dict:
+        return self._request("PUT", "/research-skills", json=research_skills).json()
+
     def put_project_summary(self, project_id: str, summary: str, evidence: str) -> dict:
         return self._request("PUT", f"/projects/{project_id}/summary",
                              json={"summary": summary, "summary_evidence": evidence}).json()

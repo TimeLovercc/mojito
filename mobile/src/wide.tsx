@@ -65,15 +65,22 @@ export function useToggleChat(): () => void {
   }
 }
 
-// 窗口内快捷键（只在网页 / Mac app）：⌘N 笔记（聚焦输入框），⌘J 开关对话页
+// 窗口内快捷键（只在网页 / Mac app）：⌘N 笔记（聚焦输入框），⌘J 开关对话页，
+// ⌘F / Ctrl+F 页面列表（聚焦搜索框；Mac app 的 WKWebView 没有页内查找，用户定）
 export function useShortcuts() {
   const router = useRouter()
   const toggleChat = useToggleChat()
   useEffect(() => {
     if (Platform.OS !== 'web') return
     const onKey = (e: KeyboardEvent) => {
-      if (!e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) return
+      if (e.shiftKey || e.altKey) return
       const k = e.key.toLowerCase()
+      if (k === 'f' && e.metaKey !== e.ctrlKey) {
+        e.preventDefault()
+        router.navigate({ pathname: '/pages', params: { focus: String(Date.now()) } })
+        return
+      }
+      if (!e.metaKey || e.ctrlKey) return
       if (k === 'n') {
         e.preventDefault()
         router.navigate({ pathname: '/notes', params: { focus: String(Date.now()) } })
@@ -82,7 +89,7 @@ export function useShortcuts() {
         toggleChat()
       }
     }
-    // 捕获阶段监听：react-native-web 的输入框会 stopPropagation，焦点在输入框里时 ⌘J / ⌘N 也要生效
+    // 捕获阶段监听：react-native-web 的输入框会 stopPropagation，焦点在输入框里时 ⌘J / ⌘N / ⌘F 也要生效
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [router, toggleChat])

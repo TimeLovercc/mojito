@@ -488,6 +488,8 @@ const USAGE_VIEWS = [
   'widget_today',
   'widget_note',
   'push_open',
+  'pages',
+  'page_detail',
 ]
 const USAGE_ACTIONS = [
   'note',
@@ -512,6 +514,7 @@ const USAGE_ACTIONS = [
   'feedback_decision',
   'push_enable',
   'push_disable',
+  'page_history',
 ]
 
 // 网页推送（docs/api.md "Web Push 接口"）：假服务器只存订阅、不真发。公钥是启动时现生成的 P-256，格式和 hub 一样
@@ -1260,7 +1263,175 @@ const routes = [
       return { events: mockEvents().filter((e) => tzYmd(new Date(e.start)) >= from && tzYmd(new Date(e.start)) <= to) }
     },
   ],
+  // 研究技能（api.md"研究技能"）：extra.json 的 research_skills，由 demo_data.py 从 examples/skills 生成
+  ['GET', /^\/research-skills$/, () => researchSkills],
+  // Idea Lab（api.md"Idea Lab"）：extra.json 的 idea_lab。假服务器不做研究："开始研究"只排队，几秒后写一句演示说明
+  ['GET', /^\/idea-lab$/, () => lab],
+  ['GET', /^\/idea-lab\/ideas\/([^/]+)$/, (m) => labFind('ideas', m[1])],
+  [
+    'PUT',
+    /^\/idea-lab\/seeds\/([^/]+)$/,
+    (m, q, body) => {
+      const seed = labFind('seeds', m[1])
+      seed.reason = require(body, 'reason')
+      return seed
+    },
+  ],
+  ['POST', /^\/idea-lab\/runs$/, (m, q, body) => labRun(body)],
+  ['GET', /^\/idea-lab\/runs\/([^/]+)$/, (m) => labFind('runs', m[1])],
+  [
+    'POST',
+    /^\/idea-lab\/runs\/([^/]+)\/cancel$/,
+    (m) => {
+      const run = labFind('runs', m[1])
+      if (run.status === 'queued' || run.status === 'running') {
+        Object.assign(run, { status: 'cancelled', finished_at: now(), summary: say('你取消了这一轮。', 'You cancelled this round.') })
+      }
+      return run
+    },
+  ],
+  [
+    'POST',
+    /^\/idea-lab\/automations$/,
+    (m, q, body) => {
+      const key = require(body, 'idempotency_key')
+      const old = lab.automations.find((a) => a.idempotency_key === key)
+      if (old !== undefined) return old
+      const enabled = require(body, 'enabled')
+      const next = new Date(Date.now() + require(body, 'interval_minutes') * 60000).toISOString()
+      const present = lab.seeds.filter((s) => s.present).map((s) => s.id)
+      const auto = { ...body, id: newId('auto'), runs_started: 0, next_at: next, last_seed_ids: present, state: enabled ? 'active' : 'disabled' }
+      lab.automations.unshift(auto)
+      return auto
+    },
+  ],
+  [
+    'PUT',
+    /^\/idea-lab\/automations\/([^/]+)$/,
+    (m, q, body) => {
+      const auto = labFind('automations', m[1])
+      const enabled = require(body, 'enabled')
+      if (enabled && auto.runs_started >= auto.max_runs) throw new HttpError(409, 'automation has exhausted its authorized run count')
+      Object.assign(auto, { enabled, state: enabled ? 'active' : 'disabled' })
+      return auto
+    },
+  ],
+  // 页面（docs/api.md「页面」）：只读，演示数据见 pageVersions；/versions、/link 后缀要排在整页之前
+  ['GET', /^\/pages$/, () => ({ pages: [...pageVersions.keys()].sort().map((path) => pageMeta(pageVersions.get(path)[0])) })],
+  ['GET', /^\/pages\/(.+)\/versions$/, (m) => ({ versions: pageOf(m[1]).map((v) => ({ ...pageMeta(v), note: v.note })) })],
+  [
+    'POST',
+    /^\/pages\/(.+)\/link$/,
+    (m, q, body) => {
+      const theme = require(body, 'theme')
+      const version = require(body, 'version')
+      if (theme !== 'dark' && theme !== 'light') throw new HttpError(422, `theme 要是 dark 或 light，现在是 ${theme}`)
+      const versions = pageOf(m[1])
+      const v = version === null ? versions[0].version : version
+      if (!versions.some((x) => x.version === v)) throw new HttpError(404, `${m[1]} 没有第 ${v} 版`)
+      return { url: `http://localhost:${PORT}/p/${m[1]}?v=${v}&theme=${theme}&exp=${Date.now() + 600000}` }
+    },
+  ],
+  ['GET', /^\/pages\/(.+)$/, (m) => pageOf(m[1])[0]],
 ]
+
+// 页面演示数据（api.md 页面）：extra.json 的 pages（demo_data.py 生成），path → 版本列表（新到旧），时间跟着演示日平移。
+// 假服务器不验签，/p/ 只看过期时间
+const pageVersions = new Map(
+  extra.pages.map((p) => [p.path, p.versions.map((v) => ({ ...v, path: p.path, updated_at: toUtc(v.updated_at) })).reverse()]),
+)
+
+// 研究技能快照和 Idea Lab 的演示状态（extra.json），时间跟着演示日平移；Idea Lab 只在内存里改
+const researchSkills = {
+  ...extra.research_skills,
+  updated_at: toUtc(extra.research_skills.updated_at),
+  skills: extra.research_skills.skills.map((s) => ({ ...s, updated_at: toUtc(s.updated_at), changes: s.changes.map((c) => ({ ...c, at: toUtc(c.at) })) })),
+}
+const shiftIdea = (i) => ({
+  ...i,
+  created_at: toUtc(i.created_at),
+  updated_at: toUtc(i.updated_at),
+  evidence: i.evidence.map((e) => ({ ...e, at: toUtc(e.at) })),
+  changes: i.changes.map((c) => ({ ...c, at: toUtc(c.at) })),
+})
+const lab = {
+  seeds: extra.idea_lab.seeds.map((s) => ({ ...s, at: toUtc(s.at), snapshot: { ...s.snapshot, at: toUtc(s.snapshot.at) }, last_explored_at: toUtc(s.last_explored_at) })),
+  ideas: extra.idea_lab.ideas.map(shiftIdea),
+  runs: extra.idea_lab.runs.map((r) => ({ ...r, created_at: toUtc(r.created_at), started_at: toUtc(r.started_at), finished_at: toUtc(r.finished_at) })),
+  automations: extra.idea_lab.automations.map((a) => ({ ...a, next_at: toUtc(a.next_at) })),
+}
+
+function labFind(kind, id) {
+  const found = lab[kind].find((x) => x.id === id)
+  if (found === undefined) throw new HttpError(404, `${kind} ${id} does not exist`)
+  return found
+}
+
+// 假服务器不做研究：新的一轮 3 秒后开始，8 秒后停在"待补条件"，写明真实实例里由谁来做
+function labRun(body) {
+  const key = require(body, 'idempotency_key')
+  const old = lab.runs.find((r) => r.idempotency_key === key)
+  if (old !== undefined) return old
+  for (const id of require(body, 'seed_ids')) labFind('seeds', id)
+  const ideaIds = require(body, 'idea_ids')
+  const revisions = Object.fromEntries(ideaIds.map((id) => [id, labFind('ideas', id).revision]))
+  const run = {
+    ...body,
+    id: newId('run'),
+    job_id: newId('j'),
+    status: 'queued',
+    created_at: now(),
+    started_at: null,
+    finished_at: null,
+    error: null,
+    summary: '',
+    idea_revisions: revisions,
+    output_idea_ids: [],
+    artifacts: [],
+    lease_token: null,
+    lease_until: null,
+    automation_id: null,
+  }
+  lab.runs.unshift(run)
+  setTimeout(() => {
+    if (run.status === 'queued') Object.assign(run, { status: 'running', started_at: now() })
+  }, 3000)
+  setTimeout(() => {
+    if (run.status !== 'running') return
+    const summary = say(
+      '（演示）这一轮没有真的研究：真实实例里，你电脑上的 worker 会在预算内用 claude -p 执行，把新证据和判断变化写回所选的想法。',
+      '(demo) No research ran: in a real instance the worker on your computer runs this round with claude -p inside the budget and writes new evidence and judgment changes back to the selected ideas.',
+    )
+    Object.assign(run, { status: 'needs_input', finished_at: now(), summary })
+  }, 8000)
+  return run
+}
+
+function pageOf(path) {
+  const versions = pageVersions.get(path)
+  if (versions === undefined) throw new HttpError(404, `页面 ${path} 不存在`)
+  return versions
+}
+
+function pageMeta(v) {
+  return { path: v.path, title: v.title, summary: v.summary, project_id: v.project_id, version: v.version, updated_at: v.updated_at, updated_by: v.updated_by }
+}
+
+// GET /p/...：签名链接（假服务器不验签，过期给 403），html 上加 data-theme，CSP sandbox 同 hub
+function servePage(url, res) {
+  const path = url.pathname.slice('/p/'.length)
+  if (Number(url.searchParams.get('exp')) < Date.now()) {
+    res.writeHead(403)
+    return res.end()
+  }
+  const v = pageOf(path).find((x) => x.version === Number(url.searchParams.get('v')))
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Content-Security-Policy': 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox',
+    'Cache-Control': 'no-store',
+  })
+  res.end(v.html.replace('<html', `<html data-theme="${url.searchParams.get('theme')}"`))
+}
 
 function send(res, status, payload) {
   res.writeHead(status, {
@@ -1360,6 +1531,7 @@ createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204)
   const url = new URL(req.url, `http://${req.headers.host}`)
   if (req.method === 'GET' && (url.pathname === '/app' || url.pathname.startsWith('/app/'))) return serveWeb(url, res)
+  if (req.method === 'GET' && url.pathname.startsWith('/p/')) return servePage(url, res)
   try {
     const auth = req.headers.authorization
     if (auth !== `Bearer ${TOKEN}`) {

@@ -638,14 +638,15 @@ def chat_reply(hub: Hub, config: Config, job: dict) -> None:
         if result["calendar_actions"] and not mentions(language, "calendar_down_marker", reply):
             reply = f"{reply}\n{t(language, 'calendar_down_note')}"
         result["calendar_actions"] = []
-    _validate_chat(result, {g["id"] for g in goals}, {p["id"] for p in projects}, {e["event_id"] for e in mojito_events},
+    # Goals created in this reply count as existing for its items, plans and projects (applied before them below).
+    goals_by_id = {g["id"]: g for g in goals}
+    goal_ids = edits.validate_goal_updates(result["goal_updates"], goals_by_id)
+    _validate_chat(result, goal_ids, {p["id"] for p in projects}, {e["event_id"] for e in mojito_events},
                    {e["uid"] for e in calendar_events})
     edits.validate_item_updates(result["item_updates"], items_by_id, {p["id"] for p in projects})
-    edits.validate_plan_changes(result["plan_changes"], plan, set(items_by_id), {g["id"] for g in goals})
-    goals_by_id = {g["id"]: g for g in goals}
-    edits.validate_goal_updates(result["goal_updates"], goals_by_id)
-    edits.validate_plan_updates(result["plan_updates"], editable_plans, set(items_by_id), set(goals_by_id))
-    edits.validate_project_updates(result["project_updates"], all_projects, set(goals_by_id))
+    edits.validate_plan_changes(result["plan_changes"], plan, set(items_by_id), goal_ids)
+    edits.validate_plan_updates(result["plan_updates"], editable_plans, set(items_by_id), goal_ids)
+    edits.validate_project_updates(result["project_updates"], all_projects, goal_ids)
     edits.validate_settings_update(result["settings_update"])
     edits.validate_card_actions(result["card_actions"], card_ids)
     edits.validate_note_links(result["note_links"], {n["id"] for n in notes}, set(items_by_id), set(all_projects))

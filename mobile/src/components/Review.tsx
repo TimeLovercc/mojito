@@ -16,12 +16,21 @@ function titleOf(items: Item[], id: string): string {
   return item === undefined ? id : item.title
 }
 
-// 一期的复盘：完成 / 没完成（脚本按事项状态算）、规律、总结；草稿时写"你的话"后完成复盘
+// 完成 / 没完成是起草复盘时按事项状态算好存下的；没完成里事项现在已是 done 的，显示时算作完成（期后标完成）
+export function doneAfterPeriod(review: Review, items: Item[]): Set<string> {
+  return new Set(review.missed_item_ids.filter((id) => items.find((i) => i.id === id)?.status === 'done'))
+}
+
+// 一期的复盘：完成 / 没完成（脚本按事项状态算，期后标完成的算完成）、规律、总结；草稿时写"你的话"后完成复盘
 export function ReviewCard({ review, items }: { review: Review; items: Item[] }) {
+  const later = doneAfterPeriod(review, items)
   return (
     <Section
       title={review.status === 'draft' ? t('复盘草稿') : t('复盘')}
-      right={t('完成 {done} / {total}', { done: review.completed_item_ids.length, total: review.completed_item_ids.length + review.missed_item_ids.length })}
+      right={t('完成 {done} / {total}', {
+        done: review.completed_item_ids.length + later.size,
+        total: review.completed_item_ids.length + review.missed_item_ids.length,
+      })}
     >
       <Card style={styles.card}>
         {review.completed_item_ids.map((id) => (
@@ -30,12 +39,21 @@ export function ReviewCard({ review, items }: { review: Review; items: Item[] })
             <Text style={styles.done}>{titleOf(items, id)}</Text>
           </View>
         ))}
-        {review.missed_item_ids.map((id) => (
-          <View key={id} style={styles.line}>
-            <Text style={styles.dot}>·</Text>
-            <Text style={styles.missed}>{t('{title}（没完成）', { title: titleOf(items, id) })}</Text>
-          </View>
-        ))}
+        {review.missed_item_ids.map((id) =>
+          later.has(id) ? (
+            <View key={id} style={styles.line}>
+              <Check size={14} color={colors.ok} />
+              <Text style={styles.done}>
+                {titleOf(items, id)} <Text style={styles.later}>{t('期后标完成')}</Text>
+              </Text>
+            </View>
+          ) : (
+            <View key={id} style={styles.line}>
+              <Text style={styles.dot}>·</Text>
+              <Text style={styles.missed}>{t('{title}（没完成）', { title: titleOf(items, id) })}</Text>
+            </View>
+          ),
+        )}
         <Text style={styles.summary}>{review.summary}</Text>
         {review.patterns.length === 0 ? null : <Patterns patterns={review.patterns} />}
         {review.status === 'done' ? (
@@ -114,6 +132,7 @@ const styles = StyleSheet.create({
   card: { paddingVertical: 11, paddingHorizontal: 13, gap: 7 },
   line: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   done: { ...font.regular, fontSize: size.secondary, color: colors.tx, flex: 1 },
+  later: { ...font.regular, fontSize: size.small, color: colors.tx2 },
   dot: { ...font.regular, width: 14, textAlign: 'center', color: colors.tx2 },
   missed: { ...font.regular, fontSize: size.secondary, color: colors.tx2, flex: 1 },
   summary: {

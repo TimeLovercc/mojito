@@ -626,9 +626,582 @@
         "source": "note",
         "area": "apps-baking",
         "note": null
+      },
+      {
+        "kind": "idea",
+        "at": "2026-09-25T22:10:00+00:00",
+        "text": "Proofing from one photo: can a small on-device vision model spot an underproofed crumb?",
+        "source": "note",
+        "area": "apps-baking",
+        "note": "Most failed loaves were underproofed"
+      },
+      {
+        "kind": "paper",
+        "at": "2026-09-24T21:30:00+00:00",
+        "text": "SmolVLM (2025): the 256M model runs inference in under 1 GB of GPU memory, the largest is 2.2B; a ready starting point for vision on a phone",
+        "source": "https://arxiv.org/abs/2504.05299",
+        "area": "apps-baking",
+        "note": null
+      },
+      {
+        "kind": "paper",
+        "at": "2026-09-23T21:15:00+00:00",
+        "text": "LoRA (2021): fine-tune by training only low-rank adapters; a few hundred of my own photos might be enough",
+        "source": "https://arxiv.org/abs/2106.09685",
+        "area": null,
+        "note": null
+      },
+      {
+        "kind": "author",
+        "at": "2026-09-24T21:35:00+00:00",
+        "text": "Hugging Face's SmolLM team: keeps releasing small models that run on phones, with the training details",
+        "source": "https://huggingface.co/HuggingFaceTB",
+        "area": null,
+        "note": null
+      },
+      {
+        "kind": "blog",
+        "at": "2026-09-21T22:40:00+00:00",
+        "text": "The Bitter Lesson (Rich Sutton, 2019): in the long run, general methods that use computation beat built-in human knowledge",
+        "source": "http://www.incompleteideas.net/IncIdeas/BitterLesson.html",
+        "area": null,
+        "note": "A reminder not to hand-write rules about crumb holes"
       }
     ]
   },
+  "research_skills": {
+    "updated_at": "2026-09-27T23:00:00+00:00",
+    "skills": [
+      {
+        "id": "research-idea-funnel",
+        "title": "Research Ideas",
+        "summary": "Explore new questions, or develop an existing idea through sources and evidence.",
+        "source_path": "/opt/mojito/examples/skills/research-idea-funnel/SKILL.md",
+        "updated_at": "2026-09-26T21:40:00+00:00",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "content": "---\nname: research-idea-funnel\ndescription: Explore new research questions from outside observations and the directions you care about, or develop an existing idea through evidence and small diagnostics. Use for research ideation and idea development; pick Explore or Develop first.\n---\n\n# Research Ideas\n\nFind questions worth answering, then look for the evidence that would change your mind about them. Your own taste decides what is important; outside observations (papers, released results, failures people report) supply the pressure; principles help you build and test explanations. A principle is itself a hypothesis, not a filter that every observation must be forced through.\n\nThis is a generic example skill shipped with Mojito. Copy it into your own skills folder and rewrite it to match how you work.\n\n## Recover the direction and choose a mode\n\nRead the current directions, the principles on your research map, existing ideas in Idea Lab and the project records involved. Write down the capability or understanding you want, who needs it, what an answer would change, what is out of scope and what budget (time, compute, money) is authorized.\n\n- **Explore** when the task is to find new questions or survey a direction. Rough questions are fine; do not demand a full novelty check or an experiment plan yet.\n- **Develop** when an idea already exists and the task is to understand, sharpen or test it. Development can send you back to exploring.\n\nInbox items (ideas, papers, authors, blogs) are seeds. Keep the source and the reason it was collected. Before opening a new idea, check whether the seed supports, contradicts or extends an existing one. Keep three things apart: what others found, what you suspect, and what you have verified yourself.\n\n## Explore: questions from observations\n\n1. **Start from the direction.** State the capability you are after and why it matters, and keep it in view while you look at narrow examples.\n2. **Bring in outside evidence.** Public evaluations and checkpoints, reproducible failures, workarounds practitioners use, results that disagree with each other, open questions in recent papers. A cheap re-analysis of public data can generate a question, not only check one. Note which sources you covered.\n3. **Ask before you rank solutions.** What does the observation leave unexplained? Which variables did an existing design tie together? What would a different explanation predict? A workaround is a clue, not proof that a problem is unsolved: check how often it bites and whether ordinary practice already handles it.\n4. **Write short sketches.** Observation and source, the question, why the answer matters, plausible explanations, the next useful piece of evidence. Unknowns stay marked as unknown. Never claim originality from incomplete reading.\n\nEnd the round by naming which questions deserve development and why. If nothing new turned up, say so; do not invent a discovery to fill a card.\n\n## Develop: build a credible contribution\n\n1. **Read the nearest work closely.** Compare the actual problem, setting, method, evidence and claimed contribution. Similar work is a reason to sharpen the idea; a novelty claim fails only when problem, method and contribution all coincide. Cite the exact overlap.\n2. **Separate the claim from its explanations.** State the hypothesis and its rivals. A mechanism finding, a better measurement, a design rule and a new method are different contributions; evidence for one does not establish the others.\n3. **Pick the next discriminating observation.** Check existing public or project evidence before an expensive run. Validate the measurement, the baseline and the budget, look for shortcuts, then locate the layer where the effect lives. Missing evidence calls for a diagnostic, not an invented explanation.\n4. **Run inside the authorized scope** with [Research Experiments](../research-experiments/SKILL.md). Small runs screen claims; claims about scale or transfer need matching evidence. Keep supported, refuted and inconclusive results apart. A clean negative answer completes the experiment.\n5. **Review and update** with [Research Review](../research-review/SKILL.md) before a novelty claim or a result goes into a paper. Report what new evidence arrived and which judgment it changed.\n\nJudge importance, novelty, trust in the measurement and feasibility separately. Scores, if anyone wants them, summarize evidence; they are not gates. Starting a formal project, spending beyond the budget or stopping a whole project is your call, not the session's.\n\n## Records\n\nUse the [idea card template](templates/idea-card.md) for a sketch that is growing into an idea. Idea Lab holds the evolving question, its evidence and the next step; the full write-up stays in your own documents, papers in your reference manager, experiment state in the project's repository. Every cited paper needs a verified locator (arXiv or DOI).\n\n## Close the loop: sync to Idea Lab\n\nAfter each research round, and before a handoff or a final answer, save a new sourced question or a real evidence update to Idea Lab with the [sync tool](references/idea-lab.md) (`scripts/idea_lab.py`). Reuse the returned idea id across sessions, link actual seed ids when they apply, and keep earlier evidence and judgment changes intact: add corrections instead of deleting history. A judgment change must quote the real earlier judgment; if it was only this round's working hypothesis, say so. The tool reports success only after reading the write back.\n\nIdea Lab storage and your document sync are separate: mark the document as synced only after a real write and readback. Missing credentials or a blocked write do not stop the research, but stay visible as pending work. An Idea Lab run started from the app already writes its own structured result; do not start a second writer from inside it.\n\nWhen the argument is concrete enough for an outline, continue with [Paper Writing](../paper-writing/SKILL.md); results that have not been run stay visible placeholders.\n"
+          },
+          {
+            "path": "references/idea-lab.md",
+            "content": "# Idea Lab synchronization\n\nUse this adapter when an ordinary Claude Code or Codex research session should save an idea into mojito Idea Lab (docs/api.md, Idea Lab → 普通研究会话同步). It only reads the lab and creates/updates ideas through the dedicated synchronization endpoint. It does not start research runs, create automations, authorize experiments, write Notion, or change project status. Research judgment stays with the session; the adapter never invents missing content.\n\n## Credentials and invocation\n\nBoth agents run the same standard-library CLI from any working directory:\n\n```sh\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" list\n```\n\n`$MOJITO_SKILLS_DIR` stands for the folder holding this skill (the worker's `MOJITO_SKILLS_DIR`); use its absolute path. The credential file is `$MOJITO_SECRETS_DIR/idea-lab.env` (the same secrets folder as `cards.env`; `hub/deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN \"$MOJITO_SECRETS_DIR/idea-lab.env\"` writes it). It must be a regular file owned by the current user, mode `600`, containing exactly these two assignments:\n\n- `MOJITO_HUB_URL`: hub HTTPS origin without path, query, fragment or embedded credentials.\n- `MOJITO_IDEA_LAB_TOKEN`: the dedicated Idea Lab token, not a worker/app token.\n\nDo not print or copy credentials into a bundle, research output, transcript, or repository. The CLI reads no other token source. A missing credential file is a provisioning issue, not permission to borrow a broader token. HTTP redirects are refused; HTTP is allowed only on loopback for isolated local validation. `--config /absolute/path/idea-lab.env` before the subcommand explicitly selects another dedicated configuration for such validation, with the same permission checks.\n\n## Content and a stable local bundle\n\nUse one stable bundle per idea in the existing project's idea/output location, and reuse it across session restarts. The bundle records endpoint origin, last verified server ID/revision/content, local content, pending request, receipt, remote conflict copy, and past operations. It contains no authentication token. A sibling `.lock` prevents concurrent processes from changing that bundle; an atomic write and filesystem flush persist the request before it is sent. Keep both the bundle and any source input under the project's normal persistence policy. Do not manually edit bundle internals or duplicate a pending bundle to submit another creation.\n\nThe input JSON must contain every `IdeaInput` field; unknown and missing fields fail:\n\n| Field | Required content |\n|---|---|\n| `title`, `question`, `importance`, `next_step` | Strings grounded in this research; title 1–200 characters and question nonempty |\n| `status` | `developing`, `ready`, `experimenting`, `supported`, `contradicted`, or `archived` |\n| `seed_ids`, `hypotheses` | Lists of strings; seed IDs must come from `list`, never invented |\n| `evidence` | List of `{id, claim, source, kind, at}`; kind is `observation`, `literature`, `experiment`, or `review`; unique IDs and timezone-bearing ISO timestamps |\n| `changes` | List of `{at, before, after, reason}`; use an actual prior judgment, never manufacture one; timestamps carry timezone |\n| `artifacts` | List of `{kind, title, url}`; kind is `source`, `experiment`, `paper`, `review`, or `notion` |\n| `notion_url` | Actual URL or explicit `null` |\n| `notion_sync` | `pending` or `synced`; `synced` requires a separately verified Notion HTTPS URL |\n\nTake each `at` from a clock read in the same command that writes the input, never from an estimate; a wrong time cannot be edited later because evidence is append-only. Empty lists mean the session established there are no entries to record, not placeholders to fill the schema. Unknown research conclusions remain labeled unknown in the relevant prose. An Idea Lab sync receipt proves only Idea Lab storage; it does not prove Notion synchronization. Existing evidence is append-only by ID: preserve earlier entries exactly. Existing judgment changes retain their contents and relative order. Add corrections or subsequent evidence instead of deleting inconvenient history.\n\n## Create and verify\n\nUse absolute input and bundle paths. These commands illustrate an already authorized project's chosen paths; substitute its actual directory rather than creating another generic store:\n\n```sh\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" new /absolute/project/ideas/question.bundle.json --input /absolute/project/ideas/question.input.json\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" push /absolute/project/ideas/question.bundle.json\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" status /absolute/project/ideas/question.bundle.json\n```\n\n`new` only validates and saves local content. `push` saves a UUID operation and complete request before any network access, looks for its receipt, then sends `POST /idea-lab/sync` only if the receipt is absent. A receipt is saved before the verification GET. Only when the current server idea matches every content field and the acknowledged revision does the CLI report `synced` (exit 0). Timezone representations of the same instant compare equal; text, lists, and all other fields must match. Do not report successful synchronization from a POST acknowledgement alone.\n\n## Develop an existing idea\n\n```sh\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" get IDEA_ID\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" pull /absolute/project/ideas/question.bundle.json --id IDEA_ID\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" push /absolute/project/ideas/question.bundle.json --input /absolute/project/ideas/question.updated.json\n```\n\n`pull` creates a new local bundle from the current idea, including its revision, and refuses to replace an existing bundle. If the project already has a bundle, use it. Supply a complete revised `IdeaInput`, preserving prior evidence and judgment history. A changed payload after a verified sync creates a new operation with the last verified revision; concurrent server changes therefore produce a conflict rather than an overwrite. A repeated unchanged push reuses the same operation.\n\n## Interrupted or uncertain requests\n\n```sh\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" retry /absolute/project/ideas/question.bundle.json\n```\n\nRetry uses the persisted operation ID and immutable request, first retrieving `GET /idea-lab/sync/{operation_id}`. If the prior POST succeeded but its response was lost, its original receipt recovers the same idea; it never creates a second card. A failed current-idea GET does not discard the receipt. Keep retrying the same bundle after a network interruption. Do not generate a fresh ID, change the pending payload, or create a replacement bundle to work around uncertainty. The stored endpoint must equal the selected credential endpoint; cross-endpoint replay is refused.\n\n## Conflicts and explicit merge\n\nHTTP 409 records `conflict`, preserving the local request and retrieving the current remote idea. If a receipt exists but someone has since updated the idea, verification records `current_newer` (exit 3), preserving the receipt and newer remote copy. Neither state overwrites remote data or pretends the local content is current. Inspect `payload`, `base.content`, `remote`, and the saved receipt in the bundle, then prepare a deliberate merged input.\n\n```sh\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" rebase /absolute/project/ideas/question.bundle.json --input /absolute/project/ideas/question.merged.json --revision 7\nuv run --script \"$MOJITO_SKILLS_DIR/research-idea-funnel/scripts/idea_lab.py\" push /absolute/project/ideas/question.bundle.json\n```\n\nReplace `7` with the actual remote revision just reviewed. `rebase` checks it against a fresh GET, keeps the earlier request/receipt in `history`, and saves merged content as a draft based on that revision. If the remote changed again, it saves the newest remote copy and stops for another merge. Rebase itself never sends a write. An initial creation's operation-key conflict without a known remote identity requires receipt inspection; the CLI will not silently create another card.\n\nHTTP 404/422 from POST records `rejected`: the request definitively failed validation/reference lookup. Correct the complete input and use `push --input` to create a new operation while retaining the rejected request in history. Authentication, transport, and other failures retain the existing request. Exit 2 reports an error; `status` is an offline inspection of the last recorded state, not a fresh server check. To verify current server state, use `retry` for an existing operation or `get`.\n"
+          },
+          {
+            "path": "templates/idea-card.md",
+            "content": "# Idea card: <short English title>\n\n- **Question:** one sentence a colleague could answer yes, no or \"it depends on X\".\n- **Why it matters:** the capability or understanding it moves, and for whom.\n- **Seeds:** inbox items or sources that started it (title, locator, why it was collected).\n- **Status:** developing / ready / experimenting / supported / contradicted / archived.\n\n## Observations\n\n| Observation | Source (verified locator) | Ours or theirs |\n|---|---|---|\n| | | |\n\n## Competing explanations\n\n1. <hypothesis> — predicts <observable difference>\n2. <rival> — predicts <observable difference>\n\n## Nearest work\n\n| Work | Problem / setting | What it shows | What it leaves open |\n|---|---|---|---|\n| | | | |\n\n## Next discriminating observation\n\n- What to look at or run, with which controlled variable and baseline.\n- What result would change which judgment.\n- Budget it needs (time, compute, money) and whether that is already authorized.\n\n## Judgment changes\n\n| When | Before (quote the real earlier judgment) | After | Why |\n|---|---|---|---|\n| | | | |\n"
+          }
+        ],
+        "changes": [
+          {
+            "revision": "1c9f639324a9493a401d642494e63eb534c7f3e7",
+            "at": "2026-09-26T21:40:00+00:00",
+            "summary": "Sync each round's evidence to Idea Lab"
+          },
+          {
+            "revision": "9800354d9c84c445b76dfb532fc64d507d0f5200",
+            "at": "2026-09-22T20:05:00+00:00",
+            "summary": "Add the idea card template"
+          }
+        ]
+      },
+      {
+        "id": "research-experiments",
+        "title": "Research Experiments",
+        "summary": "Turn an authorized question into a controlled experiment, run it, interpret the result.",
+        "source_path": "/opt/mojito/examples/skills/research-experiments/SKILL.md",
+        "updated_at": "2026-09-22T20:05:00+00:00",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "content": "---\nname: research-experiments\ndescription: Turn an authorized research question into a controlled experiment, run it with the project's existing tools, and interpret the result. Use when an idea needs an experiment; success means a trustworthy answer, including a negative or inconclusive one.\n---\n\n# Research Experiments\n\nThis is a generic example skill shipped with Mojito; adapt it to your own tools and compute.\n\nBefore running anything, recover the question, the idea and sources it belongs to, the results that already exist, and the authorization: how long, on what hardware, with what spending limit. A request to build or discuss a research system does not by itself authorize a new paid experiment.\n\n## Choose the next informative experiment\n\nWork in this order: check that the effect is real, check that the measurement can be trusted, find the layer where it lives, and only then change something. State the competing explanations and the observation that would tell them apart.\n\nWrite down before seeing any outcome, in the project's existing plan:\n\n- the hypothesis and its rivals;\n- the one variable you control, and what is held fixed;\n- the baselines, and why they are comparable (same data, same budget, same exposure: for training runs compare the tokens that actually carry loss, not sample counts);\n- the effect size that would matter, the noise you expect (seeds, sampling) and how many runs that needs;\n- the interpretation rule: which result supports, refutes or leaves the question open.\n\nAn underpowered test is inconclusive. A small pilot screens a wider claim; claims about scale or transfer need their own evidence. Analyses you think of after seeing the results are exploratory: label them and confirm them separately.\n\n## Run it through the existing path\n\n- Use the project's real entry point and launcher. Write new code only when it directly serves this experiment; do not build another generic runner.\n- Do a one-item smoke run through the real dependencies first, and confirm the new mechanism actually fired (the expected events appear in the records, not merely \"no error\").\n- Run inside the authorized envelope. Keep the commit, configuration, data selection, raw outputs and usage needed to reproduce the comparison.\n- Engineering failures get fixed and resumed within budget. A changed scientific criterion starts a new, clearly labeled comparison.\n- Release the hardware when the run ends.\n\n## Interpret and write back\n\nClassify every outcome as **supported**, **refuted**, **inconclusive** or **invalid** (the measurement or the execution was broken). Invalid runs are never evidence. A trustworthy negative answer is a finished experiment.\n\nNever tune, re-run or stop early until a positive or significant result appears; follow the analysis you wrote down. Report progress in one sentence: relative to the previous comparison, which controlled variable changed and which measured result moved. If you cannot write that sentence honestly, say the change is not attributable.\n\nWrite the result into the idea's evidence (Idea Lab, through [Research Ideas](../research-idea-funnel/SKILL.md)) and pick the next step from the uncertainty that remains. Before the result enters a paper, get it checked with [Research Review](../research-review/SKILL.md).\n"
+          }
+        ],
+        "changes": [
+          {
+            "revision": "006b9bb65a6175a9fe6f85720b252cfcf306893f",
+            "at": "2026-09-22T20:05:00+00:00",
+            "summary": "Write the interpretation rule down before the first run"
+          }
+        ]
+      },
+      {
+        "id": "research-review",
+        "title": "Research Review",
+        "summary": "Pick the independent check a judgment needs: idea review, claim-evidence audit or paper review.",
+        "source_path": "/opt/mojito/examples/skills/research-review/SKILL.md",
+        "updated_at": "2026-09-19T20:15:00+00:00",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "content": "---\nname: research-review\ndescription: Choose and run the independent check a research judgment needs - an idea review, a claim-evidence audit, or a full-paper review. Use when an idea, a result or a draft is about to change what you believe or publish; not for routine smoke tests.\n---\n\n# Research Review\n\nThis is a generic example skill shipped with Mojito; adapt the checks to your field.\n\nPick the review by the artifact and the decision at stake, read the artifact together with its evidence, and keep the research goal in view.\n\n| Object and decision | Check |\n|---|---|\n| Developed idea: is the contribution real, important, and is the premise right? | Idea review below, with the Develop stance of [Research Ideas](../research-idea-funnel/SKILL.md) |\n| A result or a draft claim: does the evidence support this number, this causal story, this scope? | Claim-evidence audit below |\n| A complete paper: argument, novelty, experiments, presentation | Independent paper review in [Paper Writing](../paper-writing/SKILL.md) |\n\nEarly exploration sketches get fact checks and useful questions, not a full novelty gate. Engineering smoke tests and intermediate diagnostics need no independent review. Re-review when a load-bearing claim or its evidence changes, not for formatting.\n\n## Idea review\n\n- Restate the question and the capability it serves. Is it the question the idea card actually asks?\n- Find the nearest prior work yourself and compare problem, setting, method and evidence. Name exact overlaps.\n- List rival explanations the author did not rule out, and the cheapest observation that would separate them.\n- Judge importance, novelty, measurement trust and feasibility separately; do not merge them into one score.\n\n## Claim-evidence audit\n\nFor every claim that carries weight:\n\n1. Find the evidence it rests on: the run, table, figure or citation. Open the original, not a summary of it.\n2. Check that the number, the setting and the comparison match what the claim says.\n3. Check the measurement: metric bugs, judge behavior, comparable baselines and budgets, answer distributions, held-out results.\n4. Check the scope: does a small or synthetic result get stated as general?\n5. Label each claim **supported**, **unsupported**, **overstated** (narrow it), **contradicted**, or **missing evidence** (say which run would settle it).\n\n## How to review\n\nReviewers are independent of the author: give them the actual artifact, its sources, the tools they may use and where they may write. If a required reviewer is not available, report the missing review instead of claiming a substitute ran.\n\nThe lead checks every consequential finding against the original source. Tell apart a factual error, an unsupported claim, an alternative explanation, an exact prior-work overlap and missing evidence. For each, say which judgment changes and the smallest repair or diagnostic. Keep honest negative results. A high rejection rate is not a measure of review quality.\n\nWrite the review into the existing record (the idea's evidence in Idea Lab, or the paper's review notes), linked to the reviewed version. A review can refute a claim or recommend a change of direction; it does not by itself stop a project. After revision, recheck the affected claims and note what changed.\n"
+          }
+        ],
+        "changes": [
+          {
+            "revision": "15ba30b95f1477d64228206a01d3ad1d76ef2cc2",
+            "at": "2026-09-19T20:15:00+00:00",
+            "summary": "First version"
+          }
+        ]
+      },
+      {
+        "id": "paper-writing",
+        "title": "Paper Writing",
+        "summary": "Build the paper around its central claim and the evidence for it; write, review, revise.",
+        "source_path": "/opt/mojito/examples/skills/paper-writing/SKILL.md",
+        "updated_at": "2026-09-19T20:15:00+00:00",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "content": "---\nname: paper-writing\ndescription: Write and revise a research paper around one central claim and the evidence for it - outline, draft, figures, independent review and revision. Use when drafting, editing or reviewing paper text, or when making numbers consistent across a draft.\n---\n\n# Paper Writing\n\nThis is a generic example skill shipped with Mojito; replace the conventions with your venue's and your group's.\n\n## 1. Fix the central claim\n\nWrite the paper's claim in two sentences before writing any section: what is shown, under which conditions, and why a reader in this area should care. Everything in the paper either supports this claim, bounds it, or goes.\n\n## 2. Map claims to evidence\n\nMake a table before drafting:\n\n| Claim (as it will appear) | Evidence (run, table, figure, citation) | Status |\n|---|---|---|\n| | | supported / pending run / needs citation |\n\nResults that have not been run stay visible placeholders (`[RESULT PENDING: …]`), never invented numbers. Every citation needs a verified locator (arXiv or DOI) that you actually opened. Every number in the text comes from one source of truth (a results file or table), so it can be checked and updated in one place.\n\n## 3. Outline, then draft\n\n- **Introduction:** the problem, why existing answers fall short (with citations), what this paper shows, the evidence in one paragraph, the contributions as a short list that matches the claim table.\n- **Method or setup:** enough to reproduce: data, models, budgets, baselines and why they are comparable.\n- **Results:** one subsection per claim, in the order of the claim table. Each starts with the finding in one sentence, then the evidence, then its limits.\n- **Related work:** organized by question, stating precisely how this paper differs.\n- **Limitations:** the scope the evidence does not cover, stated plainly.\n\nWrite plainly: one idea per paragraph, the finding first, concrete numbers instead of adjectives. Figures need a caption that says what to see in them.\n\n## 4. Review\n\nBefore calling a draft done, have it reviewed independently (see [Research Review](../research-review/SKILL.md)): at least one reviewer reads only the PDF, without the author's notes, and writes what they think the claim is, what convinced them and what did not. Run a claim-evidence audit on every load-bearing number. Compare the reviewers' summary of the claim with yours; a mismatch is a writing problem.\n\n## 5. Revise and close the loop\n\nFix the highest-impact issues first: wrong or unsupported claims, then missing evidence, then structure, then wording. After each revision, recheck the claims that changed and keep the claim table current. When the paper reveals a reusable lesson about how you write, add it to this skill instead of keeping it in one paper's notes.\n"
+          }
+        ],
+        "changes": [
+          {
+            "revision": "bc4781ee91552e85e5cb01e3a6355e25d2b638f4",
+            "at": "2026-09-19T20:15:00+00:00",
+            "summary": "First version"
+          }
+        ]
+      }
+    ]
+  },
+  "idea_lab": {
+    "seeds": [
+      {
+        "id": "89a736ddce143bf7a53ffd72",
+        "kind": "idea",
+        "text": "Success rate by flour brand",
+        "source": "note",
+        "at": "2026-09-26T08:20:00+00:00",
+        "snapshot": {
+          "at": "2026-09-26T08:20:00+00:00",
+          "text": "Success rate by flour brand",
+          "source": "note",
+          "area": "apps-baking",
+          "note": null,
+          "kind": "idea"
+        },
+        "reason": "",
+        "idea_ids": [
+          "0dc41fd6-0810-5411-954f-0a24435a1e1f"
+        ],
+        "present": true,
+        "last_explored_at": "2026-09-27T20:58:00+00:00"
+      },
+      {
+        "id": "852f7673576e3073010f80c4",
+        "kind": "idea",
+        "text": "Proofing from one photo: can a small on-device vision model spot an underproofed crumb?",
+        "source": "note",
+        "at": "2026-09-25T22:10:00+00:00",
+        "snapshot": {
+          "kind": "idea",
+          "at": "2026-09-25T22:10:00+00:00",
+          "text": "Proofing from one photo: can a small on-device vision model spot an underproofed crumb?",
+          "source": "note",
+          "area": "apps-baking",
+          "note": "Most failed loaves were underproofed"
+        },
+        "reason": "If one photo after cutting says why, I can stop writing long notes every bake",
+        "idea_ids": [
+          "931ea17b-427b-5654-8dce-b62bb7311f92",
+          "44c8720b-fa7d-5c90-8d0a-5705d4eadf05"
+        ],
+        "present": true,
+        "last_explored_at": "2026-09-26T21:28:00+00:00"
+      },
+      {
+        "id": "6aa5edcef96238fe57726f86",
+        "kind": "paper",
+        "text": "SmolVLM (2025): the 256M model runs inference in under 1 GB of GPU memory, the largest is 2.2B; a ready starting point for vision on a phone",
+        "source": "https://arxiv.org/abs/2504.05299",
+        "at": "2026-09-24T21:30:00+00:00",
+        "snapshot": {
+          "kind": "paper",
+          "at": "2026-09-24T21:30:00+00:00",
+          "text": "SmolVLM (2025): the 256M model runs inference in under 1 GB of GPU memory, the largest is 2.2B; a ready starting point for vision on a phone",
+          "source": "https://arxiv.org/abs/2504.05299",
+          "area": "apps-baking",
+          "note": null
+        },
+        "reason": "Check whether the smallest one fits in the app",
+        "idea_ids": [
+          "931ea17b-427b-5654-8dce-b62bb7311f92"
+        ],
+        "present": true,
+        "last_explored_at": "2026-09-26T21:28:00+00:00"
+      },
+      {
+        "id": "3ff6e0dc1324edf107209192",
+        "kind": "paper",
+        "text": "LoRA (2021): fine-tune by training only low-rank adapters; a few hundred of my own photos might be enough",
+        "source": "https://arxiv.org/abs/2106.09685",
+        "at": "2026-09-23T21:15:00+00:00",
+        "snapshot": {
+          "kind": "paper",
+          "at": "2026-09-23T21:15:00+00:00",
+          "text": "LoRA (2021): fine-tune by training only low-rank adapters; a few hundred of my own photos might be enough",
+          "source": "https://arxiv.org/abs/2106.09685",
+          "area": null,
+          "note": null
+        },
+        "reason": "",
+        "idea_ids": [],
+        "present": true,
+        "last_explored_at": null
+      },
+      {
+        "id": "9456713e7eaccaf0151bd2e3",
+        "kind": "author",
+        "text": "Hugging Face's SmolLM team: keeps releasing small models that run on phones, with the training details",
+        "source": "https://huggingface.co/HuggingFaceTB",
+        "at": "2026-09-24T21:35:00+00:00",
+        "snapshot": {
+          "kind": "author",
+          "at": "2026-09-24T21:35:00+00:00",
+          "text": "Hugging Face's SmolLM team: keeps releasing small models that run on phones, with the training details",
+          "source": "https://huggingface.co/HuggingFaceTB",
+          "area": null,
+          "note": null
+        },
+        "reason": "",
+        "idea_ids": [
+          "931ea17b-427b-5654-8dce-b62bb7311f92"
+        ],
+        "present": true,
+        "last_explored_at": null
+      },
+      {
+        "id": "f25fdcd6b29e4a0846057661",
+        "kind": "blog",
+        "text": "The Bitter Lesson (Rich Sutton, 2019): in the long run, general methods that use computation beat built-in human knowledge",
+        "source": "http://www.incompleteideas.net/IncIdeas/BitterLesson.html",
+        "at": "2026-09-21T22:40:00+00:00",
+        "snapshot": {
+          "kind": "blog",
+          "at": "2026-09-21T22:40:00+00:00",
+          "text": "The Bitter Lesson (Rich Sutton, 2019): in the long run, general methods that use computation beat built-in human knowledge",
+          "source": "http://www.incompleteideas.net/IncIdeas/BitterLesson.html",
+          "area": null,
+          "note": "A reminder not to hand-write rules about crumb holes"
+        },
+        "reason": "",
+        "idea_ids": [],
+        "present": true,
+        "last_explored_at": null
+      }
+    ],
+    "ideas": [
+      {
+        "title": "Proofing from one crumb photo",
+        "question": "Can a vision-language model small enough for a phone tell an underproofed crumb from a well-proofed one in a single photo?",
+        "importance": "14 of the last 40 bakes failed from underproofing; a photo right after cutting would say why without a notebook.",
+        "status": "experimenting",
+        "hypotheses": [
+          "Crumb structure (big irregular holes, a dense gummy band) shows in one phone photo",
+          "Lighting and camera differences dominate; one photo is not enough without a reference card"
+        ],
+        "evidence": [
+          {
+            "id": "e1",
+            "claim": "Of the last 40 bakes, 14 marked failed were underproofed; 9 of those have a crumb photo.",
+            "source": "Loaflog bake log (last 40 bakes)",
+            "kind": "observation",
+            "at": "2026-09-24T20:50:00+00:00"
+          },
+          {
+            "id": "e2",
+            "claim": "SmolVLM's 256M model runs inference in under 1 GB of GPU memory; the 2.2B model rivals models using twice the memory.",
+            "source": "https://arxiv.org/abs/2504.05299",
+            "kind": "literature",
+            "at": "2026-09-24T21:40:00+00:00"
+          },
+          {
+            "id": "e3",
+            "claim": "Labelled 40 crumb photos by hand twice, a week apart: 36 of 40 agree, good enough for a first test set.",
+            "source": "labels.csv in the Loaflog repo",
+            "kind": "experiment",
+            "at": "2026-09-26T21:20:00+00:00"
+          }
+        ],
+        "changes": [
+          {
+            "at": "2026-09-26T21:25:00+00:00",
+            "before": "You have to poke the dough; a photo can't show proofing",
+            "after": "Hand labels from photos are consistent; worth testing a model",
+            "reason": "The two labelling passes agree on 36 of 40"
+          }
+        ],
+        "next_step": "Run the 256M model zero-shot on the 40 photos on a rented GPU (about $2, needs your OK)",
+        "artifacts": [
+          {
+            "kind": "paper",
+            "title": "SmolVLM: Redefining small and efficient multimodal models",
+            "url": "https://arxiv.org/abs/2504.05299"
+          }
+        ],
+        "notion_url": null,
+        "notion_sync": "pending",
+        "seed_ids": [
+          "852f7673576e3073010f80c4",
+          "6aa5edcef96238fe57726f86",
+          "9456713e7eaccaf0151bd2e3"
+        ],
+        "id": "931ea17b-427b-5654-8dce-b62bb7311f92",
+        "revision": 1,
+        "created_at": "2026-09-24T20:50:00+00:00",
+        "updated_at": "2026-09-26T21:20:00+00:00"
+      },
+      {
+        "title": "Rise time or flour brand: which explains the failures?",
+        "question": "Once kitchen temperature is held fixed, does flour brand still explain the success rate?",
+        "importance": "Decides whether Loaflog should log temperature or flour first.",
+        "status": "developing",
+        "hypotheses": [
+          "Brand matters through protein content",
+          "Rise time and room temperature explain most failures; brand is confounded with the season"
+        ],
+        "evidence": [
+          {
+            "id": "e1",
+            "claim": "11 of the 40 bakes failed, mostly in weeks when the kitchen was below 20 °C.",
+            "source": "Loaflog bake log (last 40 bakes)",
+            "kind": "observation",
+            "at": "2026-09-27T21:10:00+00:00"
+          }
+        ],
+        "changes": [],
+        "next_step": "Split the 40 bakes by kitchen temperature and compare failure rates per brand inside each half.",
+        "artifacts": [],
+        "notion_url": null,
+        "notion_sync": "pending",
+        "seed_ids": [
+          "89a736ddce143bf7a53ffd72"
+        ],
+        "id": "0dc41fd6-0810-5411-954f-0a24435a1e1f",
+        "revision": 1,
+        "created_at": "2026-09-27T21:10:00+00:00",
+        "updated_at": "2026-09-27T21:10:00+00:00"
+      },
+      {
+        "title": "Sharper photos, better judgments?",
+        "question": "Does a 12 MP photo give better proofing labels than a 3 MP one?",
+        "importance": "Decides whether the app has to keep full-size photos.",
+        "status": "contradicted",
+        "hypotheses": [
+          "Crumb detail needs high resolution"
+        ],
+        "evidence": [
+          {
+            "id": "e1",
+            "claim": "Re-labelled the 40 photos at 3 MP: 39 got the same label as at 12 MP.",
+            "source": "labels-3mp.csv in the Loaflog repo",
+            "kind": "experiment",
+            "at": "2026-09-25T21:05:00+00:00"
+          }
+        ],
+        "changes": [
+          {
+            "at": "2026-09-25T21:10:00+00:00",
+            "before": "Sharper photos give better judgments",
+            "after": "For hand labels at least, 3 MP is enough; resolution is not the bottleneck",
+            "reason": "39 of 40 labels unchanged"
+          }
+        ],
+        "next_step": "Keep 3 MP thumbnails; drop the full-size photos.",
+        "artifacts": [],
+        "notion_url": null,
+        "notion_sync": "pending",
+        "seed_ids": [
+          "852f7673576e3073010f80c4"
+        ],
+        "id": "44c8720b-fa7d-5c90-8d0a-5705d4eadf05",
+        "revision": 1,
+        "created_at": "2026-09-25T21:05:00+00:00",
+        "updated_at": "2026-09-25T21:05:00+00:00"
+      }
+    ],
+    "runs": [
+      {
+        "title": "Develop: rise time or flour",
+        "goal": "Find the cheapest check that separates temperature from brand",
+        "direction": "Know why a bake failed",
+        "mode": "develop",
+        "budget": {
+          "wall_minutes": 20,
+          "max_turns": 30,
+          "allow_cpu": true,
+          "allow_write": true
+        },
+        "experiment_policy": "Read the Loaflog export only; don't touch the repo",
+        "seed_ids": [
+          "89a736ddce143bf7a53ffd72"
+        ],
+        "idea_ids": [
+          "0dc41fd6-0810-5411-954f-0a24435a1e1f"
+        ],
+        "idempotency_key": "demo-r-rise",
+        "id": "93e3782a-4643-5dc3-8952-1336b3c64eab",
+        "job_id": "j-demo-r-rise",
+        "status": "completed",
+        "created_at": "2026-09-27T20:40:00+00:00",
+        "started_at": "2026-09-27T20:41:00+00:00",
+        "finished_at": "2026-09-27T20:58:00+00:00",
+        "error": null,
+        "summary": "New evidence: failures cluster in weeks below 20 °C (11 of 40) and brand is confounded with the season, so the judgment moved from \"brand decides\" to \"hold temperature fixed, then compare brands\". Next: split by temperature. The research text is saved and not yet synced to your documents.",
+        "idea_revisions": {
+          "0dc41fd6-0810-5411-954f-0a24435a1e1f": 1
+        },
+        "output_idea_ids": [
+          "0dc41fd6-0810-5411-954f-0a24435a1e1f"
+        ],
+        "artifacts": [],
+        "lease_token": null,
+        "lease_until": null,
+        "automation_id": null
+      },
+      {
+        "title": "Cycle: proofing from one photo",
+        "goal": "Check that a zero-shot test is worth running and write its plan",
+        "direction": "Know why a bake failed",
+        "mode": "cycle",
+        "budget": {
+          "wall_minutes": 30,
+          "max_turns": 40,
+          "allow_cpu": false,
+          "allow_write": true
+        },
+        "experiment_policy": "No model runs; public sources and the label sheet only",
+        "seed_ids": [
+          "852f7673576e3073010f80c4",
+          "6aa5edcef96238fe57726f86"
+        ],
+        "idea_ids": [
+          "931ea17b-427b-5654-8dce-b62bb7311f92"
+        ],
+        "idempotency_key": "demo-r-photo",
+        "id": "b6377167-b014-53d5-a965-50ad2702b27c",
+        "job_id": "j-demo-r-photo",
+        "status": "needs_input",
+        "created_at": "2026-09-26T21:00:00+00:00",
+        "started_at": "2026-09-26T21:01:00+00:00",
+        "finished_at": "2026-09-26T21:28:00+00:00",
+        "error": null,
+        "summary": "Explore and Develop done: the labels hold up (36 of 40) and SmolVLM-256M is the right size. The smallest diagnostic runs the model on a GPU, which this executor may not use: it needs your OK to rent one (about $2). Independent evidence review: the citations and numbers match the sources.",
+        "idea_revisions": {
+          "931ea17b-427b-5654-8dce-b62bb7311f92": 1
+        },
+        "output_idea_ids": [
+          "931ea17b-427b-5654-8dce-b62bb7311f92"
+        ],
+        "artifacts": [],
+        "lease_token": null,
+        "lease_until": null,
+        "automation_id": null
+      }
+    ],
+    "automations": [
+      {
+        "title": "Explore new material as it arrives",
+        "enabled": true,
+        "trigger": "new_seed",
+        "interval_minutes": 1440,
+        "max_runs": 3,
+        "run": {
+          "title": "Explore new material",
+          "goal": "See whether new material supports, contradicts or extends an existing question",
+          "direction": "Know why a bake failed",
+          "mode": "explore",
+          "seed_ids": [],
+          "idea_ids": [],
+          "budget": {
+            "wall_minutes": 15,
+            "max_turns": 20,
+            "allow_cpu": false,
+            "allow_write": true
+          },
+          "experiment_policy": "Public sources only"
+        },
+        "idempotency_key": "demo-auto-explore",
+        "id": "5e3e8b64-9532-5991-8956-9059d69aeed1",
+        "runs_started": 0,
+        "next_at": "2026-09-28T21:00:00+00:00",
+        "last_seed_ids": [
+          "89a736ddce143bf7a53ffd72",
+          "852f7673576e3073010f80c4",
+          "6aa5edcef96238fe57726f86",
+          "3ff6e0dc1324edf107209192",
+          "9456713e7eaccaf0151bd2e3",
+          "f25fdcd6b29e4a0846057661"
+        ],
+        "state": "active"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "path": "research/small-vision-models",
+      "versions": [
+        {
+          "version": 1,
+          "updated_at": "2026-09-22T20:30:00+00:00",
+          "updated_by": "session:loaflog-ml",
+          "note": "First version",
+          "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Small vision models on a phone</title><meta name=\"description\" content=\"Picking a model to judge proofing in Loaflog: candidates, size, next step.\"><meta name=\"mojito-project\" content=\"p-loaflog\"><style>:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--tx2:#5f5e5a;--line:#e3e1da;--brand:#2f6f9f}@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}}:root[data-theme=dark]{--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}body{background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}p{color:var(--tx2);margin:0 0 12px}.now{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:12px 14px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}ul{padding-left:18px;font-size:14px}a{color:var(--brand)}</style></head><body><h1>Small vision models on a phone</h1><p>Picking a model to judge proofing in Loaflog: candidates, size, next step.</p><div class=\"now\"><b>Now: </b>Choosing a model</div><h2>At a glance</h2><table><tr><th>Item</th><th>Now</th><th>Notes</th></tr><tr><td>SmolVLM-256M</td><td>First pick: under 1 GB of GPU memory at inference</td><td><a href=\"https://arxiv.org/abs/2504.05299\">arXiv 2504.05299</a></td></tr><tr><td>SmolVLM-2.2B</td><td>Fallback: stronger, needs quantizing for a phone</td><td><a href=\"https://arxiv.org/abs/2504.05299\">arXiv 2504.05299</a></td></tr><tr><td>Fine-tuning</td><td>LoRA if zero-shot falls short</td><td><a href=\"https://arxiv.org/abs/2106.09685\">arXiv 2106.09685</a></td></tr><tr><td>Test set</td><td>40 crumb photos, two labelling passes agree on 36</td><td>labels.csv</td></tr></table><h2>Log</h2><ul><li><b>v1</b> Listed the candidate models</li></ul></body></html>",
+          "title": "Small vision models on a phone",
+          "summary": "Picking a model to judge proofing in Loaflog: candidates, size, next step.",
+          "project_id": "p-loaflog"
+        },
+        {
+          "version": 2,
+          "updated_at": "2026-09-26T21:30:00+00:00",
+          "updated_by": "session:loaflog-ml",
+          "note": "Added the labelled test set",
+          "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Small vision models on a phone</title><meta name=\"description\" content=\"Picking a model to judge proofing in Loaflog: candidates, size, next step.\"><meta name=\"mojito-project\" content=\"p-loaflog\"><style>:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--tx2:#5f5e5a;--line:#e3e1da;--brand:#2f6f9f}@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}}:root[data-theme=dark]{--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}body{background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}p{color:var(--tx2);margin:0 0 12px}.now{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:12px 14px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}ul{padding-left:18px;font-size:14px}a{color:var(--brand)}</style></head><body><h1>Small vision models on a phone</h1><p>Picking a model to judge proofing in Loaflog: candidates, size, next step.</p><div class=\"now\"><b>Now: </b>Test set ready; no model run yet</div><h2>At a glance</h2><table><tr><th>Item</th><th>Now</th><th>Notes</th></tr><tr><td>SmolVLM-256M</td><td>First pick: under 1 GB of GPU memory at inference</td><td><a href=\"https://arxiv.org/abs/2504.05299\">arXiv 2504.05299</a></td></tr><tr><td>SmolVLM-2.2B</td><td>Fallback: stronger, needs quantizing for a phone</td><td><a href=\"https://arxiv.org/abs/2504.05299\">arXiv 2504.05299</a></td></tr><tr><td>Fine-tuning</td><td>LoRA if zero-shot falls short</td><td><a href=\"https://arxiv.org/abs/2106.09685\">arXiv 2106.09685</a></td></tr><tr><td>Test set</td><td>40 crumb photos, two labelling passes agree on 36</td><td>labels.csv</td></tr></table><h2>Log</h2><ul><li><b>v1</b> Listed the candidate models</li><li><b>v2</b> Labelled 40 photos; the two passes agree on 36</li></ul></body></html>",
+          "title": "Small vision models on a phone",
+          "summary": "Picking a model to judge proofing in Loaflog: candidates, size, next step.",
+          "project_id": "p-loaflog"
+        },
+        {
+          "version": 3,
+          "updated_at": "2026-09-27T21:15:00+00:00",
+          "updated_by": "session:loaflog-ml",
+          "note": "Next step: zero-shot test on a GPU",
+          "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Small vision models on a phone</title><meta name=\"description\" content=\"Picking a model to judge proofing in Loaflog: candidates, size, next step.\"><meta name=\"mojito-project\" content=\"p-loaflog\"><style>:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--tx2:#5f5e5a;--line:#e3e1da;--brand:#2f6f9f}@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}}:root[data-theme=dark]{--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}body{background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}p{color:var(--tx2);margin:0 0 12px}.now{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:12px 14px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}ul{padding-left:18px;font-size:14px}a{color:var(--brand)}</style></head><body><h1>Small vision models on a phone</h1><p>Picking a model to judge proofing in Loaflog: candidates, size, next step.</p><div class=\"now\"><b>Now: </b>The zero-shot test waits for your OK to rent a GPU (about $2)</div><h2>At a glance</h2><table><tr><th>Item</th><th>Now</th><th>Notes</th></tr><tr><td>SmolVLM-256M</td><td>First pick: under 1 GB of GPU memory at inference</td><td><a href=\"https://arxiv.org/abs/2504.05299\">arXiv 2504.05299</a></td></tr><tr><td>SmolVLM-2.2B</td><td>Fallback: stronger, needs quantizing for a phone</td><td><a href=\"https://arxiv.org/abs/2504.05299\">arXiv 2504.05299</a></td></tr><tr><td>Fine-tuning</td><td>LoRA if zero-shot falls short</td><td><a href=\"https://arxiv.org/abs/2106.09685\">arXiv 2106.09685</a></td></tr><tr><td>Test set</td><td>40 crumb photos, two labelling passes agree on 36</td><td>labels.csv</td></tr></table><h2>Log</h2><ul><li><b>v1</b> Listed the candidate models</li><li><b>v2</b> Labelled 40 photos; the two passes agree on 36</li><li><b>v3</b> Next: zero-shot test on a GPU (waiting for your OK)</li></ul></body></html>",
+          "title": "Small vision models on a phone",
+          "summary": "Picking a model to judge proofing in Loaflog: candidates, size, next step.",
+          "project_id": "p-loaflog"
+        }
+      ]
+    },
+    {
+      "path": "life/open-mic",
+      "versions": [
+        {
+          "version": 1,
+          "updated_at": "2026-09-23T22:00:00+00:00",
+          "updated_by": "session:maint",
+          "note": "First version",
+          "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Open mic prep</title><meta name=\"description\" content=\"The open mic at the end of the month: set list, practice, the day-of list.\"><meta name=\"mojito-project\" content=\"p-guitar\"><style>:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--tx2:#5f5e5a;--line:#e3e1da;--brand:#2f6f9f}@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}}:root[data-theme=dark]{--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}body{background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}p{color:var(--tx2);margin:0 0 12px}.now{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:12px 14px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}ul{padding-left:18px;font-size:14px}a{color:var(--brand)}</style></head><body><h1>Open mic prep</h1><p>The open mic at the end of the month: set list, practice, the day-of list.</p><div class=\"now\"><b>Now: </b>Three songs picked</div><h2>At a glance</h2><table><tr><th>Item</th><th>Now</th><th>Notes</th></tr><tr><td>Set</td><td>Three songs; the chord change in the second still stumbles</td><td></td></tr><tr><td>Practice</td><td>20 minutes a day, five days running</td><td></td></tr><tr><td>On the day</td><td>Spare strings, tuner, arrive 30 minutes early</td><td></td></tr></table><h2>Log</h2><ul><li><b>v1</b> Picked the set</li></ul></body></html>",
+          "title": "Open mic prep",
+          "summary": "The open mic at the end of the month: set list, practice, the day-of list.",
+          "project_id": "p-guitar"
+        },
+        {
+          "version": 2,
+          "updated_at": "2026-09-27T22:05:00+00:00",
+          "updated_by": "session:maint",
+          "note": "Practice progress",
+          "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Open mic prep</title><meta name=\"description\" content=\"The open mic at the end of the month: set list, practice, the day-of list.\"><meta name=\"mojito-project\" content=\"p-guitar\"><style>:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--tx2:#5f5e5a;--line:#e3e1da;--brand:#2f6f9f}@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}}:root[data-theme=dark]{--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}body{background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}p{color:var(--tx2);margin:0 0 12px}.now{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:12px 14px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}ul{padding-left:18px;font-size:14px}a{color:var(--brand)}</style></head><body><h1>Open mic prep</h1><p>The open mic at the end of the month: set list, practice, the day-of list.</p><div class=\"now\"><b>Now: </b>The second song's chord change needs work</div><h2>At a glance</h2><table><tr><th>Item</th><th>Now</th><th>Notes</th></tr><tr><td>Set</td><td>Three songs; the chord change in the second still stumbles</td><td></td></tr><tr><td>Practice</td><td>20 minutes a day, five days running</td><td></td></tr><tr><td>On the day</td><td>Spare strings, tuner, arrive 30 minutes early</td><td></td></tr></table><h2>Log</h2><ul><li><b>v1</b> Picked the set</li><li><b>v2</b> Five days of practice in a row</li></ul></body></html>",
+          "title": "Open mic prep",
+          "summary": "The open mic at the end of the month: set list, practice, the day-of list.",
+          "project_id": "p-guitar"
+        }
+      ]
+    }
+  ],
   "cards": [
     {
       "id": "c-demo-1",

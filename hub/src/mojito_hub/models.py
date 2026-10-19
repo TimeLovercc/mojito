@@ -5,11 +5,12 @@ import base64
 import logging
 from contextvars import ContextVar
 from datetime import UTC, date, datetime
+from pathlib import PurePosixPath
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from pydantic import (
-    AwareDatetime, BaseModel, ConfigDict, Field, PositiveInt, StringConstraints, field_validator, model_validator,
+    AwareDatetime, BaseModel, ConfigDict, Discriminator, Field, PositiveInt, StringConstraints, Tag, field_validator, model_validator,
 )
 
 # "METHOD /path" of the request being handled (set by middleware; "startup" during lifespan),
@@ -48,20 +49,20 @@ RecordCategory = Literal["brief", "chat", "alert", "feedback", "release", "jobs"
 JobKind = Literal["refresh", "process_note", "draft_plan", "chat_reply", "morning_brief",
                   "evening_prompt", "undo", "draft_review", "weekly_summary", "sync_projects",
                   "feed_arxiv", "feed_papers", "feed_weekly", "feed_mail", "calendar_delete",
-                  "feed_brief", "feed_watch"]
+                  "feed_brief", "feed_watch", "research_run"]
 ProjectStatus = Literal["proposed", "active", "paused", "done", "declined"]
 
 # api.md 使用记录: the two name tables. unused in /usage/summary = names here with count 0.
 USAGE_VIEWS = (
     "today", "plan_current", "plan_history", "plan_detail", "projects", "project_detail", "items",
     "item_detail", "timeline", "feed", "card_detail", "chat", "system", "note_sheet", "widget_today",
-    "widget_note", "push_open", "notes", "feedback_sheet", "app_open",
+    "widget_note", "push_open", "notes", "feedback_sheet", "app_open", "pages", "page_detail",
 )
 USAGE_ACTIONS = (
     "note", "decision", "refresh", "chat_send", "item_ask", "undo", "draft_copy", "draft_resolve",
     "review_finish", "review_start", "settings_save", "open_orca", "inline_reply",
     "card_save", "card_dismiss", "card_ask", "card_to_item", "client_error", "feedback_send",
-    "feedback_decision", "note_hide", "push_enable", "push_disable",
+    "feedback_decision", "note_hide", "push_enable", "push_disable", "page_history",
 )
 FeedbackStatus = Literal["open", "triaged", "fixing", "awaiting_approval", "shipped", "declined"]
 AuthName = Literal["google-calendar-write", "gmail-read", "claude-server", "claude-mac", "x"]
@@ -275,6 +276,23 @@ class InboxIdea(Body):
         return v.astimezone(UTC)
 
 
+class TypedInboxItem(InboxIdea):
+    kind: Literal["idea", "paper", "author", "blog"]
+
+
+def _inbox_format(value: Any) -> str:
+    # Explicit legacy format: a malformed typed record must never become an idea.
+    if isinstance(value, dict):
+        return "typed" if "kind" in value else "legacy"
+    return "typed" if isinstance(value, TypedInboxItem) else "legacy"
+
+
+InboxItem = Annotated[
+    Annotated[InboxIdea, Tag("legacy")] | Annotated[TypedInboxItem, Tag("typed")],
+    Discriminator(_inbox_format),
+]
+
+
 class ResearchMap(Body):
     """api.md 研究地图: the map file, copied whole by the worker; the hub only stores it."""
     updated_at: AwareDatetime
@@ -282,12 +300,123 @@ class ResearchMap(Body):
     areas: list[MapArea]
     projects: list[MapProject]
     hidden: list[str]  # hub project ids left off the map on purpose
-    inbox: list[InboxIdea]
+    inbox: list[InboxItem]
 
     @field_validator("updated_at")
     @classmethod
     def _utc(cls, v: datetime) -> datetime:
         return v.astimezone(UTC)
+
+
+class ResearchSkillFile(Body):
+    path: str
+    content: str
+
+    @field_validator("path")
+    @classmethod
+    def _relative_markdown(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if path.is_absolute() or ".." in path.parts or "\\" in value or path.as_posix() != value or path.suffix.lower() != ".md":
+            raise ValueError(f"invalid relative Markdown path: {value!r}")
+        return value
+
+
+class ResearchSkillChange(Body):
+    revision: str
+    at: AwareDatetime
+    summary: str
+
+
+class ResearchSkill(Body):
+    id: str
+    title: str
+    summary: str
+    source_path: str
+    updated_at: AwareDatetime
+    files: list[ResearchSkillFile]
+    changes: list[ResearchSkillChange]
+
+    @model_validator(mode="after")
+    def _files(self):
+        paths = [file.path for file in self.files]
+        if "SKILL.md" not in paths or len(paths) != len(set(paths)):
+            raise ValueError(f"skill {self.id!r} must have SKILL.md and unique file paths: {paths!r}")
+        if not PurePosixPath(self.source_path).is_absolute() or PurePosixPath(self.source_path).name != "SKILL.md":
+            raise ValueError(f"invalid skill source_path: {self.source_path!r}")
+        return self
+
+
+class ResearchSkills(Body):
+    updated_at: AwareDatetime
+    skills: list[ResearchSkill]
+
+    @model_validator(mode="after")
+    def _unique_ids(self):
+        ids = [skill.id for skill in self.skills]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"duplicate research skill ids: {ids!r}")
+        return self
+
+
+class PageHead(BaseModel):
+    """api.md 页面: what a page and each of its versions carry, without html."""
+    path: str
+    title: str
+    summary: str
+    project_id: str | None
+    version: int
+    updated_at: datetime
+    updated_by: str  # session:<name>, or the writing token's role
+
+
+class PageMeta(PageHead):
+    """A page without its html (GET /pages, PUT and DELETE responses). api.md 删除页面: the deleted_*
+    fields are set only in the DELETE response, since a deleted page is never listed or read."""
+    deleted_at: datetime | None
+    deleted_by: str | None  # written like updated_by
+    delete_note: str | None
+
+
+class Page(PageMeta):
+    html: str
+
+
+class PageList(BaseModel):
+    pages: list[PageMeta]
+
+
+class PageVersionMeta(PageHead):
+    note: str
+
+
+class PageVersion(PageVersionMeta):
+    html: str
+
+
+class PageVersionList(BaseModel):
+    versions: list[PageVersionMeta]  # newest first
+
+
+class PagePutIn(Body):
+    html: str
+    base_version: Annotated[int, Field(ge=0)]  # 0 = the page must not exist yet
+    note: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+    by: Annotated[str, StringConstraints(pattern=r"^\S{1,80}$")] | None  # session name; null → the token's role
+
+
+class PageDeleteIn(Body):
+    base_version: PositiveInt  # must be the current version
+    note: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]  # why it goes
+    by: Annotated[str, StringConstraints(pattern=r"^\S{1,80}$")] | None  # session name; null → the token's role
+
+
+class PageLinkIn(Body):
+    theme: Literal["dark", "light"]
+    version: PositiveInt | None  # null = whatever is latest when the link is opened
+
+
+class PageLink(BaseModel):
+    url: str
 
 
 class ProjectOverview(Body):

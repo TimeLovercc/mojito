@@ -1,0 +1,151 @@
+/* mojito pages: shared stylesheet (docs/api.md 页面). Colors are the app's tokens (mobile/src/theme.ts):
+   dark B 冷静蓝, light C 浅色纸面. Follows prefers-color-scheme; :root[data-theme] forces one.
+   Pages color only through these variables. Five font sizes: 26 / 18 / 16 / 14 / 12. */
+
+:root {
+  color-scheme: light;
+  --bg: #f3f4f6; --card: #ffffff; --raised: #eceef2; --line: #e0e3e8;
+  --tx: #15171c; --tx2: #4d5462; --tx3: #6b7280;
+  --brand: #2f54eb; --on-brand: #ffffff; --brand-soft: #e6ebff;
+  --ok: #15803d; --ok-soft: #e3f5e9;
+  --warn: #b45309; --warn-soft: #fdf0e1;
+  --bad: #dc2626; --bad-soft: #fde8e8;
+
+  --fs-page: 26px; --fs-title: 18px; --fs-body: 16px; --fs-secondary: 14px; --fs-small: 12px;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace, "PingFang SC", sans-serif;
+  --r-card: 14px; --r-tag: 10px; --r-button: 8px;
+  --gutter: 16px; --gap: 12px; --inner: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1115; --card: #1a1d24; --raised: #252a33; --line: #2f3541;
+    --tx: #eaedf3; --tx2: #aab1be; --tx3: #8a92a1;
+    --brand: #8ea2ff; --on-brand: #0f1430; --brand-soft: #232b52;
+    --ok: #4ade80; --ok-soft: #14301f;
+    --warn: #fbbf24; --warn-soft: #3a2e10;
+    --bad: #f87171; --bad-soft: #3b1a1c;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1115; --card: #1a1d24; --raised: #252a33; --line: #2f3541;
+  --tx: #eaedf3; --tx2: #aab1be; --tx3: #8a92a1;
+  --brand: #8ea2ff; --on-brand: #0f1430; --brand-soft: #232b52;
+  --ok: #4ade80; --ok-soft: #14301f;
+  --warn: #fbbf24; --warn-soft: #3a2e10;
+  --bad: #f87171; --bad-soft: #3b1a1c;
+}
+
+/* ---- page ---- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0 auto; max-width: 720px; padding: 24px var(--gutter) 48px;
+  background: var(--bg); color: var(--tx);
+  font-family: var(--font); font-size: var(--fs-body); line-height: 1.65; font-weight: 400;
+  -webkit-font-smoothing: antialiased; overflow-wrap: break-word;
+}
+img, svg, video, canvas, iframe { max-width: 100%; }
+img, video { height: auto; }
+
+/* ---- text ---- */
+
+h1, h2, h3, h4 { color: var(--tx); font-weight: 600; line-height: 1.35; }
+h1 { font-size: var(--fs-page); margin: 0 0 6px; }
+h2 { font-size: var(--fs-title); margin: 32px 0 10px; }
+h3, h4 { font-size: var(--fs-body); margin: 22px 0 8px; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 12px; padding-left: 1.4em; }
+li + li { margin-top: 4px; }
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong, b { font-weight: 600; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+small, .small { font-size: var(--fs-small); color: var(--tx3); }
+.muted, .secondary { font-size: var(--fs-secondary); color: var(--tx2); }
+.meta { font-size: var(--fs-secondary); color: var(--tx2); margin: 0 0 20px; }
+time, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+code, kbd { font-family: var(--mono); font-size: 0.875em; background: var(--raised); border-radius: 6px; padding: 1px 5px; }
+pre {
+  font-family: var(--mono); font-size: var(--fs-secondary); line-height: 1.55;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-button);
+  padding: 10px 12px; overflow-x: auto; margin: 0 0 12px;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote { margin: 0 0 12px; padding: 10px 14px; background: var(--raised); border-radius: var(--r-button); color: var(--tx2); }
+blockquote > :last-child { margin-bottom: 0; }
+
+/* ---- status: the "现在状态" block at the top of every page ---- */
+
+.status { background: var(--brand-soft); border-radius: var(--r-card); padding: var(--inner) var(--gutter); margin: 0 0 24px; }
+.status > :first-child { margin-top: 0; }
+.status > :last-child { margin-bottom: 0; }
+.status h2 { margin: 0 0 6px; }
+
+/* ---- cards ---- */
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: var(--inner) var(--gutter); margin: 0 0 var(--gap);
+}
+.card > :first-child { margin-top: 0; }
+.card > :last-child { margin-bottom: 0; }
+.card h3 { font-size: var(--fs-title); margin: 0 0 6px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--gap); margin: 0 0 var(--gap); }
+.cards > .card { margin: 0; }
+
+/* ---- tags ---- */
+
+.tag {
+  display: inline-block; font-size: var(--fs-small); line-height: 1.5; font-weight: 500;
+  padding: 1px 8px; border-radius: var(--r-tag); background: var(--raised); color: var(--tx2);
+  white-space: nowrap; vertical-align: 0.1em;
+}
+.tag.brand { background: var(--brand-soft); color: var(--brand); }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+
+/* ---- tables: shrink and wrap at phone width; wrap wide ones in .scroll ---- */
+
+table { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: var(--fs-secondary); }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+th { font-weight: 600; color: var(--tx2); background: var(--raised); }
+td.num, th.num { text-align: right; }
+.scroll { overflow-x: auto; margin: 0 0 16px; }
+.scroll > table { margin: 0; }
+
+/* ---- timeline: <ol class="timeline"><li class="done|now|todo"><time>…</time> text</li></ol> ---- */
+
+.timeline { list-style: none; margin: 0 0 16px; padding: 0 0 0 22px; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+.timeline > li { position: relative; margin: 0; padding: 0 0 14px; }
+.timeline > li:last-child { padding-bottom: 0; }
+.timeline > li::before {
+  content: ""; position: absolute; left: -22px; top: 7px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--tx3);
+}
+.timeline > li.done::before { background: var(--ok); border-color: var(--ok); }
+.timeline > li.now::before { background: var(--brand); border-color: var(--brand); }
+.timeline > li.late::before { background: var(--warn); border-color: var(--warn); }
+.timeline > li.todo::before { background: var(--bg); border-color: var(--tx3); }
+.timeline time { display: block; font-size: var(--fs-small); color: var(--tx3); line-height: 1.6; }
+
+/* ---- misc ---- */
+
+details { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-button); padding: 8px 12px; margin: 0 0 12px; }
+summary { cursor: pointer; font-weight: 500; }
+details[open] > summary { margin-bottom: 8px; }
+.button {
+  display: inline-block; font-size: var(--fs-secondary); font-weight: 500; padding: 6px 12px;
+  border-radius: var(--r-button); background: var(--brand); color: var(--on-brand);
+}
+.button:hover { text-decoration: none; opacity: 0.9; }

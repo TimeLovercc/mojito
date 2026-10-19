@@ -42,17 +42,21 @@ fn set_size(app: tauri::AppHandle, height: f64) -> Result<(), String> {
 }
 
 // 外部链接（shell.js 接管 window.open 和外链 <a> 后调）：交给 macOS 的 open，用系统默认浏览器或对应 app 打开。
-// WKWebView 自己会把 window.open 直接丢掉。只放行 app 用到的协议：http / https（简报、卡片原文），
+// WKWebView 自己会把 window.open 直接丢掉。只放行 app 用到的协议：http / https（简报、卡片原文、页面里的外链），
 // orca（系统页"去 Orca"，Orca.app 注册的 orca://），claude（研究卡片的 Claude 按钮，Claude.app 注册的
 // claude://claude.ai/<路径>，design.md 8.13）；其他拒绝并记日志
 #[tauri::command]
 fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    let scheme = reqwest::Url::parse(&url).map_err(|e| format!("链接 {url}：{e}"))?.scheme().to_string();
+    open_url(&app, &url)
+}
+
+fn open_url(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+    let scheme = reqwest::Url::parse(url).map_err(|e| format!("链接 {url}：{e}"))?.scheme().to_string();
     if !matches!(scheme.as_str(), "http" | "https" | "orca" | "claude") {
-        weblog::write(&app, &format!("open_external refused {url}"))?;
+        weblog::write(app, &format!("open_external refused {url}"))?;
         return Err(format!("不打开 {scheme}: 链接（只放行 http、https、orca、claude）"));
     }
-    let status = std::process::Command::new("/usr/bin/open").arg(&url).status().map_err(|e| format!("open {url}：{e}"))?;
+    let status = std::process::Command::new("/usr/bin/open").arg(url).status().map_err(|e| format!("open {url}：{e}"))?;
     if !status.success() {
         return Err(format!("open {url} 失败：{status}"));
     }
@@ -155,16 +159,26 @@ pub(crate) const MAIN: &str = "main";
 // 在 WKWebView 里 12 秒超时、整页白屏。报成 Safari 后 expo-font 跳过它（同真 Safari）。
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15 mojito-desktop";
 
-// 主窗口和菜单栏面板都加载 mobile 的网页构建，只是路由不同
+// 主窗口和菜单栏面板都加载 mobile 的网页构建，只是路由不同。
+// 新窗口请求：顶层页面的 window.open 和外链 <a> 已由 shell.js 接走；剩下的来自页面 iframe（docs/api.md「页面」，
+// 签名链接的 HTML 页，sandbox 允许弹窗）里的 target=_blank 和 window.open。shell.js 进不了跨源 iframe，
+// WKWebView 把这些交给 on_new_window：一律不开新窗口，链接交给系统浏览器（同 open_external 的协议白名单），打不开记日志
 pub(crate) fn web_window<'a>(
     app: &'a tauri::App,
     label: &'a str,
     route: &str,
 ) -> WebviewWindowBuilder<'a, tauri::Wry, tauri::App> {
+    let handle = app.handle().clone();
     WebviewWindowBuilder::new(app, label, WebviewUrl::App(route.into()))
         .theme(theme::saved(app.handle()).expect("读配色设置失败"))
         .user_agent(USER_AGENT)
         .initialization_script(include_str!("shell.js"))
+        .on_new_window(move |url, _features| {
+            if let Err(err) = open_url(&handle, url.as_str()) {
+                weblog::write(&handle, &format!("new window {url}: {err}")).unwrap();
+            }
+            tauri::webview::NewWindowResponse::Deny
+        })
 }
 
 fn build_main(app: &tauri::App) -> tauri::Result<WebviewWindow> {

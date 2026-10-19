@@ -31,6 +31,7 @@ TIMEZONE = os.environ["MOJITO_TIMEZONE"]
 # deploy.sh splits the env file into arguments for its preflight.
 OWNER_NAME = os.environ["MOJITO_OWNER_NAME"]
 CONTACT_EMAIL = os.environ["MOJITO_CONTACT_EMAIL"]
+PAGES_KEY_FILE = os.environ["MOJITO_PAGES_KEY_FILE"]
 
 ROLE_PATTERN = re.compile(r"^(app|worker|agent|maintainer|source:[A-Za-z0-9_.:-]+)$")
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,}$")
@@ -76,6 +77,14 @@ def ical_extra_urls() -> list[str]:
     return urls
 
 
+def _load_pages_key(path: str) -> bytes:
+    """api.md 页面: HMAC key of /p/ links, ≥32 random bytes as hex (gen-pages-key.sh)."""
+    key = bytes.fromhex(Path(path).read_text().strip())
+    if len(key) < 32:
+        raise ValueError(f"MOJITO_PAGES_KEY_FILE {path}: key must be at least 32 bytes, got {len(key)}")
+    return key
+
+
 def _load_vapid(path: str) -> tuple[Vapid02, str]:
     # Not Vapid02.from_file: it silently generates and writes a new key when the file is missing.
     if not Path(path).is_file():
@@ -102,3 +111,4 @@ ical_extra_urls()  # fail at startup on a missing file or a bad line
 if not Path(WEB_DIR).is_dir():
     raise FileNotFoundError(f"MOJITO_WEB_DIR {WEB_DIR} is not a directory")
 VAPID, VAPID_PUBLIC_KEY = _load_vapid(VAPID_KEY_FILE)  # public key: 65-byte point, base64url, no padding
+PAGES_LINK_KEY = _load_pages_key(PAGES_KEY_FILE)

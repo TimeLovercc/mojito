@@ -279,7 +279,7 @@ function QuickNote({ onSent, focus }: { onSent: () => Promise<void>; focus: stri
   const [text, setText] = useDraft('note')
   const [busy, setBusy] = useState(false)
   // 笔记可以带图片，整理时 Claude 看图（design.md 8.6）
-  const attach = useImageAttach(busy)
+  const attach = useImageAttach(busy, input)
   const send = async () => {
     if (config.hub === null) {
       toast(t('先到"系统"页填 hub 地址和令牌'), true)

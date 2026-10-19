@@ -12,6 +12,7 @@ import type {
   HubRecord,
   Item,
   Job,
+  PageLink,
   NewRecord,
   Plan,
   Project,
@@ -107,4 +108,7 @@ export const actions = {
   // 订阅页"现在跑"：入队这个订阅的抓取任务（同类任务已在排队 / 在跑时返回那一个，design.md 8.7）
   runSubscription: (c: HubConfig, id: string) => hubRequest<Job>(c, 'POST', `/subscriptions/${encodeURIComponent(id)}/run`),
   getJob: (c: HubConfig, jobId: string) => hubRequest<Job>(c, 'GET', `/jobs/${encodeURIComponent(jobId)}`),
+  // 页面的签名链接（docs/api.md「页面」）：theme 用 app 当前深浅色；version null 是最新版。path 在 URL 里按原样带 /
+  pageLink: (c: HubConfig, path: string, theme: 'dark' | 'light', version: number | null) =>
+    hubRequest<PageLink>(c, 'POST', `/pages/${path}/link`, { theme, version }),
 }

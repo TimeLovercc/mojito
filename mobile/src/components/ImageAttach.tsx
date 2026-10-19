@@ -1,31 +1,48 @@
-import { useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState, type RefObject } from 'react'
+import { Image, Pressable, StyleSheet, Text, View, type TextInput } from 'react-native'
 import { Camera, Image as ImageIcon, X } from 'lucide-react-native'
 import { uploadImage } from '../api/upload'
 import type { HubConfig } from '../config/store'
-import { HAS_CAMERA, MAX_IMAGES, pickImages, type PreparedImage } from '../images'
-import { useErrorToast } from '../toast'
+import { HAS_CAMERA, MAX_IMAGES, listenPaste, pickImages, type PreparedImage } from '../images'
+import { useErrorToast, useToast } from '../toast'
 import { colors, desktop, font, size } from '../theme'
 import { t } from '../i18n'
 
-// 输入框旁的"图片"：一个按钮（手机上点开选拍照还是相册，电脑上直接打开文件选择）、待发的缩略图、上传。
-// 对话输入框和笔记输入框共用（design.md 8.3、8.6）
-export function useImageAttach(busy: boolean) {
+// 输入框旁的"图片"：一个按钮（手机上点开选拍照还是相册，电脑上直接打开文件选择）、待发的缩略图、上传；
+// 网页 / Mac app 上还能在输入框 input 里直接粘贴图片。对话输入框和笔记输入框共用（design.md 8.3、8.6）
+export function useImageAttach(busy: boolean, input: RefObject<TextInput | null>) {
+  const toast = useToast()
   const showError = useErrorToast()
   const [images, setImages] = useState<PreparedImage[]>([])
   const [choosing, setChoosing] = useState(false)
-  const full = images.length >= MAX_IMAGES
+  const remaining = MAX_IMAGES - images.length
+  const full = remaining <= 0
 
-  const pick = async (source: 'library' | 'camera') => {
-    setChoosing(false)
+  // 选的图和粘贴的图走同一条路：处理好（长边 ≤ 1600、JPEG 0.8、不带 EXIF）后进待发
+  const add = async (prepare: () => Promise<PreparedImage[]>) => {
     try {
-      const picked = await pickImages(source, MAX_IMAGES - images.length)
-      setImages((prev) => [...prev, ...picked])
+      const got = await prepare()
+      setImages((prev) => [...prev, ...got])
     } catch (err) {
       if (!(err instanceof Error)) throw err
       showError(t('没取到图片'), err)
     }
   }
+
+  const pick = (source: 'library' | 'camera') => {
+    setChoosing(false)
+    add(() => pickImages(source, remaining))
+  }
+
+  // 网页 / Mac app：输入框里粘贴的图（手机原生 listenPaste 不监听）；发送中不收
+  useEffect(() => {
+    if (busy) return
+    if (input.current === null) throw new Error('图片粘贴：输入框还没挂上')
+    return listenPaste(input.current, remaining, (prepare, dropped) => {
+      if (dropped > 0) toast(t('最多 {n} 张图，多的没加上', { n: MAX_IMAGES }), true)
+      add(prepare)
+    })
+  }, [busy, remaining])
 
   // 逐张 POST /attachments，返回附件 id
   const upload = async (hub: HubConfig): Promise<string[]> => {

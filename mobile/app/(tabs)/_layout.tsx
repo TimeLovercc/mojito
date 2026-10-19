@@ -26,6 +26,7 @@ const TAB_PATHS = [
   '/chat?limit=30',
   '/jobs',
   '/cards?limit=20',
+  '/pages',
 ]
 
 export default function TabsLayout() {

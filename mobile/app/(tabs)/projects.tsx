@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import type { ProjectsList, ResearchMap } from '../../src/api/types'
+import { ChevronDown, ChevronRight, FileText } from 'lucide-react-native'
+import type { PagesList, ProjectsList, ResearchMap } from '../../src/api/types'
 import { RunBox } from '../../src/components/ResearchCard'
+import { IdeaLab } from '../../src/components/IdeaLab'
+import { InspirationInbox } from '../../src/components/InspirationInbox'
+import { ResearchEntries, ResearchSkills } from '../../src/components/ResearchSkills'
 import { Screen } from '../../src/components/Screen'
 import { Card, Filter } from '../../src/components/ui'
 import { ResearchMapWide } from '../../src/desktop/ResearchMapWide'
 import { t } from '../../src/i18n'
 import { LIFE, STAGE, both, branchColor, decisionsOf, originPrinciples, placeProjects, placesOf, runOf, type Placed } from '../../src/research'
 import { colors, desktop, font, overlay, size } from '../../src/theme'
-import { when } from '../../src/time'
 import { useHub } from '../../src/use-hub'
 import { useViewTracking } from '../../src/usage'
 import { hoverRow } from '../../src/web-data'
@@ -19,7 +21,7 @@ export { PageError as ErrorBoundary } from '../../src/components/PageError'
 
 // 项目页 = 研究地图（design.md 8.13）。电脑是横向思维导图（src/desktop/ResearchMapWide.tsx）；手机和其他屏幕是同一棵树的
 // 折叠列表：最上面是总原则（默认收起）；方向 → 叶子 → 起点 → 项目，点方向收起 / 展开，点起点展开它的整句和对应原则，
-// 点项目进全屏卡片（app/projects/[id].tsx）；最下面是灵感收件箱
+// 点项目进全屏卡片（app/projects/[id].tsx）；顶部入口打开灵感收件箱和研究技能。最上面是"页面"入口（docs/api.md「页面」：手机没有侧边栏，从这里进列表）
 export default function ProjectsScreen() {
   const wide = useWide()
   return wide && desktop ? <ResearchMapWide /> : <ProjectTree />
@@ -29,8 +31,10 @@ function ProjectTree() {
   const map = useHub<ResearchMap>('/research-map')
   const open = useHub<ProjectsList>('/projects')
   const done = useHub<ProjectsList>('/projects?status=done')
+  const [panel, setPanel] = useState<'inbox' | 'lab' | 'skills' | null>(null)
+  const [labTarget, setLabTarget] = useState<{ idea: string | null; seed: string | null }>({ idea: null, seed: null })
   const [onlyRunning, setOnlyRunning] = useState(false)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['inbox', 'principles']))
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['principles']))
   // 起点默认只显示短标签，点一下展开整句
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   useViewTracking('projects')
@@ -47,118 +51,128 @@ function ProjectTree() {
     setExpanded(next)
   }
   return (
-    <Screen view={both(map, both(open, done))} head={{ kind: 'title', title: t('项目') }} fab>
+    <Screen view={both(map, both(open, done))} head={{ kind: 'title', title: t('项目') }} top={<PagesEntry />} fab>
       {({ a: m, b: lists }) => {
         const { placed, missing } = placeProjects(m, [...lists.a.projects, ...lists.b.projects])
         const shown = (x: Placed) => !onlyRunning || runOf(x.project, x.area === LIFE) === 'running'
         const running = placed.filter((x) => runOf(x.project, x.area === LIFE) === 'running').length
         return (
           <View style={styles.col}>
-            <View style={styles.filters}>
-              <Filter label={t('只看进行中的（{n}）', { n: running })} on={onlyRunning} onPress={() => setOnlyRunning(!onlyRunning)} />
-            </View>
-            <Card>
-              <Pressable onPress={() => toggle('principles')} style={styles.areaHead} {...hoverRow}>
-                <View style={[styles.bar, { backgroundColor: colors.tx }]} />
-                <Text style={styles.areaName}>{t('总原则')}</Text>
-                <Text style={styles.count}>{m.principles.length}</Text>
-                <View style={styles.grow} />
-                {collapsed.has('principles') ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
-              </Pressable>
-              {collapsed.has('principles')
-                ? null
-                : m.principles.map((p, i) => (
-                    <View key={p.id} style={styles.idea}>
-                      <Text style={styles.ideaText}>{`${i + 1}. ${p.label}`}</Text>
-                      <Text style={styles.principleText}>{p.text}</Text>
-                    </View>
-                  ))}
-            </Card>
-            {m.areas.map((a, i) => {
-              const color = branchColor(i)
-              const places = placesOf(a)
-              const inArea = placed.filter((x) => places.includes(x.area) && shown(x))
-              if (onlyRunning && inArea.length === 0) return null
-              const key = `a:${a.id}`
-              const folded = collapsed.has(key)
-              const pending = inArea.reduce((n, x) => n + decisionsOf(x.project), 0)
-              return (
-                <Card key={a.id}>
-                  <Pressable onPress={() => toggle(key)} style={styles.areaHead} {...hoverRow}>
-                    <View style={[styles.bar, { backgroundColor: color }]} />
-                    <Text style={[styles.areaName, { color }]}>{a.name}</Text>
-                    <Text style={styles.count}>{inArea.length}</Text>
-                    <Badge n={pending} />
+            <ResearchEntries count={m.inbox.length} selected={panel} onSelect={(kind) => { setLabTarget({ idea: null, seed: null }); setPanel(panel === kind ? null : kind) }} />
+            {panel !== null ? (
+              <View style={styles.col}>
+                <Pressable accessibilityRole="button" onPress={() => setPanel(null)} style={styles.returnButton} {...hoverRow}>
+                  <Text style={styles.returnText}>{t('返回研究地图')}</Text>
+                </Pressable>
+                {panel === 'skills' ? <ResearchSkills /> : panel === 'lab' ? <IdeaLab key={`${labTarget.idea}:${labTarget.seed}`} initialIdea={labTarget.idea} initialSeed={labTarget.seed} /> : <InspirationInbox map={m} showTitle onIdea={id => { setLabTarget({ idea: id, seed: null }); setPanel('lab') }} onExplore={id => { setLabTarget({ idea: null, seed: id }); setPanel('lab') }} />}
+              </View>
+            ) : (
+              <>
+                <View style={styles.filters}>
+                  <Filter label={t('只看进行中的（{n}）', { n: running })} on={onlyRunning} onPress={() => setOnlyRunning(!onlyRunning)} />
+                </View>
+                <Card>
+                  <Pressable onPress={() => toggle('principles')} style={styles.areaHead} {...hoverRow}>
+                    <View style={[styles.bar, { backgroundColor: colors.tx }]} />
+                    <Text style={styles.areaName}>{t('总原则')}</Text>
+                    <Text style={styles.count}>{m.principles.length}</Text>
                     <View style={styles.grow} />
-                    {folded ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
+                    {collapsed.has('principles') ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
                   </Pressable>
-                  {folded
+                  {collapsed.has('principles')
                     ? null
-                    : a.children.length === 0
-                      ? inArea.map((x) => <ProjectLine key={x.project.id} item={x} deep={false} />)
-                      : a.children.map((l) => {
-                          const direct = inArea.filter((x) => x.area === l.id)
-                          const origins = l.origins
-                            .map((o) => ({ o, list: inArea.filter((x) => x.area === o.id) }))
-                            .filter((g) => !onlyRunning || g.list.length > 0)
-                          if (onlyRunning && direct.length === 0 && origins.length === 0) return null
-                          return (
-                            <View key={l.id}>
-                              <Text style={[styles.leaf, { borderBottomColor: color }]}>{l.name}</Text>
-                              {direct.length === 0 && origins.length === 0 ? <Text style={styles.empty}>{t('空')}</Text> : null}
-                              {direct.map((x) => <ProjectLine key={x.project.id} item={x} deep={false} />)}
-                              {origins.map(({ o, list }) => {
-                                const open = expanded.has(o.id)
-                                const rests = originPrinciples(m, o)
-                                return (
-                                  <View key={o.id}>
-                                    <Pressable onPress={() => expand(o.id)} style={styles.origin} {...hoverRow}>
-                                      <View style={[styles.originDot, { borderColor: color }]} />
-                                      <Text style={styles.originLabel}>{o.label}</Text>
-                                      <View style={styles.grow} />
-                                      {open ? <ChevronDown size={14} color={colors.tx3} /> : <ChevronRight size={14} color={colors.tx3} />}
-                                    </Pressable>
-                                    {open ? (
-                                      <View style={styles.originBody}>
-                                        <Text style={styles.originText}>{o.text}</Text>
-                                        {rests === null ? null : <Text style={styles.ideaMeta}>{t('对应原则：{list}', { list: rests })}</Text>}
-                                      </View>
-                                    ) : null}
-                                    {list.map((x) => <ProjectLine key={x.project.id} item={x} deep />)}
-                                  </View>
-                                )
-                              })}
-                            </View>
-                          )
-                        })}
+                    : m.principles.map((p, i) => (
+                        <View key={p.id} style={styles.idea}>
+                          <Text style={styles.ideaText}>{`${i + 1}. ${p.label}`}</Text>
+                          <Text style={styles.principleText}>{p.text}</Text>
+                        </View>
+                      ))}
                 </Card>
-              )
-            })}
-            <Card>
-              <Pressable onPress={() => toggle('inbox')} style={styles.areaHead} {...hoverRow}>
-                <View style={[styles.bar, { backgroundColor: colors.tx3 }]} />
-                <Text style={styles.areaName}>{t('灵感收件箱')}</Text>
-                <Text style={styles.count}>{m.inbox.length}</Text>
-                <View style={styles.grow} />
-                {collapsed.has('inbox') ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
-              </Pressable>
-              {collapsed.has('inbox')
-                ? null
-                : m.inbox.map((x, i) => (
-                    <View key={i} style={styles.idea}>
-                      <Text style={styles.ideaText}>{x.text}</Text>
-                      {x.note === null ? null : <Text style={styles.ideaMeta}>{x.note}</Text>}
-                      <Text style={styles.ideaMeta}>{`${x.source} · ${when(x.at)}`}</Text>
-                    </View>
-                  ))}
-            </Card>
-            {missing.length === 0 ? null : (
-              <Text style={styles.missing}>{t('地图文件里有 {n} 个项目在 hub 里找不到：{ids}', { n: missing.length, ids: missing.join('、') })}</Text>
+                {m.areas.map((a, i) => {
+                  const color = branchColor(i)
+                  const places = placesOf(a)
+                  const inArea = placed.filter((x) => places.includes(x.area) && shown(x))
+                  if (onlyRunning && inArea.length === 0) return null
+                  const key = `a:${a.id}`
+                  const folded = collapsed.has(key)
+                  const pending = inArea.reduce((n, x) => n + decisionsOf(x.project), 0)
+                  return (
+                    <Card key={a.id}>
+                      <Pressable onPress={() => toggle(key)} style={styles.areaHead} {...hoverRow}>
+                        <View style={[styles.bar, { backgroundColor: color }]} />
+                        <Text style={[styles.areaName, { color }]}>{a.name}</Text>
+                        <Text style={styles.count}>{inArea.length}</Text>
+                        <Badge n={pending} />
+                        <View style={styles.grow} />
+                        {folded ? <ChevronRight size={16} color={colors.tx3} /> : <ChevronDown size={16} color={colors.tx3} />}
+                      </Pressable>
+                      {folded
+                        ? null
+                        : a.children.length === 0
+                          ? inArea.map((x) => <ProjectLine key={x.project.id} item={x} deep={false} />)
+                          : a.children.map((l) => {
+                              const direct = inArea.filter((x) => x.area === l.id)
+                              const origins = l.origins
+                                .map((o) => ({ o, list: inArea.filter((x) => x.area === o.id) }))
+                                .filter((g) => !onlyRunning || g.list.length > 0)
+                              if (onlyRunning && direct.length === 0 && origins.length === 0) return null
+                              return (
+                                <View key={l.id}>
+                                  <Text style={[styles.leaf, { borderBottomColor: color }]}>{l.name}</Text>
+                                  {direct.length === 0 && origins.length === 0 ? <Text style={styles.empty}>{t('空')}</Text> : null}
+                                  {direct.map((x) => <ProjectLine key={x.project.id} item={x} deep={false} />)}
+                                  {origins.map(({ o, list }) => {
+                                    const open = expanded.has(o.id)
+                                    const rests = originPrinciples(m, o)
+                                    return (
+                                      <View key={o.id}>
+                                        <Pressable onPress={() => expand(o.id)} style={styles.origin} {...hoverRow}>
+                                          <View style={[styles.originDot, { borderColor: color }]} />
+                                          <Text style={styles.originLabel}>{o.label}</Text>
+                                          <View style={styles.grow} />
+                                          {open ? <ChevronDown size={14} color={colors.tx3} /> : <ChevronRight size={14} color={colors.tx3} />}
+                                        </Pressable>
+                                        {open ? (
+                                          <View style={styles.originBody}>
+                                            <Text style={styles.originText}>{o.text}</Text>
+                                            {rests === null ? null : <Text style={styles.ideaMeta}>{t('对应原则：{list}', { list: rests })}</Text>}
+                                          </View>
+                                        ) : null}
+                                        {list.map((x) => <ProjectLine key={x.project.id} item={x} deep />)}
+                                      </View>
+                                    )
+                                  })}
+                                </View>
+                              )
+                            })}
+                    </Card>
+                  )
+                })}
+                {missing.length === 0 ? null : (
+                  <Text style={styles.missing}>{t('地图文件里有 {n} 个项目在 hub 里找不到：{ids}', { n: missing.length, ids: missing.join('、') })}</Text>
+                )}
+              </>
             )}
           </View>
         )
       }}
     </Screen>
+  )
+}
+
+function PagesEntry() {
+  const router = useRouter()
+  const pages = useHub<PagesList>('/pages')
+  return (
+    <Card onPress={() => router.push('/pages')}>
+      <View style={styles.areaHead}>
+        <FileText size={17} color={colors.tx2} strokeWidth={1.8} />
+        <Text style={styles.areaName}>{t('页面')}</Text>
+        {pages.data === null ? null : <Text style={styles.count}>{pages.data.pages.length}</Text>}
+        <View style={styles.grow} />
+        <ChevronRight size={16} color={colors.tx3} />
+      </View>
+    </Card>
   )
 }
 
@@ -195,6 +209,8 @@ function Badge({ n }: { n: number }) {
 
 const styles = StyleSheet.create({
   col: { gap: 12 },
+  returnButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 8 },
+  returnText: { ...font.medium, fontSize: size.secondary, color: colors.tx2 },
   filters: { flexDirection: 'row' },
   areaHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14 },
   bar: { width: 4, height: 18, borderRadius: 2 },

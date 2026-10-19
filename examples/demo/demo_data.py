@@ -30,11 +30,12 @@ import stat
 import subprocess
 import urllib.error
 import urllib.request
+import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-ROLES = ("app", "worker", "agent", "maintainer", "source:cards")
+ROLES = ("app", "worker", "agent", "maintainer", "source:cards", "source:pages", "source:ideas")
 AGENT = "server-agent"  # the hub's source name for the server agent (auth.py SOURCE_OF)
 OWNER_NAME = "Sam"
 CONTACT_EMAIL = "sam@example.com"
@@ -656,9 +657,334 @@ def research_map_of(c: Clock, t: Lang, app: str) -> dict:
                      {"id": "p-guitar", "area": "life", "chats": no_chats},
                      {"id": "p-closet", "area": "life", "chats": no_chats}],
         "hidden": [],
-        "inbox": [{"at": c.iso(-2, "08:20"), "text": t("按面粉牌子统计烤成的比例", "Success rate by flour brand"),
-                   "source": t("笔记", "note"), "area": "apps-baking", "note": None}],
+        "inbox": list(inbox_of(c, t).values()),
     }
+
+
+# ---------------------------------------------------------------- the story: research (inbox, Idea Lab, skills, pages)
+#
+# Sam wants Loaflog to say why a bake failed. The research thread around it uses only public AI material (every
+# paper link below was opened and checked): small on-device vision models, LoRA, The Bitter Lesson.
+
+SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"  # examples/skills, the worker's MOJITO_SKILLS_DIR
+RULES_FILE = Path(__file__).resolve().parent.parent / "research-rules.md"  # the worker's MOJITO_RESEARCH_RULES
+# The four skills the app lists (worker research_skills.py CURATED_SKILLS) and the story's commits to each folder
+SKILLS = (
+    ("research-idea-funnel", "Research Ideas",
+     "Explore new questions, or develop an existing idea through sources and evidence.",
+     (("Sync each round's evidence to Idea Lab", -2, "21:40"), ("Add the idea card template", -6, "20:05"))),
+    ("research-experiments", "Research Experiments",
+     "Turn an authorized question into a controlled experiment, run it, interpret the result.",
+     (("Write the interpretation rule down before the first run", -6, "20:05"),)),
+    ("research-review", "Research Review",
+     "Pick the independent check a judgment needs: idea review, claim-evidence audit or paper review.",
+     (("First version", -9, "20:15"),)),
+    ("paper-writing", "Paper Writing",
+     "Build the paper around its central claim and the evidence for it; write, review, revise.",
+     (("First version", -9, "20:15"),)),
+)
+SMOLVLM = "https://arxiv.org/abs/2504.05299"  # SmolVLM: Redefining small and efficient multimodal models
+LORA = "https://arxiv.org/abs/2106.09685"  # LoRA: Low-Rank Adaptation of Large Language Models
+BITTER = "http://www.incompleteideas.net/IncIdeas/BitterLesson.html"  # Rich Sutton, March 13, 2019
+
+
+def inbox_of(c: Clock, t: Lang) -> dict:
+    """api.md 研究地图 收件箱: key -> entry (kinds idea / paper / author / blog; the first has no kind: legacy = idea).
+    Each entry's (kind, at, source) is unique (api.md Idea Lab 收件箱身份唯一)."""
+    return {
+        "flour": {"at": c.iso(-2, "08:20"), "text": t("按面粉牌子统计烤成的比例", "Success rate by flour brand"),
+                  "source": t("笔记", "note"), "area": "apps-baking", "note": None},
+        "photo": {"kind": "idea", "at": c.iso(-3, "22:10"),
+                  "text": t("一张照片判断发酵：手机上的小视觉模型分得出发酵不足的切面吗？",
+                            "Proofing from one photo: can a small on-device vision model spot an underproofed crumb?"),
+                  "source": t("笔记", "note"), "area": "apps-baking",
+                  "note": t("失败的面包里一大半是发酵不足", "Most failed loaves were underproofed")},
+        "smolvlm": {"kind": "paper", "at": c.iso(-4, "21:30"),
+                    "text": t("SmolVLM（2025）：最小的 256M 版本推理不到 1GB 显存，最大 2.2B；手机上跑视觉模型的现成起点",
+                              "SmolVLM (2025): the 256M model runs inference in under 1 GB of GPU memory, the largest is "
+                              "2.2B; a ready starting point for vision on a phone"),
+                    "source": SMOLVLM, "area": "apps-baking", "note": None},
+        "lora": {"kind": "paper", "at": c.iso(-5, "21:15"),
+                 "text": t("LoRA（2021）：只训练低秩适配器就能微调，几百张自己的照片也许就够",
+                           "LoRA (2021): fine-tune by training only low-rank adapters; a few hundred of my own photos "
+                           "might be enough"),
+                 "source": LORA, "area": None, "note": None},
+        "smol-team": {"kind": "author", "at": c.iso(-4, "21:35"),
+                      "text": t("Hugging Face SmolLM 团队：持续发布能在手机上跑的小模型和训练细节",
+                                "Hugging Face's SmolLM team: keeps releasing small models that run on phones, with "
+                                "the training details"),
+                      "source": "https://huggingface.co/HuggingFaceTB", "area": None, "note": None},
+        "bitter": {"kind": "blog", "at": c.iso(-7, "22:40"),
+                   "text": t("The Bitter Lesson（Rich Sutton，2019）：长期看，借助算力的通用方法胜过人工设计的知识",
+                             "The Bitter Lesson (Rich Sutton, 2019): in the long run, general methods that use "
+                             "computation beat built-in human knowledge"),
+                   "source": BITTER, "area": None,
+                   "note": t("提醒自己：先别手写规则判断气孔", "A reminder not to hand-write rules about crumb holes")},
+    }
+
+
+def seed_id(entry: dict) -> str:
+    """The hub's seed id for an inbox entry (idea_lab.seed_identity: kind, at in UTC to the second, source)."""
+    identity = [entry["kind"] if "kind" in entry else "idea", db_ts(datetime.fromisoformat(entry["at"])), entry["source"]]
+    return hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()[:24]
+
+
+def demo_uuid(key: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"mojito-demo/{key}"))
+
+
+def seed_reasons(t: Lang) -> dict:
+    """PUT /idea-lab/seeds/{id}: why Sam collected these."""
+    return {"photo": t("如果切开拍一张就知道原因，就不用每次记一大堆", "If one photo after cutting says why, I can stop "
+                       "writing long notes every bake"),
+            "smolvlm": t("看看最小的那档能不能装进 app", "Check whether the smallest one fits in the app")}
+
+
+def ideas_of(c: Clock, t: Lang) -> dict:
+    """POST /idea-lab/ideas: key -> IdeaInput with seed keys (mapped to seed ids by the caller)."""
+    note_src = t("Loaflog 烘焙记录（最近 40 次）", "Loaflog bake log (last 40 bakes)")
+    return {
+        "i-photo": {
+            "title": t("一张照片判断发酵", "Proofing from one crumb photo"),
+            "question": t("手机能跑的视觉语言模型，能从一张切面照片分出发酵不足和发酵正常吗？",
+                          "Can a vision-language model small enough for a phone tell an underproofed crumb from a "
+                          "well-proofed one in a single photo?"),
+            "importance": t("最近 40 次里有 14 次失败是发酵不足；切开拍一张就能说出原因，比记笔记省事。",
+                            "14 of the last 40 bakes failed from underproofing; a photo right after cutting would say "
+                            "why without a notebook."),
+            "status": "experimenting", "seeds": ["photo", "smolvlm", "smol-team"],
+            "hypotheses": [t("切面的气孔结构（不规则大洞、湿黏的密实带）在一张手机照片里看得出来",
+                             "Crumb structure (big irregular holes, a dense gummy band) shows in one phone photo"),
+                           t("光线和手机相机的差别更大，没有参照卡片时单张照片不够",
+                             "Lighting and camera differences dominate; one photo is not enough without a reference card")],
+            "evidence": [
+                {"id": "e1", "claim": t("最近 40 次烘焙里 14 次标为失败的是发酵不足，其中 9 次有切面照片。",
+                                        "Of the last 40 bakes, 14 marked failed were underproofed; 9 of those have a crumb photo."),
+                 "source": note_src, "kind": "observation", "at": c.iso(-4, "20:50")},
+                {"id": "e2", "claim": t("SmolVLM 最小的 256M 版本推理不到 1GB 显存，最大 2.2B 版本接近更大的模型。",
+                                        "SmolVLM's 256M model runs inference in under 1 GB of GPU memory; the 2.2B model "
+                                        "rivals models using twice the memory."),
+                 "source": SMOLVLM, "kind": "literature", "at": c.iso(-4, "21:40")},
+                {"id": "e3", "claim": t("40 张切面照片隔一周人工标两遍，36 张一致：可以先当测试集。",
+                                        "Labelled 40 crumb photos by hand twice, a week apart: 36 of 40 agree, good "
+                                        "enough for a first test set."),
+                 "source": t("Loaflog 仓库里的 labels.csv", "labels.csv in the Loaflog repo"), "kind": "experiment",
+                 "at": c.iso(-2, "21:20")}],
+            "changes": [{"at": c.iso(-2, "21:25"),
+                         "before": t("发酵得戳一下才知道，照片看不出来", "You have to poke the dough; a photo can't show proofing"),
+                         "after": t("人工从照片标发酵是稳定的，值得试模型", "Hand labels from photos are consistent; worth testing a model"),
+                         "reason": t("两遍标注 36/40 一致", "The two labelling passes agree on 36 of 40")}],
+            "next_step": t("在租来的 GPU 上让 256M 模型零样本标这 40 张（约 2 美元，要你同意）",
+                           "Run the 256M model zero-shot on the 40 photos on a rented GPU (about $2, needs your OK)"),
+            "artifacts": [{"kind": "paper", "title": "SmolVLM: Redefining small and efficient multimodal models", "url": SMOLVLM}],
+            "notion_url": None, "notion_sync": "pending"},
+        "i-rise": {
+            "title": t("失败更多来自发酵时间，还是面粉牌子？", "Rise time or flour brand: which explains the failures?"),
+            "question": t("控制住厨房温度以后，面粉牌子还能解释烤成率的差别吗？",
+                          "Once kitchen temperature is held fixed, does flour brand still explain the success rate?"),
+            "importance": t("决定 Loaflog 该先记温度还是先记面粉。", "Decides whether Loaflog should log temperature or flour first."),
+            "status": "developing", "seeds": ["flour"],
+            "hypotheses": [t("面粉牌子通过蛋白质含量起作用", "Brand matters through protein content"),
+                           t("发酵时间和室温解释大部分失败，牌子只是和季节混在一起", "Rise time and room temperature explain "
+                             "most failures; brand is confounded with the season")],
+            "evidence": [{"id": "e1", "claim": t("40 次里 11 次失败集中在厨房低于 20°C 的那几周。",
+                                                 "11 of the 40 bakes failed, mostly in weeks when the kitchen was below 20 °C."),
+                          "source": note_src, "kind": "observation", "at": c.iso(-1, "21:10")}],
+            "changes": [],
+            "next_step": t("按室温把 40 次分成两半，各自比较不同牌子的失败率。",
+                           "Split the 40 bakes by kitchen temperature and compare failure rates per brand inside each half."),
+            "artifacts": [], "notion_url": None, "notion_sync": "pending"},
+        "i-res": {
+            "title": t("照片越清楚判断越准？", "Sharper photos, better judgments?"),
+            "question": t("1200 万像素的照片比 300 万像素的标得更准吗？", "Does a 12 MP photo give better proofing labels than a 3 MP one?"),
+            "importance": t("决定 app 要不要存原图。", "Decides whether the app has to keep full-size photos."),
+            "status": "contradicted", "seeds": ["photo"],
+            "hypotheses": [t("气孔细节需要高分辨率", "Crumb detail needs high resolution")],
+            "evidence": [{"id": "e1", "claim": t("把 40 张降到 300 万像素重标，39 张和原图标得一样。",
+                                                 "Re-labelled the 40 photos at 3 MP: 39 got the same label as at 12 MP."),
+                          "source": t("Loaflog 仓库里的 labels-3mp.csv", "labels-3mp.csv in the Loaflog repo"),
+                          "kind": "experiment", "at": c.iso(-3, "21:05")}],
+            "changes": [{"at": c.iso(-3, "21:10"), "before": t("照片越清楚判断越准", "Sharper photos give better judgments"),
+                         "after": t("至少对人工标注，300 万像素就够；分辨率不是瓶颈", "For hand labels at least, 3 MP is "
+                                    "enough; resolution is not the bottleneck"),
+                         "reason": t("39/40 一致", "39 of 40 labels unchanged")}],
+            "next_step": t("缩略图直接用 300 万像素，不存原图。", "Keep 3 MP thumbnails; drop the full-size photos."),
+            "artifacts": [], "notion_url": None, "notion_sync": "pending"},
+    }
+
+
+def runs_of(c: Clock, t: Lang) -> list[dict]:
+    """POST /idea-lab/runs, plus how each ended (the demo has no worker: the end is written by backdate / the mock)."""
+    return [
+        {"key": "r-rise", "spec": {
+            "title": t("发展：发酵时间还是面粉", "Develop: rise time or flour"),
+            "goal": t("找出最便宜、能把温度和牌子分开的检查", "Find the cheapest check that separates temperature from brand"),
+            "direction": t("烤坏了要知道为什么", "Know why a bake failed"), "mode": "develop",
+            "seeds": ["flour"], "ideas": ["i-rise"],
+            "budget": {"wall_minutes": 20, "max_turns": 30, "allow_cpu": True, "allow_write": True},
+            "experiment_policy": t("只读 Loaflog 导出的记录，不改仓库", "Read the Loaflog export only; don't touch the repo")},
+         "created": (-1, "20:40"), "started": (-1, "20:41"), "finished": (-1, "20:58"), "status": "completed",
+         "summary": t("新证据：失败集中在室温低于 20°C 的几周（11/40），牌子和季节混在一起，判断从"
+                      "\"牌子决定成败\"变成\"先控制温度再比牌子\"。下一步：按室温分两半比较。研究文本已暂存，尚未同步到研究文档。",
+                      "New evidence: failures cluster in weeks below 20 °C (11 of 40) and brand is confounded with the "
+                      "season, so the judgment moved from \"brand decides\" to \"hold temperature fixed, then compare "
+                      "brands\". Next: split by temperature. The research text is saved and not yet synced to your documents."),
+         "outputs": ["i-rise"]},
+        {"key": "r-photo", "spec": {
+            "title": t("完整一轮：一张照片判断发酵", "Cycle: proofing from one photo"),
+            "goal": t("确认零样本测试值得做，并写好测试方案", "Check that a zero-shot test is worth running and write its plan"),
+            "direction": t("烤坏了要知道为什么", "Know why a bake failed"), "mode": "cycle",
+            "seeds": ["photo", "smolvlm"], "ideas": ["i-photo"],
+            "budget": {"wall_minutes": 30, "max_turns": 40, "allow_cpu": False, "allow_write": True},
+            "experiment_policy": t("不跑模型，只读公开资料和标注表", "No model runs; public sources and the label sheet only")},
+         "created": (-2, "21:00"), "started": (-2, "21:01"), "finished": (-2, "21:28"), "status": "needs_input",
+         "summary": t("Explore 和 Develop 完成：标注可靠（36/40），SmolVLM-256M 大小合适。最小诊断要在 GPU 上跑模型，"
+                      "这个执行器没有 GPU 权限，需要你同意租一台（约 2 美元）。独立证据复核：引用和数字与原文一致。",
+                      "Explore and Develop done: the labels hold up (36 of 40) and SmolVLM-256M is the right size. The "
+                      "smallest diagnostic runs the model on a GPU, which this executor may not use: it needs your OK to "
+                      "rent one (about $2). Independent evidence review: the citations and numbers match the sources."),
+         "outputs": ["i-photo"]},
+    ]
+
+
+def automation_of(t: Lang) -> dict:
+    """POST /idea-lab/automations: explore each new inbox item, three runs at most."""
+    return {"title": t("新材料来了就探索", "Explore new material as it arrives"), "enabled": True, "trigger": "new_seed",
+            "interval_minutes": 1440, "max_runs": 3,
+            "run": {"title": t("探索新材料", "Explore new material"),
+                    "goal": t("看新材料支持、反驳还是扩展已有的问题", "See whether new material supports, contradicts or extends an existing question"),
+                    "direction": t("烤坏了要知道为什么", "Know why a bake failed"), "mode": "explore",
+                    "seed_ids": [], "idea_ids": [],
+                    "budget": {"wall_minutes": 15, "max_turns": 20, "allow_cpu": False, "allow_write": True},
+                    "experiment_policy": t("只读公开资料", "Public sources only")}}
+
+
+def skills_snapshot_of(c: Clock, root: str) -> dict:
+    """PUT /research-skills (api.md 研究技能): examples/skills as the worker uploads it; `root` is the folder shown as
+    source_path (the mock shows a made-up one, a demo hub the real checkout). Commits are the story's."""
+    skills = []
+    for skill_id, title, summary, commits in SKILLS:
+        folder = SKILLS_DIR / skill_id
+        files = sorted((p for p in folder.rglob("*.md") if p.is_file()), key=lambda p: (p.name != "SKILL.md", p.relative_to(folder).as_posix()))
+        if files[0] != folder / "SKILL.md":
+            raise SystemExit(f"{folder} has no SKILL.md")
+        skills.append({
+            "id": skill_id, "title": title, "summary": summary, "source_path": f"{root}/{skill_id}/SKILL.md",
+            "updated_at": c.iso(commits[0][1], commits[0][2]),
+            "files": [{"path": p.relative_to(folder).as_posix(), "content": p.read_text()} for p in files],
+            "changes": [{"revision": hashlib.sha1(f"{skill_id}:{s}".encode()).hexdigest(), "at": c.iso(n, hm), "summary": s}
+                        for s, n, hm in commits]})
+    return {"updated_at": c.iso(-1, "23:00"), "skills": skills}
+
+
+def page_html(t: Lang, title: str, summary: str, project: str | None, now: str, rows: list[tuple[str, str, str]],
+              log: list[str]) -> str:
+    """api.md 页面: a self-contained page (title, description, optional project meta); colors follow the theme."""
+    project_meta = "" if project is None else f'<meta name="mojito-project" content="{project}">'
+    head_cells = (t("项", "Item"), t("现在", "Now"), t("备注", "Notes"))
+    table = "".join(f"<tr><td>{a}</td><td>{b}</td><td>{n}</td></tr>" for a, b, n in rows)
+    timeline = "".join(f"<li><b>v{n}</b> {what}</li>" for n, what in enumerate(log, 1))
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{title}</title><meta name=\"description\" content=\"{summary}\">{project_meta}"
+        "<style>:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--tx2:#5f5e5a;--line:#e3e1da;--brand:#2f6f9f}"
+        "@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;"
+        "--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}}"
+        ":root[data-theme=dark]{--bg:#141618;--card:#1c1f22;--tx:#e8e8e6;--tx2:#a3a7ab;--line:#2c3136;--brand:#7fb0d9}"
+        "body{background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}"
+        "h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}p{color:var(--tx2);margin:0 0 12px}"
+        ".now{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:12px 14px}"
+        "table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}"
+        "ul{padding-left:18px;font-size:14px}a{color:var(--brand)}</style></head><body>"
+        f"<h1>{title}</h1><p>{summary}</p><div class=\"now\"><b>{t('现在：', 'Now: ')}</b>{now}</div>"
+        f"<h2>{t('一览', 'At a glance')}</h2><table><tr>{''.join(f'<th>{h}</th>' for h in head_cells)}</tr>{table}</table>"
+        f"<h2>{t('记录', 'Log')}</h2><ul>{timeline}</ul></body></html>")
+
+
+def page_fields(html: str) -> dict:
+    """What the hub takes from a page's html (title, description, project meta), for the mock that stores no pages."""
+    project = re.search(r'<meta name="mojito-project" content="([^"]+)">', html)
+    return {"title": re.search(r"<title>([^<]+)</title>", html)[1],
+            "summary": re.search(r'<meta name="description" content="([^"]+)">', html)[1],
+            "project_id": None if project is None else project[1]}
+
+
+def pages_of(c: Clock, t: Lang) -> list[dict]:
+    """api.md 页面: each page's versions, oldest first; every write is a version with a note."""
+    def models(now: str, log: list[str]) -> str:
+        return page_html(
+            t, t("手机上的小视觉模型", "Small vision models on a phone"),
+            t("给 Loaflog 判断发酵挑模型：候选、大小和下一步。", "Picking a model to judge proofing in Loaflog: candidates, size, next step."),
+            "p-loaflog", now,
+            [("SmolVLM-256M", t("首选：推理不到 1GB 显存", "First pick: under 1 GB of GPU memory at inference"),
+              f'<a href="{SMOLVLM}">arXiv 2504.05299</a>'),
+             ("SmolVLM-2.2B", t("备选：更准，但装进手机要量化", "Fallback: stronger, needs quantizing for a phone"),
+              f'<a href="{SMOLVLM}">arXiv 2504.05299</a>'),
+             (t("微调", "Fine-tuning"), t("零样本不够再用 LoRA", "LoRA if zero-shot falls short"), f'<a href="{LORA}">arXiv 2106.09685</a>'),
+             (t("测试集", "Test set"), t("40 张切面照片，两遍标注 36 张一致", "40 crumb photos, two labelling passes agree on 36"),
+              "labels.csv")], log)
+    first = [t("列出候选模型", "Listed the candidate models")]
+    second = first + [t("40 张照片标好了，两遍 36/40 一致", "Labelled 40 photos; the two passes agree on 36")]
+    third = second + [t("下一步：在 GPU 上零样本测试（等你同意）", "Next: zero-shot test on a GPU (waiting for your OK)")]
+
+    def mic(now: str, log: list[str]) -> str:
+        return page_html(
+            t, t("开放麦准备", "Open mic prep"), t("月底开放麦：曲目、练习进度和当天清单。", "The open mic at the end of the month: set list, practice, the day-of list."),
+            "p-guitar", now,
+            [(t("曲目", "Set"), t("三首，第二首还卡在换和弦", "Three songs; the chord change in the second still stumbles"), ""),
+             (t("练习", "Practice"), t("每天 20 分钟，连续 5 天", "20 minutes a day, five days running"), ""),
+             (t("当天", "On the day"), t("备用琴弦、调音器、提前 30 分钟到", "Spare strings, tuner, arrive 30 minutes early"), "")], log)
+    return [
+        {"path": "research/small-vision-models", "by": "session:loaflog-ml", "versions": [
+            {"at": c.iso(-6, "20:30"), "note": t("第一版", "First version"),
+             "html": models(t("在挑模型", "Choosing a model"), first)},
+            {"at": c.iso(-2, "21:30"), "note": t("加上标好的测试集", "Added the labelled test set"),
+             "html": models(t("测试集已就绪，模型还没跑", "Test set ready; no model run yet"), second)},
+            {"at": c.iso(-1, "21:15"), "note": t("下一步：GPU 上零样本测试", "Next step: zero-shot test on a GPU"),
+             "html": models(t("零样本测试等你同意租 GPU（约 2 美元）", "The zero-shot test waits for your OK to rent a GPU (about $2)"), third)}]},
+        {"path": "life/open-mic", "by": "session:maint", "versions": [
+            {"at": c.iso(-5, "22:00"), "note": t("第一版", "First version"),
+             "html": mic(t("选好三首歌", "Three songs picked"), [t("定了曲目", "Picked the set")])},
+            {"at": c.iso(-1, "22:05"), "note": t("更新练习进度", "Practice progress"),
+             "html": mic(t("第二首的换和弦还要练", "The second song's chord change needs work"),
+                         [t("定了曲目", "Picked the set"), t("连续练了 5 天", "Five days of practice in a row")])}]},
+    ]
+
+
+def idea_lab_mock_of(c: Clock, t: Lang) -> dict:
+    """GET /idea-lab as the mock serves it: the hub's view after `load` + `backdate` (same ids for seeds)."""
+    inbox, ideas, reasons = inbox_of(c, t), ideas_of(c, t), seed_reasons(t)
+    idea_id = {key: demo_uuid(key) for key in ideas}
+    linked = {key: [idea_id[i] for i, idea in ideas.items() if key in idea["seeds"]] for key in inbox}
+    explored = {}
+    for run in runs_of(c, t):
+        for key in run["spec"]["seeds"]:
+            explored[key] = max(explored.get(key, ""), c.iso(*run["finished"]))
+    seeds = [{"id": seed_id(e), "kind": e["kind"] if "kind" in e else "idea", "text": e["text"], "source": e["source"],
+              "at": e["at"], "snapshot": {**e, "kind": e["kind"] if "kind" in e else "idea"},
+              "reason": reasons[key] if key in reasons else "", "idea_ids": linked[key], "present": True,
+              "last_explored_at": explored[key] if key in explored else None} for key, e in inbox.items()]
+    sid = {key: seed_id(e) for key, e in inbox.items()}
+    lab_ideas = []
+    for key, idea in ideas.items():
+        content = {k: v for k, v in idea.items() if k != "seeds"}
+        lab_ideas.append({**content, "seed_ids": [sid[s] for s in idea["seeds"]], "id": idea_id[key], "revision": 1,
+                          "created_at": idea["evidence"][0]["at"], "updated_at": idea["evidence"][-1]["at"]})
+    runs = []
+    for run in runs_of(c, t):
+        spec = {k: v for k, v in run["spec"].items() if k not in ("seeds", "ideas")}
+        runs.append({**spec, "seed_ids": [sid[s] for s in run["spec"]["seeds"]], "idea_ids": [idea_id[i] for i in run["spec"]["ideas"]],
+                     "idempotency_key": f"demo-{run['key']}", "id": demo_uuid(run["key"]), "job_id": f"j-demo-{run['key']}",
+                     "status": run["status"], "created_at": c.iso(*run["created"]), "started_at": c.iso(*run["started"]),
+                     "finished_at": c.iso(*run["finished"]), "error": None, "summary": run["summary"],
+                     "idea_revisions": {idea_id[i]: 1 for i in run["spec"]["ideas"]},
+                     "output_idea_ids": [idea_id[i] for i in run["outputs"]], "artifacts": [],
+                     "lease_token": None, "lease_until": None, "automation_id": None})
+    auto = automation_of(t)
+    automations = [{**auto, "idempotency_key": "demo-auto-explore", "id": demo_uuid("auto-explore"), "runs_started": 0,
+                    "next_at": c.iso(0, "21:00"), "last_seed_ids": list(sid.values()), "state": "active"}]
+    return {"seeds": seeds, "ideas": lab_ideas, "runs": runs, "automations": automations}
 
 
 def ask_feedback(t: Lang) -> dict:
@@ -791,6 +1117,12 @@ def mock_extra_of(c: Clock, t: Lang, app: str, seed: dict) -> dict:
                               for pid, s in x["summaries"].items()},
         "project_overviews": x["overviews"],
         "research_map": x["research_map"],
+        # the projects page's three panels (design.md 8.14, 8.15) and the pages list (api.md 页面)
+        "research_skills": skills_snapshot_of(c, "/opt/mojito/examples/skills"),
+        "idea_lab": idea_lab_mock_of(c, t),
+        "pages": [{"path": page["path"], "versions": [
+            {"version": n, "updated_at": v["at"], "updated_by": page["by"], "note": v["note"], "html": v["html"], **page_fields(v["html"])}
+            for n, v in enumerate(page["versions"], 1)]} for page in pages_of(c, t)],
         "cards": cards,
         "feedback": [{"id": "f-demo-1", "at": c.iso(-1, "19:30"),
                       "body": t("信息流卡片太长了，能不能默认只显示三行？", "Feed cards are too long. Can they show three lines by default?"),
@@ -892,6 +1224,7 @@ def cmd_build(a) -> None:
     (out / "ical-extra-urls").write_text("")  # MOJITO_ICAL_EXTRA_FILE: no subscribed calendars
     openssl("ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", str(out / "vapid.pem"))
     (out / "vapid.pem").chmod(stat.S_IRUSR | stat.S_IWUSR)
+    write_private(out / "pages-link.key", secrets.token_hex(32) + "\n")  # MOJITO_PAGES_KEY_FILE (gen-pages-key.sh)
     tokens = {role: secrets.token_urlsafe(32) for role in ROLES}
     write_private(out / "tokens.json", json.dumps({tok: role for role, tok in tokens.items()}, indent=2))
     hub = f"http://127.0.0.1:{a.port}"
@@ -901,14 +1234,18 @@ def cmd_build(a) -> None:
         f"MOJITO_ICAL_EXTRA_FILE={out / 'ical-extra-urls'}", f"MOJITO_FCM_CREDENTIALS={fcm}",
         f"MOJITO_ATTACHMENTS_DIR={out / 'attachments'}", f"MOJITO_VAPID_KEY_FILE={out / 'vapid.pem'}",
         f"MOJITO_VAPID_SUBJECT={a.public_url}", f"MOJITO_PUBLIC_URL={a.public_url}", f"MOJITO_WEB_DIR={out / 'web'}",
-        f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_OWNER_NAME={OWNER_NAME}", f"MOJITO_CONTACT_EMAIL={CONTACT_EMAIL}"]) + "\n")
+        f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_OWNER_NAME={OWNER_NAME}", f"MOJITO_CONTACT_EMAIL={CONTACT_EMAIL}",
+        f"MOJITO_PAGES_KEY_FILE={out / 'pages-link.key'}"]) + "\n")
     clients = out / "clients"
     clients.mkdir(mode=0o700)
     for name, var, role, extra in (("worker.env", "MOJITO_WORKER_TOKEN", "worker",
-                                    [f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_RESEARCH_MAP={out / 'research-map.json'}"]),
+                                    [f"MOJITO_TIMEZONE={a.timezone}", f"MOJITO_RESEARCH_MAP={out / 'research-map.json'}",
+                                     f"MOJITO_SKILLS_DIR={SKILLS_DIR}", f"MOJITO_RESEARCH_RULES={RULES_FILE}"]),
                                    ("agent.env", "MOJITO_AGENT_TOKEN", "agent", [f"MOJITO_TIMEZONE={a.timezone}"]),
                                    ("maintainer.env", "MOJITO_MAINTAINER_TOKEN", "maintainer", []),
-                                   ("cards.env", "MOJITO_CARDS_TOKEN", "source:cards", [])):
+                                   ("cards.env", "MOJITO_CARDS_TOKEN", "source:cards", []),
+                                   ("pages.env", "MOJITO_PAGES_TOKEN", "source:pages", []),
+                                   ("idea-lab.env", "MOJITO_IDEA_LAB_TOKEN", "source:ideas", [])):
         write_private(clients / name, "\n".join([f"MOJITO_HUB_URL={hub}", f"{var}={tokens[role]}", *extra]) + "\n")
     write_private(clients / "app-token.txt", tokens["app"] + "\n")
     write_json(out / "demo.json", {"day": c.ymd(0), "timezone": a.timezone, "language": a.language,
@@ -951,6 +1288,47 @@ class NewRecords:
         self.tagged += [[rid, db_ts(at)] for _, rid in rows]
         if rows:
             self.last = rows[-1][0]
+
+
+def load_idea_lab(hub: Hub, c: Clock, t: Lang) -> dict:
+    """Idea Lab (api.md Idea Lab): the hub turns the map's inbox into seeds; Sam's reasons, ideas, two runs and a plan.
+    The runs stay queued here (no worker in the demo); backdate writes how they ended."""
+    inbox = inbox_of(c, t)
+    sid = {key: seed_id(e) for key, e in inbox.items()}
+    have = {s["id"] for s in hub.call("app", "GET", "/idea-lab", None)["seeds"]}
+    if set(sid.values()) != have:
+        raise SystemExit(f"the hub's seed ids differ from demo_data.seed_id: {sorted(have)} vs {sorted(sid.values())}")
+    for key, reason in seed_reasons(t).items():
+        hub.call("app", "PUT", f"/idea-lab/seeds/{sid[key]}", {"reason": reason})
+    ideas = {}
+    for key, idea in ideas_of(c, t).items():
+        body = {k: v for k, v in idea.items() if k != "seeds"} | {"seed_ids": [sid[s] for s in idea["seeds"]]}
+        ideas[key] = hub.call("app", "POST", "/idea-lab/ideas", body)["id"]
+    runs = []
+    for run in runs_of(c, t):
+        spec = {k: v for k, v in run["spec"].items() if k not in ("seeds", "ideas")}
+        body = spec | {"idempotency_key": f"demo-{run['key']}", "seed_ids": [sid[s] for s in run["spec"]["seeds"]],
+                       "idea_ids": [ideas[i] for i in run["spec"]["ideas"]]}
+        made = hub.call("app", "POST", "/idea-lab/runs", body)
+        runs.append({"id": made["id"], "job_id": made["job_id"], "status": run["status"], "summary": run["summary"],
+                     "created": db_ts(c.at(*run["created"])), "started": db_ts(c.at(*run["started"])),
+                     "finished": db_ts(c.at(*run["finished"])), "outputs": [ideas[i] for i in run["outputs"]],
+                     "seeds": [sid[s] for s in run["spec"]["seeds"]]})
+    hub.call("app", "POST", "/idea-lab/automations", automation_of(t) | {"idempotency_key": "demo-auto-explore"})
+    stamps = {ideas[key]: [db_ts(datetime.fromisoformat(i["evidence"][0]["at"])), db_ts(datetime.fromisoformat(i["evidence"][-1]["at"]))]
+              for key, i in ideas_of(c, t).items()}
+    return {"runs": runs, "ideas": stamps}
+
+
+def load_pages(hub: Hub, c: Clock, t: Lang) -> list:
+    """Pages (api.md 页面): every version through PUT (source:pages), as the pages CLI writes them."""
+    written = []
+    for page in pages_of(c, t):
+        for base, version in enumerate(page["versions"]):
+            hub.call("source:pages", "PUT", f"/pages/{page['path']}",
+                     {"html": version["html"], "base_version": base, "note": version["note"], "by": page["by"].removeprefix("session:")})
+            written.append([page["path"], base + 1, db_ts(datetime.fromisoformat(version["at"]))])
+    return written
 
 
 def cmd_load(a) -> None:
@@ -1006,6 +1384,10 @@ def cmd_load(a) -> None:
         new.tag(datetime.fromisoformat(overview["checked_at"]))
     # the projects page's map (api.md 研究地图): the worker copies the map file whole; stored without a record
     hub.call("worker", "PUT", "/research-map", x["research_map"])
+    # research skills (api.md 研究技能): the worker uploads examples/skills on every project sync
+    hub.call("worker", "PUT", "/research-skills", skills_snapshot_of(c, str(SKILLS_DIR)))
+    done["idea_lab"] = load_idea_lab(hub, c, t)
+    done["pages"] = load_pages(hub, c, t)
 
     events = [{"at": c.iso(n, hm), "kind": "view", "name": "app_open", "detail": None} for n, hms in x["opens"].items() for hm in hms]
     hub.call("app", "POST", "/usage", {"events": events})
@@ -1029,6 +1411,24 @@ def cmd_load(a) -> None:
           "stop the hub, then run backdate")
 
 
+def backdate_idea_lab(db: sqlite3.Connection, lab: dict) -> None:
+    """The runs end as a worker would have ended them (status, summary, output ideas, job done); ideas and explored
+    seeds carry story times."""
+    def update(table: str, key: str, **fields) -> None:
+        body = json.loads(db.execute(f"SELECT body FROM {table} WHERE id = ?", (key,)).fetchone()[0])
+        db.execute(f"UPDATE {table} SET body = ? WHERE id = ?", (json.dumps(body | fields, ensure_ascii=False), key))
+
+    for idea_id, (created, updated) in lab["ideas"].items():
+        update("research_ideas", idea_id, created_at=created, updated_at=updated)
+    for run in lab["runs"]:
+        update("research_runs", run["id"], status=run["status"], summary=run["summary"], created_at=run["created"],
+               started_at=run["started"], finished_at=run["finished"], output_idea_ids=run["outputs"])
+        db.execute("UPDATE jobs SET status = 'done', requested_at = ?, started_at = ?, finished_at = ? WHERE id = ?",
+                   (run["created"], run["started"], run["finished"], run["job_id"]))
+        for seed in run["seeds"]:
+            update("idea_seeds", seed, last_explored_at=run["finished"])
+
+
 def cmd_backdate(a) -> None:
     out = Path(a.out).resolve()
     done = json.loads((out / "loaded.json").read_text())
@@ -1047,6 +1447,9 @@ def cmd_backdate(a) -> None:
             db.execute("UPDATE feedback SET at = ?, updated_at = ? WHERE id = ?", (at, updated, fid))
         for rid, at in done["records"]:
             db.execute("UPDATE records SET at = ? WHERE id = ?", (at, rid))
+        backdate_idea_lab(db, done["idea_lab"])
+        for path, version, at in done["pages"]:
+            db.execute("UPDATE page_versions SET updated_at = ? WHERE path = ? AND version = ?", (at, path, version))
         left = db.execute("SELECT title FROM records WHERE at >= ?", (start,)).fetchall()
         if left:
             raise SystemExit(f"records written during load still carry load time (written by the hub on its own?): {left}")

@@ -1,3 +1,4 @@
+import type { TextInput } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { ReadableError } from './api/client'
@@ -18,6 +19,15 @@ async function prepare(asset: ImagePicker.ImagePickerAsset): Promise<PreparedIma
   const ref = await ctx.renderAsync()
   const out = await ref.saveAsync({ compress: 0.8, format: SaveFormat.JPEG })
   return { uri: out.uri, width: out.width, height: out.height }
+}
+
+// 粘贴图片只在网页 / Mac app（images.web.ts）：RN 原生输入框收不到剪贴板里的图片，这里不监听
+export function listenPaste(
+  _input: TextInput,
+  _remaining: number,
+  _onImages: (prepare: () => Promise<PreparedImage[]>, dropped: number) => void,
+): () => void {
+  return () => {}
 }
 
 // 从相册选（可多选，最多 remaining 张）或拍一张；用户取消返回空列表

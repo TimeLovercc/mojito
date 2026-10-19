@@ -1,3 +1,4 @@
+import type { TextInput } from 'react-native'
 import { ReadableError } from './api/client'
 import { t } from './i18n'
 
@@ -33,6 +34,31 @@ async function prepareAll(files: File[]): Promise<PreparedImage[]> {
   const out: PreparedImage[] = []
   for (const file of files) out.push(await prepare(file))
   return out
+}
+
+// 输入框里 ⌘V / Ctrl+V：剪贴板里有图片文件就拦下默认粘贴，把"处理前 remaining 张"交给 onImages，dropped 是超出上限没取的张数；
+// 剪贴板只有文字时不拦，照常粘贴。网页上 TextInput 的 ref 就是 <textarea> 节点（react-native-web）。返回取消监听
+export function listenPaste(
+  input: TextInput,
+  remaining: number,
+  onImages: (prepare: () => Promise<PreparedImage[]>, dropped: number) => void,
+): () => void {
+  const node = input as unknown as HTMLElement
+  const onPaste = (e: ClipboardEvent) => {
+    if (e.clipboardData === null) throw new Error('paste 事件没有 clipboardData')
+    const files = [...e.clipboardData.items].filter((i) => i.kind === 'file' && i.type.startsWith('image/')).map(asFile)
+    if (files.length === 0) return
+    e.preventDefault()
+    onImages(() => prepareAll(files.slice(0, remaining)), Math.max(0, files.length - remaining))
+  }
+  node.addEventListener('paste', onPaste)
+  return () => node.removeEventListener('paste', onPaste)
+}
+
+function asFile(item: DataTransferItem): File {
+  const file = item.getAsFile()
+  if (file === null) throw new Error(`剪贴板项 ${item.type} 取不到文件`)
+  return file
 }
 
 // 打开文件选择（可多选，最多 remaining 张）；用户取消返回空列表

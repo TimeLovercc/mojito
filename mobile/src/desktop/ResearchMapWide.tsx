@@ -6,11 +6,13 @@ import { actions } from '../api/client'
 import type { MapOrigin, Project, ProjectsList, ResearchMap } from '../api/types'
 import { projectActions, useAct } from '../components/Decision'
 import { ResearchCard, RunBox } from '../components/ResearchCard'
+import { IdeaLab } from '../components/IdeaLab'
+import { InspirationInbox } from '../components/InspirationInbox'
+import { ResearchEntries, ResearchSkills } from '../components/ResearchSkills'
 import { StaleBanner } from '../components/Screen'
 import { t } from '../i18n'
 import { LIFE, RUN, STAGE, both, branchColor, decisionsOf, originPrinciples, placeName, placeProjects, placesOf, runOf, type Placed } from '../research'
 import { colors, font, isDark, overlay, size, txAlpha } from '../theme'
-import { when } from '../time'
 import { trackAction, useScreenIds, useViewTracking } from '../usage'
 import { useHub } from '../use-hub'
 import { useHover } from '../hover'
@@ -20,10 +22,10 @@ import { Menu } from './Menu'
 import { TopBarD } from './TopBar'
 
 // 电脑项目页 = 研究地图（design.md 8.13，照研究地图演示页）：一张横向思维导图，根在左，方向、叶子、起点、项目依次往右；
-// 方向节点点一下收起 / 展开；项目节点有运行状态方块、阶段和待你决定数；"灵感收件箱"挂在根下。点根节点看总原则，
+// 方向节点点一下收起 / 展开；项目节点有运行状态方块、阶段和待你决定数；顶部入口打开收件箱和研究技能。点根节点看总原则，
 // 点起点看它的整句、对应原则和长出来的项目，点项目或收件箱看卡片，都在右边抽屉（components/ResearchCard）。
 // 顶栏右边"只看进行中的"开关和选中项目的"⋯"（暂停 / 完成 / 恢复）
-type Sel = { kind: 'project'; id: string } | { kind: 'origin'; id: string } | { kind: 'inbox' } | { kind: 'principles' }
+type Sel = { kind: 'project'; id: string } | { kind: 'origin'; id: string } | { kind: 'inbox' } | { kind: 'skills' } | { kind: 'lab'; idea?: string; seed?: string } | { kind: 'principles' }
 
 export function ResearchMapWide() {
   const map = useHub<ResearchMap>('/research-map')
@@ -51,7 +53,12 @@ export function ResearchMapWide() {
     <View style={styles.page}>
       <TopBarD
         title={t('项目')}
-        sub={ready ? t('{n} 个', { n: placed.length }) : null}
+        sub={
+          <View style={styles.entries}>
+            {ready ? <Text style={styles.count}>{t('{n} 个', { n: placed.length })}</Text> : null}
+            <ResearchEntries count={map.data === null ? null : map.data.inbox.length} selected={sel !== null && (sel.kind === 'inbox' || sel.kind === 'skills' || sel.kind === 'lab') ? sel.kind : null} onSelect={(kind) => setSel(sel !== null && sel.kind === kind ? null : { kind })} />
+          </View>
+        }
         back={null}
         tools={
           <View style={styles.tools}>
@@ -92,8 +99,12 @@ export function ResearchMapWide() {
             </View>
             <CloseBtn onPress={() => setSel(null)} />
             <ScrollView contentContainerStyle={styles.drawerBody}>
-              {sel.kind === 'inbox' ? (
-                <Inbox map={map.data!} />
+              {sel.kind === 'lab' ? (
+                <IdeaLab key={`${sel.idea}:${sel.seed}`} initialIdea={sel.idea === undefined ? null : sel.idea} initialSeed={sel.seed === undefined ? null : sel.seed} />
+              ) : sel.kind === 'skills' ? (
+                <ResearchSkills />
+              ) : sel.kind === 'inbox' ? (
+                <InspirationInbox map={map.data!} showTitle onIdea={(id) => setSel({ kind: 'lab', idea: id })} onExplore={(id) => setSel({ kind: 'lab', seed: id })} />
               ) : sel.kind === 'principles' ? (
                 <Principles map={map.data!} />
               ) : sel.kind === 'origin' ? (
@@ -141,7 +152,7 @@ function useDrawerWidth() {
 function CloseBtn({ onPress }: { onPress: () => void }) {
   const [hovered, hover] = useHover()
   return (
-    <Pressable onPress={onPress} {...hover} style={[styles.close, hovered && styles.closeHover]} accessibilityLabel={t('关闭')}>
+    <Pressable onPress={onPress} {...hover} style={[styles.close, hovered && styles.closeHover]} accessibilityLabel={t('关闭')} accessibilityRole="button">
       <X size={16} color={hovered ? colors.tx : colors.tx2} />
     </Pressable>
   )
@@ -214,23 +225,6 @@ function OriginProject({ item: x, onPress }: { item: Placed; onPress: () => void
   )
 }
 
-function Inbox({ map }: { map: ResearchMap }) {
-  return (
-    <View style={styles.inbox}>
-      <Text style={styles.inboxTitle}>{t('灵感收件箱')}</Text>
-      <Text style={styles.inboxSub}>{t('还没立项的想法，{n} 条', { n: map.inbox.length })}</Text>
-      {map.inbox.map((x, i) => (
-        <View key={i} style={styles.idea}>
-          <Text style={styles.ideaText}>{x.text}</Text>
-          {x.area === null ? null : <Text style={styles.ideaMeta}>{t('建议放在 {place}', { place: placeName(map, x.area) })}</Text>}
-          {x.note === null ? null : <Text style={styles.ideaMeta}>{x.note}</Text>}
-          <Text style={styles.ideaMeta}>{`${x.source} · ${when(x.at)}`}</Text>
-        </View>
-      ))}
-    </View>
-  )
-}
-
 // "⋯"：该状态下现有的动作（暂停 / 完成 / 恢复）
 function ProjectMenu({ project }: { project: Project }) {
   const { act } = useAct()
@@ -256,7 +250,7 @@ function ProjectMenu({ project }: { project: Project }) {
 // 节点宽度用 canvas 量字（电脑版只跑在网页里），高度按种类固定；排版同演示页：每个节点的子树高度自下而上算好，
 // 子节点在父节点右边 HGAP 处竖着排开、整体对齐父节点中线；方向节点之间多留一点空
 
-type Kind = 'root' | 'inbox' | 'area' | 'leaf' | 'origin' | 'project'
+type Kind = 'root' | 'area' | 'leaf' | 'origin' | 'project'
 type Node = {
   kind: Kind
   key: string
@@ -278,7 +272,6 @@ const PAD = 24
 const UI_FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif'
 const NODE = {
   root: { h: 50, title: size.title, sub: size.small },
-  inbox: { h: 30, title: size.secondary + 1 },
   area: { h: 30, title: size.secondary + 1 },
   leaf: { h: 24, title: size.small + 1 },
   origin: { h: 26, title: size.small + 1 },
@@ -300,7 +293,6 @@ function sizeOf(n: Node): { w: number; h: number } {
   switch (n.kind) {
     case 'root':
       return { w: 36 + Math.max(textWidth(n.label, NODE.root.title, 600), textWidth(t('{n} 个项目', { n: n.count }), NODE.root.sub, 400)), h: NODE.root.h }
-    case 'inbox':
     case 'area':
       return { w: 28 + textWidth(n.label, NODE.area.title, 600) + 6 + textWidth(String(n.count), size.small, 400) + badgeW(n.pending), h: NODE.area.h }
     case 'leaf':
@@ -352,8 +344,7 @@ function buildTree(map: ResearchMap, placed: Placed[], onlyRunning: boolean, col
       }),
     )
   })
-  const inbox = node('inbox', 'inbox', colors.tx3, t('灵感收件箱'), [], { count: map.inbox.length })
-  return node('root', 'root', colors.tx, t('研究地图'), [inbox, ...areas], { count: placed.length })
+  return node('root', 'root', colors.tx, t('研究地图'), areas, { count: placed.length })
 }
 
 function layout(root: Node): { nodes: Node[]; W: number; H: number } {
@@ -394,7 +385,7 @@ function layout(root: Node): { nodes: Node[]; W: number; H: number } {
   }
 }
 
-const EDGE_WIDTH: Record<Kind, number> = { root: 3, area: 2.2, leaf: 1.6, origin: 1.4, inbox: 1.4, project: 1.4 }
+const EDGE_WIDTH: Record<Kind, number> = { root: 3, area: 2.2, leaf: 1.6, origin: 1.4, project: 1.4 }
 
 function MindMap({
   map,
@@ -423,14 +414,14 @@ function MindMap({
       const x2 = c.x
       const y2 = anchorY(c)
       const mx = (x1 + x2) / 2
-      return { key: `${p.key}>${c.key}`, d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, color: c.color, width: EDGE_WIDTH[p.kind], dash: c.kind === 'inbox' }
+      return { key: `${p.key}>${c.key}`, d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, color: c.color, width: EDGE_WIDTH[p.kind] }
     }),
   )
   return (
     <View style={{ width: W, height: H }}>
       <Svg width={W} height={H} style={StyleSheet.absoluteFill}>
         {edges.map((e) => (
-          <Path key={e.key} d={e.d} stroke={e.color} strokeWidth={e.width} fill="none" strokeDasharray={e.dash ? '5 5' : undefined} />
+          <Path key={e.key} d={e.d} stroke={e.color} strokeWidth={e.width} fill="none" />
         ))}
       </Svg>
       {nodes.map((n) => (
@@ -464,7 +455,7 @@ function MapNode({
   onToggle: (key: string) => void
   onSelect: (s: Sel) => void
 }) {
-  // 悬停：项目节点边框换成方向的颜色、底色加深一档；方向和收件箱节点底色加深（光标保持箭头）
+  // 悬停：项目节点边框换成方向的颜色、底色加深一档；方向节点底色加深（光标保持箭头）
   const [hovered, hover] = useHover()
   switch (n.kind) {
     case 'root':
@@ -477,17 +468,6 @@ function MapNode({
         >
           <Text style={styles.rootTitle}>{n.label}</Text>
           <Text style={styles.rootSub}>{t('{n} 个项目', { n: n.count })}</Text>
-        </Pressable>
-      )
-    case 'inbox':
-      return (
-        <Pressable
-          onPress={() => onSelect({ kind: 'inbox' })}
-          {...hover}
-          style={[styles.node, styles.pillNode, styles.inboxNode, hovered && styles.nodeHover, sel !== null && sel.kind === 'inbox' && styles.nodeSel]}
-        >
-          <Text style={styles.areaText}>{n.label}</Text>
-          <Text style={styles.count}>{n.count}</Text>
         </Pressable>
       )
     case 'area':
@@ -550,6 +530,7 @@ function MapNode({
 }
 
 const styles = StyleSheet.create({
+  entries: { flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0, flexShrink: 1 },
   page: { flex: 1, backgroundColor: colors.bg },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toggle: { height: 26, paddingHorizontal: 10, borderRadius: 13, justifyContent: 'center', backgroundColor: overlay.fill },
@@ -580,7 +561,6 @@ const styles = StyleSheet.create({
   longText: { ...font.regular, fontSize: size.body, lineHeight: Math.round(size.body * 1.6), color: colors.tx2 },
   section: { ...font.semibold, fontSize: size.secondary, color: colors.tx, marginTop: 8 },
   pillNode: { height: '100%', paddingHorizontal: 12, gap: 6, borderRadius: 15, borderWidth: 2, backgroundColor: colors.card },
-  inboxNode: { borderStyle: 'dashed', borderColor: colors.tx3 },
   areaFolded: { opacity: 0.7, borderStyle: 'dashed' },
   areaText: { ...font.semibold, fontSize: NODE.area.title, color: colors.tx },
   count: { ...font.regular, fontSize: size.small, color: colors.tx3 },

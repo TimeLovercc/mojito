@@ -295,19 +295,26 @@ def _require_new_id(value: str, where: str) -> None:
         raise ValidationError(f"{where}: new id {value!r} must be a lowercase slug ({ID_PATTERN})")
 
 
-def validate_goal_updates(updates: list[dict], goals_by_id: dict[str, dict]) -> None:
+def validate_goal_updates(updates: list[dict], goals_by_id: dict[str, dict]) -> set[str]:
+    """Returns the goal ids that exist once these updates are applied: the hub's plus the new ones, which the same
+    reply's items, plans and projects may point to (apply_goal_updates runs before them)."""
+    goal_ids = set(goals_by_id)
     for i, u in enumerate(updates):
         where = _where("goal_updates", i)
         changes = u["changes"]
         if u["goal_id"] not in goals_by_id:
             _require_new_id(u["goal_id"], where)
+            if u["goal_id"] in goal_ids:
+                raise ValidationError(f"{where}: new goal {u['goal_id']!r} is created twice")
             missing = [f for f in ("title", "status") if f not in changes]
             if missing:
                 raise ValidationError(f"{where}: a new goal needs {missing}, got {changes}")
+            goal_ids.add(u["goal_id"])
         elif not changes:
             raise ValidationError(f"{where}: changes nothing")
         if "title" in changes:
             require_nonempty_str(changes, "title", where)
+    return goal_ids
 
 
 def apply_goal_updates(hub: Hub, updates: list[dict], goals_by_id: dict[str, dict]) -> None:

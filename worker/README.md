@@ -2,9 +2,11 @@
 
 Mac 上的长驻工人：轮询 hub 队列，事实用脚本查、判断交给 `claude -p`，结果写回 hub。约定见 `../docs/api.md`。
 
+研究技能快照由 `research_skills.py` 在每次 `sync_projects` 中读取并上传 `/research-skills`：`MOJITO_SKILLS_DIR` 下的 `research-idea-funnel`、`research-experiments`、`research-review`、`paper-writing` 四个技能，包含完整 `SKILL.md`、目录内 Markdown、真实文件修改时间及最近五次目录 Git 提交（目录不在 Git 仓库里时为空）。符号链接不读取，主文件缺失或 Git 读取失败使同步报错。仓库自带四个通用示例 `../examples/skills/`，可以直接指向它，也可以复制进你自己的技能目录再改。现有 60 秒文件监视包含技能目录与 Markdown 的新增、删除、修改，不另建调度器。上线前须先部署 hub 的 `/research-skills` 接口，再启动新版 worker；手动同步会实际写入 hub。
+
 ## 配置
 
-`worker/.env`（不入库；从 `worker/.env.example` 复制），每项都必填：`MOJITO_RESEARCH_MAP` 缺了每次 `sync_projects` 报错（api.md"研究地图"），其余缺一个启动即退出：
+`worker/.env`（不入库；从 `worker/.env.example` 复制），每项都必填：`MOJITO_RESEARCH_MAP`、`MOJITO_SKILLS_DIR` 缺了每次 `sync_projects` 报错，`MOJITO_RESEARCH_RULES` 缺了 Idea Lab 的研究运行报错（`launchd/install.sh` 安装时三项都查），其余缺一个启动即退出：
 
 | 变量 | 说明 |
 |---|---|
@@ -17,6 +19,8 @@ Mac 上的长驻工人：轮询 hub 队列，事实用脚本查、判断交给 `
 | `MOJITO_ZOTERO_DB` | `zotero.sqlite` 的路径，或写 `none`（论文口味不参考 Zotero、不做关注作者） |
 | `MOJITO_ARXIV_CATEGORIES` | 每日论文的 arXiv 分类，逗号分隔，如 `cs.AI,cs.HC` |
 | `MOJITO_RESEARCH_MAP` | 研究地图文件 `map.json` 的绝对路径（项目页的地图，见 api.md"研究地图"） |
+| `MOJITO_SKILLS_DIR` | 研究技能根目录的绝对路径（app 里"研究技能"读它，见 api.md"研究技能"），如仓库的 `examples/skills` |
+| `MOJITO_RESEARCH_RULES` | 研究运行的规则文件（Markdown）绝对路径，每次 Idea Lab 运行都放进提示词，比如你的 `~/.claude/CLAUDE.md` 展开后的路径 |
 
 固定项在 `src/mojito_worker/config.py`：轮询 15 秒、心跳 `expected_interval_s=86400`、`claude -p` 超时 600 秒。`claude -p` 一律不给工具（`--tools "" --strict-mcp-config`），查事实、动作都由脚本执行（报告的网页新闻也是脚本抓）。
 
@@ -58,7 +62,7 @@ uv run mojito-worker
 `feed_brief` / `feed_watch` / `feed_mail` 由 hub 按订阅入队，跑完都 `POST /subscriptions/{id}/result`（`{result, health}`，出错报 error 并让任务失败）；订阅按 `kind` 从 `GET /subscriptions` 找。
 
 其他常驻职责（主循环里顺带做）：
-- 卡片文件一改就同步（`card_watch.py`）：每 60 秒（墙钟）只 stat 上次 `sync_projects` 查过的各项目目录下的 `overview.json` 和 `MOJITO_RESEARCH_MAP` 地图文件；有新出现、消失或修改时间变了 → `POST /worker/jobs sync_projects`（hub 同 kind 去重），基线更新。基线在每次同步读文件前重建；目录清单存在 `~/.mojito-worker/card_dirs.json`，重启后第一次检查只记基线。出错只写日志。
+- 卡片文件一改就同步（`card_watch.py`）：每 60 秒（墙钟）只 stat 上次 `sync_projects` 查过的各项目目录下的 `overview.json`、`MOJITO_RESEARCH_MAP` 地图文件和四个研究技能目录里的 Markdown；有新出现、消失或修改时间变了 → `POST /worker/jobs sync_projects`（hub 同 kind 去重），基线更新。基线在每次同步读文件前重建；目录清单存在 `~/.mojito-worker/card_dirs.json`，重启后第一次检查只记基线。出错只写日志。
 - 维护会话看门狗（`watchdog.py`）：每 5 分钟看 `maintainer` 心跳，失联 ≥30 分钟且 60 分钟内没拉起过 → `orca terminal create` 在主 checkout 开新的维护会话，并推送。Mac 刚醒（两轮之间墙钟跳了 >10 分钟）或 worker 刚启动后 5 分钟内不判失联；开终端前先用 `claude -p` 最小调用查登录，认证失败就不开、改推"Mac 上的 Claude 登录过期，请 /login"（60 分钟内不重复），其他失败照旧开。命令非 0 时把退出码、stdout、stderr 记进日志，按 stdout 的 JSON 判断：拿到 handle 照常；`runtime_timeout`，或 `runtime_error` 且消息是"Timed out waiting for terminal handle"（都是 Orca 已收到请求、回复超时，终端几分钟后才出现）也照常写记录和推送（正文说明可能晚几分钟），60 分钟冷却生效；其他错误码或 stdout 不是 JSON 才报错。这是 Mac agent 对 Orca 唯一的写操作。
 - 授权状态：`gmail-read`（每小时）、`claude-mac`（认证失败/恢复时）。
 - hub 重启时（502/503/504、连接失败）退避重试约 30 秒。
@@ -99,3 +103,15 @@ worker/launchd/install.sh      # 检查 .env、uv sync、渲染 plist 到 ~/Libr
 launchctl bootout gui/$(id -u)/com.example.mojito.worker   # 卸载
 tail -f ~/Library/Logs/mojito-worker.log
 ```
+
+## Idea Lab research runner
+
+`research_runner.py` 通过独立 supervisor 进程执行 `research_run`，主 worker 立即返回原轮询，不被长研究任务堵住心跳。supervisor 自行 claim、每 5 秒续租、调用实际安装的 Claude CLI，并在同一个结果事务里结束 job。已有 worker 重启时不会重复认领仍有效的运行；进程丢失则由 Hub 租约检查标为失败。
+
+CLI 使用本机登录订阅，不指定旧 model，不携带额外 API key/provider 环境变量。启用 Read/Glob/Grep/WebSearch/WebFetch；只有授权本地写入时加 Write/Edit，授权 CPU 时才加 Bash（CPU也要求允许写复现产物）。提示词读取 `MOJITO_RESEARCH_RULES` 指向的规则文件、四个研究技能、地图的总原则、口味（taste）和选中材料，用户可见的文字按 app 的界面语言写。网页和论文是待分析数据，不能提供执行授权。没有 GPU 执行、远程 SSH、外部发送、投稿或自动立项权限；这些需求输出 needs_input。工具许可和提示词约束不应宣称为 GPU 配额隔离。
+
+OS 实时定时器硬截本轮 wall budget（网络阻塞也计时），CLI `--max-turns` 限制轮数；cycle 在同一总预算内保留一部分 turns 给第二个隔离的证据复核 CLI。复核预算不够或结果不确定会标为 needs_input，不声称完整 cycle 已通过。取消和失去租约会终止本次新建的进程组，既不使用模式 pkill，也不影响其他会话。仅支持前台、有界CPU命令，禁止任务自行后台化或建立第二调度。
+
+上下文、CLI原始输出、证据复核与结构化 result 保存在 `~/.mojito-worker/research-runs/<run-id>/`，用于中断恢复与审计。该目录是暂存区；当前执行器没有 Notion 写连接，所以研究文本始终标 `notion_sync=pending`，summary明确待同步，研究正文的真源仍是你自己的研究文档（例如 Notion）。程序失败和预算耗尽都保留已写文件。界面可用同一 POST 请求的幂等键重试网络失败；需要重新研究则建立新 run，不能重用原幂等键。
+
+日常由主 worker 的 `research_runner.launch()` 建立 `start_new_session=True` supervisor。手动有限试运行也必须用 `subprocess.Popen([sys.executable, '-m', 'mojito_worker.research_runner', run_id, job_id], start_new_session=True)`，并显式提供所用 Hub URL/token；run/job 必须已经通过授权 API 创建并领用。直接在交互 shell 调模块会拒绝启动，因为取消不能杀掉调用者的进程组。部署先 Hub，再 worker 和技能首次同步，最后客户端。

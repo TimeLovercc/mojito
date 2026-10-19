@@ -13,7 +13,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from mojito_worker import card_watch, claude, health, orca, overview
+from mojito_worker import card_watch, claude, health, orca, overview, research_skills
 from mojito_worker.hub import Hub
 from mojito_worker.i18n import say
 from mojito_worker.local_facts import LocalFactError
@@ -325,6 +325,7 @@ def _sync(hub: Hub, lang: str) -> tuple[int, int, int, list[str]]:
         bad_files.append(say(lang, "研究地图文件有问题：{problems}", problems="；".join(map_problems)))
     else:
         hub.put_research_map(json.loads(_research_map_file().read_text()))
+    hub.put_research_skills(research_skills.snapshot())
     return len(snapshot_worktrees), len(proposed), overviews, bad_files
 
 

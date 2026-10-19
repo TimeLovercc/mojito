@@ -19,7 +19,7 @@ tokens_path, agent_env_path, extra_roles = sys.argv[1], sys.argv[2], sys.argv[3:
 for role in extra_roles:
     if not role.startswith("source:") or role == "source:":
         sys.exit(f"extra role {role!r} must be source:<name>")
-roles = ["app", "worker", "agent", "source:cards", "maintainer", *extra_roles]
+roles = ["app", "worker", "agent", "source:cards", "maintainer", "source:pages", "source:ideas", *extra_roles]
 
 tokens = {}
 if os.path.exists(tokens_path):

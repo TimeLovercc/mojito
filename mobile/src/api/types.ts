@@ -243,17 +243,21 @@ export type ResearchCard = {
 
 // 研究地图（api.md"研究地图"）：方向 → 叶子 → 起点 → 项目；项目也可以直接挂在叶子上，没有叶子的方向（生活）项目直接挂在方向上。
 // principles 是点根节点看到的总原则；起点是项目当初开始做时的想法，principles 列它对应的总原则 id。
-// projects 的 id 是 hub 项目 id；hidden 是故意不上地图的项目；inbox 是还没立项的想法
+// projects 的 id 是 hub 项目 id；hidden 是故意不上地图的项目；inbox 收录想法、论文、作者和博客
 export type ChatLink = { title: string; url: string }
 export type MapPrinciple = { id: string; label: string; text: string }
 export type MapOrigin = { id: string; label: string; text: string; principles: string[] }
+export type InboxKind = 'idea' | 'paper' | 'author' | 'blog'
+export type InboxIdea = { at: string; text: string; source: string; area: string | null; note: string | null }
+export type TypedInboxItem = InboxIdea & { kind: InboxKind }
+export type InboxItem = InboxIdea | TypedInboxItem
 export type ResearchMap = {
   updated_at: string
   principles: MapPrinciple[]
   areas: { id: string; name: string; children: { id: string; name: string; origins: MapOrigin[] }[] }[]
   projects: { id: string; area: string; chats: { claude: ChatLink[]; chatgpt: ChatLink[] } }[]
   hidden: string[]
-  inbox: { at: string; text: string; source: string; area: string | null; note: string | null }[]
+  inbox: InboxItem[]
 }
 
 // worker 从 Orca 只读采集的快照，每个项目只存最新一份
@@ -293,6 +297,24 @@ export type Card = {
   image_attachment_id: string | null
 }
 export type CardsPage = { cards: Card[]; last_read_id: string | null }
+
+// 页面（docs/api.md「页面」）：固定路径、反复修改的自包含 HTML 页；列表和版本列表都不含 html。
+// updated_by 是 "session:<会话名>" 或令牌角色
+export type PageMeta = {
+  path: string
+  title: string
+  summary: string
+  project_id: string | null
+  version: number
+  updated_at: string
+  updated_by: string
+}
+export type PagesList = { pages: PageMeta[] }
+// 版本列表倒序（最新在前）；note 是这次改了什么
+export type PageVersion = PageMeta & { note: string }
+export type PageVersions = { versions: PageVersion[] }
+// 10 分钟有效的签名链接，iframe 或系统浏览器直接打开
+export type PageLink = { url: string }
 
 // 用户反馈（系统页"更多 → 反馈与建议"）；维护会话分诊、修复，需要确认的进"等你拍板"
 export type FeedbackContext = { screen: string | null; item_id: string | null; project_id: string | null; app_update_id: string | null }
@@ -365,3 +387,15 @@ export type Decision =
   | { action: 'done' }
   | { action: 'close' }
   | { action: 'reopen' }
+
+// 研究技能：共享 SKILL.md 与同目录 Markdown 的只读快照（docs/api.md「研究技能」）。
+export type ResearchSkill = {
+  id: string
+  title: string
+  summary: string
+  source_path: string
+  updated_at: string
+  files: { path: string; content: string }[]
+  changes: { revision: string; at: string; summary: string }[]
+}
+export type ResearchSkillsSnapshot = { updated_at: string; skills: ResearchSkill[] }

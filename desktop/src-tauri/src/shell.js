@@ -59,6 +59,7 @@
   // 外部链接：mobile 用 Linking.openURL，在 react-native-web 上就是 window.open(url, '_blank', 'noopener')，
   // WKWebView 会直接丢掉。改交给 Rust 的 open_external，用系统默认浏览器或对应 app 打开（只放行 http / https / orca / claude）。
   // 点到指向外站的 <a> 也一样处理，不让 WebView 自己跳走。主窗口和菜单栏面板都注入这段。
+  // 页面 iframe（跨源、sandbox）里的 target=_blank 和 window.open 不经过这里，由 Rust 的 on_new_window 交给系统浏览器（lib.rs web_window）。
   const openExternal = (url) => {
     const href = new URL(url, location.href).href
     invoke('open_external', { url: href }).catch((reason) => log(`open_external ${href} failed ${reason}`))
