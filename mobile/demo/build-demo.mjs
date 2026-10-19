@@ -108,4 +108,6 @@ for (const page of extra.pages) {
 // GitHub Pages answers unknown paths with 404.html: serve the app there too so deep links load
 copyFileSync(htmlPath, join(out, '404.html'))
 writeFileSync(join(out, '.nojekyll'), '')
+// The research guide (docs/research-guide.html) is a standalone page published next to the demo
+copyFileSync(join(root, '..', 'docs', 'research-guide.html'), join(out, 'research-guide.html'))
 console.log(`${OUT} ready: base ${BASE}, timezone ${TIMEZONE}, mock ${Math.round(bundled.outputFiles[0].text.length / 1024)} KB`)

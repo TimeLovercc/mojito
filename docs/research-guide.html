@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mojito Research Guide</title>
+<meta name="description" content="用 Mojito 研究工作区自动找想法、让 agent 跑实验、写完论文的上手指南。">
+<style>
+:root {
+  --bg: #f3f4f6; --card: #ffffff; --raised: #eceef2; --line: #e0e3e8;
+  --tx: #15171c; --tx2: #4d5462; --tx3: #6b7280;
+  --brand: #2f54eb; --brand-soft: #e6ebff; --ok: #15803d; --warn: #b45309;
+  --code-bg: #f6f7f9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --card: #1a1d24; --raised: #252a33; --line: #2f3541;
+    --tx: #eaedf3; --tx2: #aab1be; --tx3: #8a92a1;
+    --brand: #8ea2ff; --brand-soft: #232b52; --ok: #4ade80; --warn: #fbbf24;
+    --code-bg: #14171d;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --card: #1a1d24; --raised: #252a33; --line: #2f3541;
+  --tx: #eaedf3; --tx2: #aab1be; --tx3: #8a92a1;
+  --brand: #8ea2ff; --brand-soft: #232b52; --ok: #4ade80; --warn: #fbbf24;
+  --code-bg: #14171d;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--tx);
+  font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+main { max-width: 780px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 30px; line-height: 1.3; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 44px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+p, li { color: var(--tx); }
+.lead { color: var(--tx2); font-size: 17px; margin: 0 0 20px; }
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 8px; }
+.links a {
+  display: inline-block; padding: 8px 14px; border-radius: 8px;
+  background: var(--brand-soft); font-weight: 600; font-size: 15px;
+}
+nav.toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 24px 0; }
+nav.toc ol { margin: 0; padding-left: 20px; }
+nav.toc li { margin: 2px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.roles .card { margin: 0; }
+.roles b { display: block; margin-bottom: 4px; }
+.roles span { color: var(--tx2); font-size: 15px; }
+ol.steps > li { margin: 14px 0; }
+code { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--raised); padding: 1px 5px; border-radius: 4px; word-break: break-word; }
+.code { position: relative; margin: 10px 0; }
+.code pre {
+  margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px 14px; overflow-x: auto; font: 13.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.code pre code { background: none; padding: 0; font: inherit; word-break: normal; white-space: pre; }
+.code button {
+  position: absolute; top: 6px; right: 6px; border: 1px solid var(--line); background: var(--card);
+  color: var(--tx2); border-radius: 6px; font-size: 12px; padding: 3px 8px; cursor: pointer;
+}
+.note { border-left: 3px solid var(--brand); background: var(--card); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; color: var(--tx2); }
+.warn { border-left-color: var(--warn); }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; margin: 10px 0; }
+summary { cursor: pointer; font-weight: 600; }
+details ul { padding-left: 20px; }
+footer { margin-top: 48px; color: var(--tx3); font-size: 13px; }
+@media (max-width: 520px) { h1 { font-size: 26px; } h2 { font-size: 20px; } }
+</style>
+</head>
+<body>
+<main>
+<h1>用 Mojito 做研究：上手指南</h1>
+<p class="lead">这页写给第一次用 Mojito 做研究的人：怎么把研究工作区搭起来，怎么让 agent 自动找想法，怎么让它跑实验、把论文写完。</p>
+<div class="links">
+  <a href="https://github.com/TimeLovercc/mojito">公开仓库</a>
+  <a href="./">在线演示（不用装）</a>
+  <a href="https://github.com/TimeLovercc/mojito/blob/main/docs/SETUP.md">完整安装说明</a>
+</div>
+
+<nav class="toc" aria-label="目录">
+<ol>
+  <li><a href="#roles">先弄清谁做什么</a></li>
+  <li><a href="#setup">第一步：搭起来</a></li>
+  <li><a href="#ideas">第二步：让 agent 自动找想法</a></li>
+  <li><a href="#experiments">第三步：让 agent 跑实验</a></li>
+  <li><a href="#papers">第四步：让 agent 写完论文</a></li>
+  <li><a href="#cycle">一键跑完整一轮</a></li>
+  <li><a href="#limits">做不到的和要花的</a></li>
+  <li><a href="#templates">附录：研究正文模板</a></li>
+</ol>
+</nav>
+
+<h2 id="roles">先弄清谁做什么</h2>
+<div class="roles">
+  <div class="card"><b>Mojito app</b><span>手机、电脑浏览器、Mac。看研究地图，往灵感收件箱里放材料，在 Idea Lab 里看每个想法走到哪一步，发起一轮自动研究。</span></div>
+  <div class="card"><b>worker</b><span>跑在你自己的电脑上。你在 app 里发起的研究由它用你登录的 Claude Code 执行，时间和调用轮数有硬上限，结果写回 Idea Lab。</span></div>
+  <div class="card"><b>终端里的 agent 会话</b><span>Claude Code 或 Codex。真正跑实验、写论文的是它们，按四个研究技能做事，每做完一轮就把新问题或新证据同步回 Idea Lab。</span></div>
+  <div class="card"><b>你的文档</b><span>比如 Notion。研究正文放这里；Idea Lab 只存摘要：问题、证据、判断变化、下一步，卡片上的链接指过来。</span></div>
+</div>
+<p>四个研究技能是：<b>Research Ideas</b>（找问题、发展想法）、<b>Research Experiments</b>（设计并跑对照实验）、<b>Research Review</b>（独立核查）、<b>Paper Writing</b>（围绕一个中心主张写论文）。仓库里带了通用示例，你可以照自己的习惯改。</p>
+
+<h2 id="setup">第一步：搭起来（第一次大约半天）</h2>
+<ol class="steps">
+<li><b>拿代码，做成你的私有仓库。</b>不要点 Fork，Fork 出来的仓库是公开的。
+<div class="code"><pre><code>git clone https://github.com/TimeLovercc/mojito.git my-mojito
+cd my-mojito
+git remote rename origin upstream
+git remote add origin &lt;你新建的空私有仓库地址&gt;
+git push -u origin main</code></pre></div></li>
+
+<li><b>按 <a href="https://github.com/TimeLovercc/mojito/blob/main/docs/SETUP.md"><code>docs/SETUP.md</code></a> 部署。</b>hub 和 agent 放在一台常开的机器上（1 GB 内存的小服务器就够），worker 放在你自己的电脑上，再把网页版装到手机主屏。只想做研究的话，日历、Gmail、安卓 app、Mac app 都可以先不配。</li>
+
+<li><b>装四个研究技能。</b>先原样用仓库里的示例，以后按你的习惯改。
+<div class="code"><pre><code>cp -R examples/skills/research-idea-funnel examples/skills/research-experiments \
+      examples/skills/research-review examples/skills/paper-writing ~/.claude/skills/</code></pre></div>
+用 Codex 的话，复制到 Codex 读技能的目录。</li>
+
+<li><b>在 <code>worker/.env</code> 里填三个路径</b>（都写绝对路径，不要用波浪号）。
+<div class="code"><pre><code>MOJITO_SKILLS_DIR=/Users/you/.claude/skills        # 四个技能所在的目录
+MOJITO_RESEARCH_RULES=/Users/you/my-mojito/examples/research-rules.md   # 每轮研究都读的规则，也可以换成你自己的 CLAUDE.md
+MOJITO_RESEARCH_MAP=/Users/you/research/map.json   # 研究地图文件</code></pre></div></li>
+
+<li><b>建研究地图 <code>map.json</code>。</b>最小的一份：
+<div class="code"><pre><code>{"updated_at": "2026-01-01T00:00:00+00:00", "principles": [],
+ "areas": [{"id": "llm", "name": "LLM", "children": []},
+           {"id": "life", "name": "Life", "children": []}],
+ "projects": [], "hidden": [], "inbox": []}</code></pre></div>
+<code>principles</code> 写你做研究的几条总原则，<code>areas</code> 是你的研究方向，格式见 <code>docs/api.md</code> 的「研究地图」一节。worker 一分钟内会读到改动。</li>
+
+<li><b>给终端里的研究会话发同步令牌。</b><code>hub/deploy/gen-tokens.sh</code> 会生成一个只能读写 Idea Lab 的 <code>source:ideas</code> 令牌，再用下面这句写到本机：
+<div class="code"><pre><code>hub/deploy/mac-env.sh source:ideas MOJITO_IDEA_LAB_TOKEN "$MOJITO_SECRETS_DIR/idea-lab.env"</code></pre></div></li>
+
+<li><b>检查。</b>打开 app 的项目页，顶部能看到「灵感收件箱」「Idea Lab」「研究技能」三个入口，研究技能里列着四个技能。</li>
+</ol>
+
+<h2 id="ideas">第二步：让 agent 自动找想法</h2>
+<ol class="steps">
+<li><b>放材料。</b>把读到的论文、关注的作者、博客、自己冒出来的念头写进 <code>map.json</code> 的 <code>inbox</code>：
+<div class="code"><pre><code>{"at": "2026-01-05T09:00:00+00:00", "kind": "paper",
+ "text": "LoRA: 冻结原权重、只训练低秩增量", "source": "https://arxiv.org/abs/2106.09685",
+ "area": "llm", "note": "想知道低秩够不够学新知识"}</code></pre></div>
+<code>kind</code> 可以是 idea、paper、author、blog。同一批加好几条时，每条的 <code>at</code> 错开一秒。</li>
+
+<li><b>在 app 里发起一轮：</b>项目页 → Idea Lab → 新建运行。要填：
+<ul>
+  <li>运行名称（英文）、重要方向与研究偏好、本轮目标；</li>
+  <li>模式选「探索问题」；</li>
+  <li>在「选择种子」里勾这轮要用的材料；</li>
+  <li>时间预算（1–120 分钟）和最大调用轮数（1–100）。</li>
+</ul>
+找想法只需要读网页，「允许 CPU 数据分析」「允许写研究产物」可以先不勾。agent 会读你的研究技能、规则文件、地图上的总原则和收件箱材料，结果写成 Idea Lab 卡片：问题、为什么重要、竞争假设、带出处的证据、下一步。没有新发现时，它会直说没有。</li>
+
+<li><b>让它自己持续找：</b>勾「启用有界持续探索」，二选一：
+<ul>
+  <li><b>按间隔运行</b>：至少 5 分钟一次；</li>
+  <li><b>新材料触发</b>：收件箱一加新条目就跑一轮。</li>
+</ul>
+两种都要写「授权总轮数」（最多 100），跑满就停，也可以随时停用。</li>
+
+<li><b>在终端里一起想：</b>开一个 Claude Code 会话，直接说「用 Research Ideas 技能，围绕 X 方向做一轮 Explore，材料用收件箱里的 Y」。它每轮结束会用 <code>research-idea-funnel/scripts/idea_lab.py</code> 把结果同步进 Idea Lab。</li>
+
+<li><b>挑想法：</b>在 Idea Lab 里看每张卡的证据和判断变化。值得继续的，用「发展想法」模式（或终端里的 Develop）往深里做：读最接近的已有工作，写清主张和对立解释，找下一个能把它们分开的观察。卡片状态会从「正在发展」走到「待验证」「实验中」，有证据才会标「有证据支持」。</li>
+</ol>
+
+<h2 id="experiments">第三步：让 agent 跑实验</h2>
+<ol class="steps">
+<li><b>先立项目。</b>想法要真做时，给它建一个项目仓库，在 hub 里建项目（在 app 的对话里说一句「新建研究项目 X」就行），再在 <code>map.json</code> 的 <code>projects</code> 里给它一个位置。项目会话在仓库里维护一份 <code>overview.json</code>，app 里这个项目的卡片就显示它：核心想法、主实验、贡献、状态、待你决定的事、状态历史。格式见 <code>docs/api.md</code>「研究地图」，每次改完跑一次 <code>mojito-overview-check &lt;overview.json 路径&gt;</code>。</li>
+
+<li><b>小实验交给 Idea Lab：</b>只用 CPU、只用公开数据的分析，可以在 Idea Lab 选「实验验证」模式，勾「允许 CPU 数据分析」和「允许写研究产物」，在「实验范围与限制」里写清边界。它不碰 GPU，产物留在 worker 的暂存区。</li>
+
+<li><b>正式实验交给终端会话：</b>在有 GPU 的机器上、项目仓库里开一个 Claude Code 会话，交代清楚问题、对应的 Idea Lab 想法、能用的资源和花费上限。它按 Research Experiments 技能做：
+<ul>
+  <li>跑之前先写下：假设和对立解释、唯一改变的变量、可比的基线、多大的效果才算数、结果怎么判读；</li>
+  <li>先用一条数据走一遍真实流程，确认新机制真的生效，再正式跑；</li>
+  <li>结果只归四类：支持、否定、没有结论、无效（测量或执行坏了）。无效的不算证据，也不为了凑出正面结果反复重跑；</li>
+  <li>跑完把结论作为实验证据同步回 Idea Lab，更新 <code>overview.json</code>，释放 GPU。</li>
+</ul>
+可以这样交代：
+<div class="code"><pre><code>用 Research Experiments 技能做 Idea Lab 里「&lt;想法标题&gt;」的下一步实验。
+资源：2 张 GPU，最多 12 小时，不调用付费 API。
+先写实验计划和判读规则，跑一条冒烟确认流程通了，再正式跑。
+跑完把结论同步到 Idea Lab，更新 overview.json；需要我拍板的写进 decisions。</code></pre></div></li>
+
+<li><b>长时间无人值守：</b>实验放在 tmux 里跑，会话定时回来查看进度（Claude Code 可以用 <code>/loop</code>）。要你决定的事（加预算、换方向、停项目）它写进卡片的「待你决定」，你在 app 里看到了再回它。</li>
+</ol>
+
+<h2 id="papers">第四步：让 agent 写完论文</h2>
+<ol class="steps">
+<li><b>先复核：</b>一个结论要写进论文之前，用 Research Review 技能，或 Idea Lab 的「独立核查」模式，做一次独立检查：想法评审、主张和证据逐条对账，或者整篇审稿。核查不确定或没通过时，结论不会被标成有证据支持。</li>
+<li><b>再写：</b>论点够具体时，在项目会话里加载 Paper Writing 技能。它围绕一个中心主张，按提纲 → 初稿 → 图表 → 独立复核 → 修改的顺序写，正文放在项目仓库里（比如 LaTeX）。还没跑出来的结果留成显眼的占位，不编数字。Idea Lab 的「论文写作」模式可以先出一份提纲。
+<div class="code"><pre><code>用 Paper Writing 技能，把 Idea Lab 里「&lt;想法标题&gt;」写成一篇短论文。
+中心主张：&lt;一句话&gt;。证据只用已经同步到 Idea Lab 的实验和文献。
+先给我提纲和证据清单，我确认后再写初稿；写完用 Research Review 做一次全文评审。</code></pre></div></li>
+<li><b>投不投、投哪里由你定。</b>agent 不会替你投稿，也不会往外发任何东西。</li>
+</ol>
+
+<h2 id="cycle">一键跑完整一轮</h2>
+<p>Idea Lab 的「完整研究循环」模式把上面几步串成一轮：根据已有证据自己选「探索」还是「发展」，做一次最小的诊断，再做独立核查，最后给出论文提纲。负面结果也算完成了一轮。核查共用这轮的时间和调用轮数。</p>
+
+<h2 id="limits">做不到的和要花的</h2>
+<ul>
+  <li>app 里发起的研究一次只跑一轮。它不跑 GPU、不调付费接口、不往外发消息、不写 Notion，文字在 Idea Lab 里一直标「待同步」，等你搬进自己的文档。</li>
+  <li>每轮用的是你自己的 Claude 订阅额度。</li>
+  <li>研究树不会自动生长：地图上的方向和项目位置由你或项目会话来改。多轮之间也没有长期的 autoresearch 流水线，能自动重复的只有上面说的「有界持续探索」。</li>
+</ul>
+
+<h2 id="templates">附录：研究正文模板</h2>
+<p>在 Notion 或任何文档工具里建一个研究文档库，字段建议：Name（标题）、Type（Idea / Experiment / Review / Paper / Note）、Status（和 Idea Lab 的状态对应）、Idea Lab（卡片链接，卡片的 notion_url 反过来指向这一页）、Project、Sources（arXiv 或 DOI）、Date。</p>
+<details><summary>Idea 模板</summary><ul>
+  <li><b>问题</b>：想知道什么？答案会改变什么？</li>
+  <li><b>为什么重要</b>：谁需要这个答案，得到以后能做什么之前做不了的事。</li>
+  <li><b>来源</b>：触发这个问题的观察，带 arXiv 或 DOI 链接。</li>
+  <li><b>最接近的已有工作</b>：它做了什么，和这里的问题、方法、贡献分别有什么不同。</li>
+  <li><b>竞争假设</b>：每个假设预测会看到什么。</li>
+  <li><b>证据</b>：【观察 / 文献 / 实验 / 复核】主张——出处——日期。</li>
+  <li><b>判断变化</b>：日期：原来的判断 → 现在的判断，因为……（只追加，不删改）</li>
+  <li><b>下一步</b>：最小的、能把几个假设分开的观察或实验。</li>
+</ul></details>
+<details><summary>Experiment 模板</summary><ul>
+  <li><b>要回答的问题</b>：对应哪个想法、哪个假设；什么结果算支持、什么算否定（先写好再跑）。</li>
+  <li><b>设置</b>：数据、模型、代码版本（提交号）、预算。</li>
+  <li><b>对照</b>：只改一个变量；基线用同样的数据、预算和训练量。</li>
+  <li><b>量尺可信吗</b>：指标、评测或裁判有没有捷径能让分数变好而能力没变。</li>
+  <li><b>结果</b>：表格或图，附日志和产物的位置。</li>
+  <li><b>判读</b>：支持 / 否定 / 没有结论 / 无效，一句话说清改了哪个变量、哪个结果动了。</li>
+  <li><b>复现方式</b>：命令、配置、随机种子。</li>
+</ul></details>
+<details><summary>Paper 模板</summary><ul>
+  <li><b>中心主张</b>：一句话，整篇只围绕它。</li>
+  <li><b>证据清单</b>：每个分主张——支撑它的实验或文献——状态（已有 / 待跑 / 待复核）。</li>
+  <li><b>提纲</b>：引言 → 相关工作 → 方法或设置 → 实验与结果 → 局限。</li>
+  <li><b>待补</b>：没跑的结果留成占位；写进论文前要独立复核的主张。</li>
+</ul></details>
+
+<footer>Mojito · <a href="https://github.com/TimeLovercc/mojito">github.com/TimeLovercc/mojito</a></footer>
+</main>
+<script>
+document.querySelectorAll('.code').forEach(function (box) {
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '复制';
+  btn.addEventListener('click', function () {
+    navigator.clipboard.writeText(box.querySelector('code').textContent).then(function () {
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = '复制'; }, 1500);
+    });
+  });
+  box.appendChild(btn);
+});
+</script>
+</body>
+</html>

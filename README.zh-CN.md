@@ -9,7 +9,7 @@
 <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
-<p align="center"><a href="https://zhimeng.page/mojito/">在线试玩</a> · <a href="README.md">English</a> · <a href="docs/SETUP.md">部署指南（英文）</a> · <a href="docs/self-rebuild-loop.md">回路怎么工作（英文）</a> · <a href="SECURITY.md">安全说明（英文）</a></p>
+<p align="center"><a href="https://zhimeng.page/mojito/">在线试玩</a> · <a href="README.md">English</a> · <a href="docs/SETUP.md">部署指南（英文）</a> · <a href="https://zhimeng.page/mojito/research-guide.html">研究工作区上手指南</a> · <a href="docs/self-rebuild-loop.md">回路怎么工作（英文）</a> · <a href="SECURITY.md">安全说明（英文）</a></p>
 
 **Mojito 是一个会进化的 app：它会照你的意思改写自己。** 在对话里说你想要什么，你自己 Mac 上的 Claude Code agent 就会改代码，把更新发到你的手机、Mac 和网页版。装好时，它是一个你自己托管的每日计划 app：今天页、计划、笔记、信息流和对话。
 

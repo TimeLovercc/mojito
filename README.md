@@ -9,7 +9,7 @@
 <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
-<p align="center"><a href="https://zhimeng.page/mojito/">Live demo</a> · <a href="README.zh-CN.md">中文说明</a> · <a href="docs/SETUP.md">Setup</a> · <a href="docs/self-rebuild-loop.md">How the loop works</a> · <a href="SECURITY.md">Security</a></p>
+<p align="center"><a href="https://zhimeng.page/mojito/">Live demo</a> · <a href="README.zh-CN.md">中文说明</a> · <a href="docs/SETUP.md">Setup</a> · <a href="https://zhimeng.page/mojito/research-guide.html">Research guide (中文)</a> · <a href="docs/self-rebuild-loop.md">How the loop works</a> · <a href="SECURITY.md">Security</a></p>
 
 **Mojito is an evolving app — it rewrites itself for you.** Tell it in chat what you want, and a Claude Code agent on your own Mac changes the code and ships the update to your phone, Mac and web app. Out of the box it's a daily planner you host yourself: Today, plans, notes, a feed and a chat.
 
