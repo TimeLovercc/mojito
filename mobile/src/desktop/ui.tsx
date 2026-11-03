@@ -163,7 +163,9 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   sectionTitle: { ...font.medium, fontSize: size.secondary, lineHeight: dt.line.secondary, color: colors.tx2 },
   sectionRight: { ...font.regular, fontSize: size.small, color: colors.tx3 },
-  card: { backgroundColor: colors.card, borderRadius: dt.radius.card, boxShadow: shadow.card, overflow: 'hidden' },
+  // clip 而不是 hidden：hidden 会让卡片成为滚动容器，加上全局 overscroll-behavior: none，
+  // 指针在卡片上时触控板滚动传不到外层页面
+  card: { backgroundColor: colors.card, borderRadius: dt.radius.card, boxShadow: shadow.card, overflow: 'clip' as ViewStyle['overflow'] },
   hair: { height: 1, backgroundColor: overlay.rowLine, marginHorizontal: dt.space.rowH },
   // 对齐方式由所在的行决定（行内居中、列里靠左）
   pill: { height: dt.height.pill, paddingHorizontal: 8, borderRadius: dt.radius.pill, justifyContent: 'center' },
